@@ -1,0 +1,220 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      rabbitmq:
+        image: rabbitmq:3-management
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        options: >-
+          --health-cmd "rabbitmq-diagnostics ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5672:5672
+          - 15672:15672
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Build shared-events
+      run: |
+        cd shared-events
+        mvn clean compile install -DskipTests
+        
+    - name: Test Order Service
+      run: |
+        cd services/order-service
+        mvn clean test
+      env:
+        DATABASE_URL: jdbc:postgresql://localhost:5432/testdb
+        DATABASE_USERNAME: postgres
+        DATABASE_PASSWORD: password
+        RABBITMQ_HOST: localhost
+        RABBITMQ_PORT: 5672
+        RABBITMQ_USERNAME: guest
+        RABBITMQ_PASSWORD: guest
+        
+    - name: Test Payment Service
+      run: |
+        cd services/payment-service
+        mvn clean test
+      env:
+        RABBITMQ_HOST: localhost
+        RABBITMQ_PORT: 5672
+        RABBITMQ_USERNAME: guest
+        RABBITMQ_PASSWORD: guest
+        
+    - name: Test Inventory Service
+      run: |
+        cd services/inventory-service
+        mvn clean test
+      env:
+        RABBITMQ_HOST: localhost
+        RABBITMQ_PORT: 5672
+        RABBITMQ_USERNAME: guest
+        RABBITMQ_PASSWORD: guest
+        
+    - name: Test Order Query Service
+      run: |
+        cd services/order-query-service
+        mvn clean test
+      env:
+        DATABASE_URL: jdbc:postgresql://localhost:5432/testdb
+        DATABASE_USERNAME: postgres
+        DATABASE_PASSWORD: password
+        RABBITMQ_HOST: localhost
+        RABBITMQ_PORT: 5672
+        RABBITMQ_USERNAME: guest
+        RABBITMQ_PASSWORD: guest
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Build shared-events
+      run: |
+        cd shared-events
+        mvn clean compile install -DskipTests
+        
+    - name: Build Order Service
+      run: |
+        cd services/order-service
+        mvn clean package -DskipTests
+        
+    - name: Build Payment Service
+      run: |
+        cd services/payment-service
+        mvn clean package -DskipTests
+        
+    - name: Build Inventory Service
+      run: |
+        cd services/inventory-service
+        mvn clean package -DskipTests
+        
+    - name: Build Order Query Service
+      run: |
+        cd services/order-query-service
+        mvn clean package -DskipTests
+        
+    - name: Upload Order Service Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: order-service-jar
+        path: services/order-service/target/*.jar
+        
+    - name: Upload Payment Service Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: payment-service-jar
+        path: services/payment-service/target/*.jar
+        
+    - name: Upload Inventory Service Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: inventory-service-jar
+        path: services/inventory-service/target/*.jar
+        
+    - name: Upload Order Query Service Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: order-query-service-jar
+        path: services/order-query-service/target/*.jar
+
+  docker-build:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+        
+    - name: Build and push Order Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./services/order-service
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/order-service:latest
+        
+    - name: Build and push Payment Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./services/payment-service
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/payment-service:latest
+        
+    - name: Build and push Inventory Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./services/inventory-service
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/inventory-service:latest
+        
+    - name: Build and push Order Query Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./services/order-query-service
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/order-query-service:latest
