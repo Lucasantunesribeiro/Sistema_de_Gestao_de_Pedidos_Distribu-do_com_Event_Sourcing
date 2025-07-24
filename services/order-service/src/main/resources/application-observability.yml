@@ -1,0 +1,54 @@
+# Observability Configuration
+management:
+  tracing:
+    sampling:
+      probability: 1.0  # 100% sampling for development (reduce in production)
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  metrics:
+    tags:
+      application: order-service
+      version: 1.0.0
+      environment: ${SPRING_PROFILES_ACTIVE:development}
+    export:
+      prometheus:
+        enabled: true
+        step: 10s
+    distribution:
+      percentiles-histogram:
+        "[http.server.requests]": true
+        "[resilience4j.circuitbreaker.calls]": true
+      percentiles:
+        "[http.server.requests]": 0.5, 0.90, 0.95, 0.99
+        "[resilience4j.circuitbreaker.calls]": 0.5, 0.90, 0.95, 0.99
+
+# Logging configuration
+logging:
+  level:
+    com.ordersystem: INFO
+    org.springframework.amqp: DEBUG
+    io.github.resilience4j: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+  appender:
+    console:
+      pattern: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
+
+# Application specific metrics
+app:
+  metrics:
+    enabled: true
+    custom:
+      order-creation-time: true
+      payment-processing-time: true
+      inventory-check-time: true

@@ -35,7 +35,7 @@ public class PaymentService {
             orderEvent.getOrderId(),
             paymentId,
             paymentStatus,
-            orderEvent.getTotalAmount(),
+            orderEvent.getTotalAmount().doubleValue(),
             LocalDateTime.now()
         );
 

@@ -2,6 +2,7 @@ package com.ordersystem.inventory.service;
 
 import com.ordersystem.inventory.model.InventoryItem;
 import com.ordersystem.shared.events.OrderCreatedEvent;
+import com.ordersystem.shared.events.OrderItem;
 import com.ordersystem.shared.events.PaymentProcessedEvent;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +18,7 @@ public class InventoryService {
         
         boolean allItemsReserved = true;
         
-        for (OrderCreatedEvent.OrderItem item : orderEvent.getItems()) {
+        for (OrderItem item : orderEvent.getItems()) {
             InventoryItem inventoryItem = inventory.get(item.getProductId());
             
             if (inventoryItem == null) {
@@ -37,7 +38,7 @@ public class InventoryService {
         
         if (allItemsReserved) {
             // Reserve all items
-            for (OrderCreatedEvent.OrderItem item : orderEvent.getItems()) {
+            for (OrderItem item : orderEvent.getItems()) {
                 InventoryItem inventoryItem = inventory.get(item.getProductId());
                 inventoryItem.reserve(item.getQuantity());
                 System.out.println("Reserved " + item.getQuantity() + " units of " + item.getProductName());

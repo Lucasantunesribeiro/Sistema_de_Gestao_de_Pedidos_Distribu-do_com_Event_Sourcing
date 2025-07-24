@@ -54,7 +54,9 @@ services:
 
   # Order Service
   order-service:
-    build: ./services/order-service
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
     ports:
       - "8081:8081"
     environment:
@@ -79,7 +81,9 @@ services:
 
   # Payment Service
   payment-service:
-    build: ./services/payment-service
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
     ports:
       - "8082:8082"
     environment:
@@ -99,7 +103,9 @@ services:
 
   # Inventory Service
   inventory-service:
-    build: ./services/inventory-service
+    build:
+      context: .
+      dockerfile: services/inventory-service/Dockerfile
     ports:
       - "8083:8083"
     environment:
@@ -119,7 +125,9 @@ services:
 
   # Order Query Service
   order-query-service:
-    build: ./services/order-query-service
+    build:
+      context: .
+      dockerfile: services/order-query-service/Dockerfile
     ports:
       - "8084:8084"
     environment:

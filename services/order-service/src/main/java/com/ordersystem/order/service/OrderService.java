@@ -7,12 +7,14 @@ import com.ordersystem.order.entity.OrderEvent;
 import com.ordersystem.order.model.OrderAggregate;
 import com.ordersystem.order.repository.OrderEventRepository;
 import com.ordersystem.shared.events.OrderCreatedEvent;
+import com.ordersystem.shared.events.OrderItem;
 import com.ordersystem.shared.events.OrderStatusUpdatedEvent;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -35,18 +37,18 @@ public class OrderService {
     public String createOrder(CreateOrderRequest request) {
         String orderId = UUID.randomUUID().toString();
         
-        List<OrderCreatedEvent.OrderItem> items = request.getItems().stream()
-            .map(item -> new OrderCreatedEvent.OrderItem(
+        List<OrderItem> items = request.getItems().stream()
+            .map(item -> new OrderItem(
                 item.getProductId(),
                 item.getProductName(),
                 item.getQuantity(),
-                item.getPrice()
+                BigDecimal.valueOf(item.getPrice())
             ))
             .collect(Collectors.toList());
 
-        double totalAmount = items.stream()
-            .mapToDouble(item -> item.getPrice() * item.getQuantity())
-            .sum();
+        BigDecimal totalAmount = items.stream()
+            .map(OrderItem::getTotalPrice)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         OrderCreatedEvent event = new OrderCreatedEvent(
             orderId,

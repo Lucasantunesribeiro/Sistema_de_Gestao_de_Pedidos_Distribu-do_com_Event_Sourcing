@@ -4,6 +4,7 @@ import com.ordersystem.query.entity.OrderItemReadModel;
 import com.ordersystem.query.entity.OrderReadModel;
 import com.ordersystem.query.repository.OrderReadModelRepository;
 import com.ordersystem.shared.events.OrderCreatedEvent;
+import com.ordersystem.shared.events.OrderItem;
 import com.ordersystem.shared.events.OrderStatusUpdatedEvent;
 import com.ordersystem.shared.events.PaymentProcessedEvent;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,16 +27,16 @@ public class OrderQueryService {
             event.getOrderId(),
             event.getCustomerId(),
             "PENDING",
-            event.getTotalAmount(),
+            event.getTotalAmount().doubleValue(),
             event.getTimestamp()
         );
 
-        for (OrderCreatedEvent.OrderItem item : event.getItems()) {
+        for (OrderItem item : event.getItems()) {
             OrderItemReadModel orderItem = new OrderItemReadModel(
                 item.getProductId(),
                 item.getProductName(),
                 item.getQuantity(),
-                item.getPrice(),
+                item.getUnitPrice().doubleValue(),
                 orderReadModel
             );
             orderReadModel.getItems().add(orderItem);
