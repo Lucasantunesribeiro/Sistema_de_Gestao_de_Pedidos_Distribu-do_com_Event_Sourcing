@@ -1,0 +1,172 @@
+spring:
+  application:
+    name: order-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  
+  # Database Configuration
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/order_db}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      leak-detection-threshold: 60000
+      pool-name: OrderServiceHikariCP
+      register-mbeans: true
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        show_sql: false
+        connection:
+          provider_disables_autocommit: true
+        jdbc:
+          batch_size: 20
+          order_inserts: true
+          order_updates: true
+        cache:
+          use_second_level_cache: false
+
+  # RabbitMQ Configuration
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    connection-timeout: 30000
+    requested-heartbeat: 60
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          multiplier: 2
+        prefetch: 10
+        concurrency: 1
+        max-concurrency: 5
+
+# Server Configuration
+server:
+  port: 8081
+  servlet:
+    context-path: /api/orders
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    connection-timeout: 20000
+    max-connections: 8192
+
+# Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    defaults:
+      enabled: true
+    db:
+      enabled: true
+    rabbit:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    com.ordersystem.order: INFO
+    org.springframework.amqp: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+  file:
+    name: logs/order-service.log
+    max-size: 10MB
+    max-history: 30
+
+# Application Specific Configuration
+app:
+  database:
+    maximum-pool-size: 10
+    minimum-idle: 5
+    connection-timeout: 20s
+    idle-timeout: 5m
+    max-lifetime: 20m
+    leak-detection-threshold: 60s
+  
+  rabbitmq:
+    connection-timeout: 30s
+    requested-heartbeat: 60s
+    channel-cache-size: 25
+    publisher-confirms: true
+    publisher-returns: true
+    max-retry-attempts: 3
+    initial-interval: 1s
+    multiplier: 2.0
+    max-interval: 10s
+  
+  resilience:
+    max-retries: 3
+    initial-delay: 1s
+    max-delay: 30s
+    backoff-multiplier: 2.0
+    failure-threshold: 5
+    circuit-breaker-timeout: 1m
+    database-connection-timeout: 20s
+    rabbitmq-connection-timeout: 30s
+    health-check-interval: 30s
+    health-check-failure-threshold: 3
+
+---
+# Docker Profile
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://order-db:5432/order_db
+
+logging:
+  level:
+    com.ordersystem.order: DEBUG
+
+---
+# Railway Profile
+spring:
+  config:
+    activate:
+      on-profile: railway
+  datasource:
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 8
+  
+logging:
+  level:
+    com.ordersystem.order: INFO
+    org.springframework.web: WARN

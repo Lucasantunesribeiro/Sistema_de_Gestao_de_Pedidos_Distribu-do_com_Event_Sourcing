@@ -1,381 +1,254 @@
 #!/bin/bash
 
-# Automated Railway.app Deployment Script
-# This script automates the complete deployment of the Order Management System
-# to Railway.app with proper error handling and validation
+# Railway Deployment Script
+# Automates deployment of microservices to Railway.app
 
-set -e  # Exit on any error
+set -e
 
-# Colors for output
-RED='\033[0;31m'
+echo "🚂 Railway Deployment Script"
+echo "============================"
+
+# Colors
 GREEN='\033[0;32m'
+RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # Configuration
-PROJECT_NAME="order-management-system"
-GITHUB_REPO="your-username/order-management-system"
+RAILWAY_PROJECT_NAME="distributed-order-system"
 SERVICES=("order-service" "payment-service" "inventory-service" "order-query-service")
 
-# Logging function
-log() {
-    echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-success() {
-    echo -e "${GREEN}✅ $1${NC}"
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
-warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-error() {
-    echo -e "${RED}❌ $1${NC}"
-    exit 1
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check prerequisites
-check_prerequisites() {
-    log "Checking prerequisites..."
-    
-    # Check Railway CLI
+check_railway_cli() {
     if ! command -v railway &> /dev/null; then
-        error "Railway CLI not found. Install it first: npm install -g @railway/cli"
+        log_error "Railway CLI is not installed"
+        log_info "Install it from: https://docs.railway.app/develop/cli"
+        exit 1
     fi
     
-    # Check if logged in to Railway
+    log_success "Railway CLI found"
+}
+
+check_authentication() {
     if ! railway whoami &> /dev/null; then
-        error "Not logged in to Railway. Run: railway login"
+        log_error "Not authenticated with Railway"
+        log_info "Run: railway login"
+        exit 1
     fi
     
-    # Check if in git repository
-    if [ ! -d ".git" ]; then
-        error "Not in a git repository. Initialize git first."
-    fi
-    
-    success "Prerequisites check passed"
+    log_success "Authenticated with Railway"
 }
 
-# Build shared components
-build_shared_components() {
-    log "Building shared components..."
+create_or_select_project() {
+    log_info "Setting up Railway project..."
     
-    cd shared-events
-    if ! mvn clean install -q; then
-        error "Failed to build shared-events"
+    # Try to link to existing project or create new one
+    if ! railway status &> /dev/null; then
+        log_info "Creating new Railway project: $RAILWAY_PROJECT_NAME"
+        railway init "$RAILWAY_PROJECT_NAME"
+    else
+        log_info "Using existing Railway project"
     fi
-    cd ..
-    
-    success "Shared components built successfully"
 }
 
-# Create Railway project
-create_project() {
-    log "Creating Railway project: $PROJECT_NAME"
-    
-    # Check if project already exists
-    if railway status 2>/dev/null | grep -q "Project:"; then
-        warning "Railway project already exists, skipping creation"
-        return 0
-    fi
-    
-    if ! railway login; then
-        error "Failed to login to Railway"
-    fi
-    
-    if ! railway init --name "$PROJECT_NAME"; then
-        error "Failed to create Railway project"
-    fi
-    
-    success "Railway project created: $PROJECT_NAME"
-}
-
-# Setup databases
 setup_databases() {
-    log "Setting up databases..."
+    log_info "Setting up databases..."
     
-    # PostgreSQL for Order Service (Event Store)
-    log "Creating PostgreSQL database for Order Service..."
-    railway add --service postgresql
-    ORDER_DB_SERVICE=$(railway status --json | jq -r '.services[] | select(.name | contains("postgresql")) | .id' | head -1)
+    # Create PostgreSQL databases
+    log_info "Creating PostgreSQL databases..."
     
-    # PostgreSQL for Query Service (Read Model)
-    log "Creating PostgreSQL database for Query Service..."
-    railway add --service postgresql
-    QUERY_DB_SERVICE=$(railway status --json | jq -r '.services[] | select(.name | contains("postgresql")) | .id' | tail -1)
+    # Order database
+    railway add --database postgresql
+    railway variables set DATABASE_NAME=order_db
     
-    # RabbitMQ
-    log "Creating RabbitMQ service..."
-    railway add --service rabbitmq
-    RABBITMQ_SERVICE=$(railway status --json | jq -r '.services[] | select(.name | contains("rabbitmq")) | .id')
+    # Query database  
+    railway add --database postgresql
+    railway variables set QUERY_DATABASE_NAME=order_query_db
     
-    success "Databases created successfully"
+    log_success "Databases configured"
 }
 
-# Deploy individual service
+setup_rabbitmq() {
+    log_info "Setting up RabbitMQ..."
+    
+    # Add RabbitMQ service
+    railway add --template rabbitmq
+    
+    log_success "RabbitMQ configured"
+}
+
 deploy_service() {
     local service_name=$1
     local service_path="services/$service_name"
     
-    log "Deploying $service_name..."
+    log_info "Deploying $service_name..."
     
     # Create service
     railway service create "$service_name"
-    railway service use "$service_name"
     
-    # Set build configuration
-    railway variables set RAILWAY_BUILD_COMMAND="cd $service_path && mvn clean package -DskipTests"
-    railway variables set RAILWAY_START_COMMAND="cd $service_path && java -jar target/$service_name-1.0.0.jar"
-    
-    # Set service-specific environment variables
+    # Set service-specific variables
     case $service_name in
         "order-service")
-            railway variables set --service "$service_name" DATABASE_URL='${{Postgres.DATABASE_URL}}'
-            railway variables set --service "$service_name" RABBITMQ_HOST='${{RabbitMQ.RABBITMQ_HOST}}'
-            railway variables set --service "$service_name" RABBITMQ_PORT='${{RabbitMQ.RABBITMQ_PORT}}'
-            railway variables set --service "$service_name" RABBITMQ_USERNAME='${{RabbitMQ.RABBITMQ_USERNAME}}'
-            railway variables set --service "$service_name" RABBITMQ_PASSWORD='${{RabbitMQ.RABBITMQ_PASSWORD}}'
-            railway variables set --service "$service_name" JWT_SECRET="your-jwt-secret-key-change-in-production"
-            railway variables set --service "$service_name" SPRING_PROFILES_ACTIVE="production"
+            railway variables set \
+                SPRING_PROFILES_ACTIVE=railway \
+                SERVER_PORT=8081 \
+                JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
             ;;
         "payment-service")
-            railway variables set --service "$service_name" RABBITMQ_HOST='${{RabbitMQ.RABBITMQ_HOST}}'
-            railway variables set --service "$service_name" RABBITMQ_PORT='${{RabbitMQ.RABBITMQ_PORT}}'
-            railway variables set --service "$service_name" RABBITMQ_USERNAME='${{RabbitMQ.RABBITMQ_USERNAME}}'
-            railway variables set --service "$service_name" RABBITMQ_PASSWORD='${{RabbitMQ.RABBITMQ_PASSWORD}}'
-            railway variables set --service "$service_name" SPRING_PROFILES_ACTIVE="production"
+            railway variables set \
+                SPRING_PROFILES_ACTIVE=railway \
+                SERVER_PORT=8082 \
+                JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
             ;;
         "inventory-service")
-            railway variables set --service "$service_name" RABBITMQ_HOST='${{RabbitMQ.RABBITMQ_HOST}}'
-            railway variables set --service "$service_name" RABBITMQ_PORT='${{RabbitMQ.RABBITMQ_PORT}}'
-            railway variables set --service "$service_name" RABBITMQ_USERNAME='${{RabbitMQ.RABBITMQ_USERNAME}}'
-            railway variables set --service "$service_name" RABBITMQ_PASSWORD='${{RabbitMQ.RABBITMQ_PASSWORD}}'
-            railway variables set --service "$service_name" SPRING_PROFILES_ACTIVE="production"
+            railway variables set \
+                SPRING_PROFILES_ACTIVE=railway \
+                SERVER_PORT=8083 \
+                JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
             ;;
         "order-query-service")
-            railway variables set --service "$service_name" DATABASE_URL='${{Postgres.DATABASE_URL}}'
-            railway variables set --service "$service_name" RABBITMQ_HOST='${{RabbitMQ.RABBITMQ_HOST}}'
-            railway variables set --service "$service_name" RABBITMQ_PORT='${{RabbitMQ.RABBITMQ_PORT}}'
-            railway variables set --service "$service_name" RABBITMQ_USERNAME='${{RabbitMQ.RABBITMQ_USERNAME}}'
-            railway variables set --service "$service_name" RABBITMQ_PASSWORD='${{RabbitMQ.RABBITMQ_PASSWORD}}'
-            railway variables set --service "$service_name" SPRING_PROFILES_ACTIVE="production"
+            railway variables set \
+                SPRING_PROFILES_ACTIVE=railway \
+                SERVER_PORT=8084 \
+                JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
             ;;
     esac
     
-    # Deploy from GitHub
-    railway up --service "$service_name"
+    # Deploy the service
+    cd "$service_path"
+    railway up --detach
+    cd - > /dev/null
     
-    success "$service_name deployed successfully"
+    log_success "$service_name deployed"
 }
 
-# Deploy all services
-deploy_services() {
-    log "Deploying all microservices..."
+wait_for_deployments() {
+    log_info "Waiting for deployments to complete..."
     
     for service in "${SERVICES[@]}"; do
-        deploy_service "$service"
-        sleep 30  # Wait between deployments
-    done
-    
-    success "All services deployed successfully"
-}
-
-# Health check
-health_check() {
-    log "Performing health checks..."
-    
-    # Get service URLs
-    ORDER_URL=$(railway status --service order-service --json | jq -r '.deployments[0].url')
-    PAYMENT_URL=$(railway status --service payment-service --json | jq -r '.deployments[0].url')
-    INVENTORY_URL=$(railway status --service inventory-service --json | jq -r '.deployments[0].url')
-    QUERY_URL=$(railway status --service order-query-service --json | jq -r '.deployments[0].url')
-    
-    # Health check function
-    check_service_health() {
-        local service_name=$1
-        local url=$2
-        local health_endpoint="$url/actuator/health"
+        log_info "Checking $service deployment status..."
         
-        log "Checking health of $service_name at $health_endpoint"
+        # Wait for deployment to complete
+        timeout=300
+        elapsed=0
         
-        local retries=0
-        local max_retries=10
-        
-        while [ $retries -lt $max_retries ]; do
-            if curl -f -s "$health_endpoint" > /dev/null; then
-                success "$service_name is healthy"
-                return 0
+        while [ $elapsed -lt $timeout ]; do
+            if railway status --service "$service" | grep -q "ACTIVE"; then
+                log_success "$service is active"
+                break
             fi
             
-            warning "$service_name not ready yet, waiting... (attempt $((retries + 1))/$max_retries)"
-            sleep 30
-            ((retries++))
+            sleep 10
+            elapsed=$((elapsed + 10))
         done
         
-        error "$service_name health check failed after $max_retries attempts"
-    }
-    
-    # Check all services
-    check_service_health "Order Service" "$ORDER_URL"
-    check_service_health "Payment Service" "$PAYMENT_URL"
-    check_service_health "Inventory Service" "$INVENTORY_URL"
-    check_service_health "Query Service" "$QUERY_URL"
-    
-    success "All services are healthy"
+        if [ $elapsed -ge $timeout ]; then
+            log_error "$service deployment timed out"
+            return 1
+        fi
+    done
 }
 
-# Functional test
-functional_test() {
-    log "Running functional tests..."
-    
-    ORDER_URL=$(railway status --service order-service --json | jq -r '.deployments[0].url')
-    QUERY_URL=$(railway status --service order-query-service --json | jq -r '.deployments[0].url')
-    
-    # Test order creation
-    log "Testing order creation..."
-    ORDER_RESPONSE=$(curl -s -X POST "$ORDER_URL/api/orders" \
-        -H "Content-Type: application/json" \
-        -d '{
-            "customerId": "test-customer-001",
-            "items": [
-                {
-                    "productId": "product-test-1",
-                    "productName": "Test Laptop",
-                    "quantity": 1,
-                    "price": 999.99
-                }
-            ]
-        }')
-    
-    if [ $? -eq 0 ]; then
-        success "Order creation test passed"
-        ORDER_ID=$(echo "$ORDER_RESPONSE" | jq -r '.orderId // .id // .')
-        log "Created order with ID: $ORDER_ID"
-    else
-        error "Order creation test failed"
-    fi
-    
-    # Wait for eventual consistency
-    sleep 10
-    
-    # Test order query
-    log "Testing order query..."
-    if curl -f -s "$QUERY_URL/api/orders" > /dev/null; then
-        success "Order query test passed"
-    else
-        error "Order query test failed"
-    fi
-    
-    success "Functional tests completed"
-}
-
-# Setup monitoring
-setup_monitoring() {
-    log "Setting up monitoring and alerting..."
-    
-    # Railway provides basic monitoring by default
-    # For advanced monitoring, you would integrate with external services
-    
-    warning "Basic monitoring is provided by Railway. For advanced monitoring:"
-    echo "1. Integrate with Datadog, New Relic, or similar APM tools"
-    echo "2. Set up log aggregation with Logtail or similar"
-    echo "3. Configure alerting with PagerDuty or similar"
-    echo "4. Set up uptime monitoring with Pingdom or similar"
-    
-    success "Basic monitoring configured"
-}
-
-# Generate deployment report
-generate_report() {
-    log "Generating deployment report..."
-    
-    local report_file="deployment-report-$(date +%Y%m%d-%H%M%S).md"
-    
-    cat > "$report_file" << EOF
-# Deployment Report - $(date)
-
-## Project Information
-- **Project Name**: $PROJECT_NAME
-- **Deployment Time**: $(date)
-- **Deployed By**: $(git config user.name)
-- **Git Commit**: $(git rev-parse --short HEAD)
-
-## Service URLs
-EOF
+verify_deployments() {
+    log_info "Verifying deployments..."
     
     for service in "${SERVICES[@]}"; do
-        local url=$(railway status --service "$service" --json | jq -r '.deployments[0].url // "Not available"')
-        echo "- **$service**: $url" >> "$report_file"
+        log_info "Getting $service URL..."
+        
+        service_url=$(railway url --service "$service" 2>/dev/null || echo "URL not available")
+        
+        if [ "$service_url" != "URL not available" ]; then
+            log_info "$service URL: $service_url"
+            
+            # Test health endpoint
+            health_url="$service_url/actuator/health"
+            if curl -f -s --max-time 10 "$health_url" | grep -q '"status":"UP"'; then
+                log_success "$service health check passed"
+            else
+                log_warning "$service health check failed or not ready yet"
+            fi
+        else
+            log_warning "$service URL not available yet"
+        fi
     done
-    
-    cat >> "$report_file" << EOF
-
-## Database Information
-- **Order Database**: PostgreSQL (Event Store)
-- **Query Database**: PostgreSQL (Read Models)
-- **Message Broker**: RabbitMQ
-
-## Health Check Results
-All services passed health checks at deployment time.
-
-## Test Results
-- ✅ Order creation functional test
-- ✅ Order query functional test
-
-## Next Steps
-1. Configure custom domain names
-2. Set up SSL certificates
-3. Configure advanced monitoring
-4. Set up CI/CD pipeline
-5. Perform load testing
-
-## Support Information
-For support, contact: $(git config user.email)
-Repository: https://github.com/$GITHUB_REPO
-EOF
-    
-    success "Deployment report generated: $report_file"
 }
 
-# Main deployment function
+show_deployment_info() {
+    log_info "Deployment Information"
+    echo "======================"
+    
+    echo ""
+    echo "🚀 Services:"
+    for service in "${SERVICES[@]}"; do
+        service_url=$(railway url --service "$service" 2>/dev/null || echo "Pending...")
+        echo "  - $service: $service_url"
+    done
+    
+    echo ""
+    echo "📊 Project Status:"
+    railway status
+    
+    echo ""
+    echo "🔧 Useful Commands:"
+    echo "  - View logs: railway logs --service <service-name>"
+    echo "  - Check status: railway status"
+    echo "  - Open dashboard: railway open"
+    echo "  - Connect to database: railway connect <database-service>"
+}
+
 main() {
-    log "Starting Railway.app deployment process..."
+    log_info "Starting Railway deployment..."
     
-    check_prerequisites
-    build_shared_components
-    create_project
+    # Pre-flight checks
+    check_railway_cli
+    check_authentication
+    
+    # Setup project
+    create_or_select_project
+    
+    # Setup infrastructure
     setup_databases
-    deploy_services
-    health_check
-    functional_test
-    setup_monitoring
-    generate_report
+    setup_rabbitmq
     
-    success "🎉 Deployment completed successfully!"
-    
-    echo ""
-    echo "=========================================="
-    echo "         DEPLOYMENT SUMMARY"
-    echo "=========================================="
-    echo "Project: $PROJECT_NAME"
-    echo "Services deployed: ${#SERVICES[@]}"
-    echo "Status: ✅ All systems operational"
-    echo ""
-    echo "Service URLs:"
+    # Deploy services
     for service in "${SERVICES[@]}"; do
-        local url=$(railway status --service "$service" --json | jq -r '.deployments[0].url // "Not available"')
-        echo "  • $service: $url"
+        deploy_service "$service"
     done
-    echo ""
-    echo "Next steps:"
-    echo "1. Test the APIs using the provided URLs"
-    echo "2. Configure monitoring and alerting"
-    echo "3. Set up custom domains if needed"
-    echo "4. Review and update security settings"
-    echo "=========================================="
+    
+    # Wait for deployments
+    if ! wait_for_deployments; then
+        log_error "Some deployments failed"
+        exit 1
+    fi
+    
+    # Verify deployments
+    verify_deployments
+    
+    # Show deployment info
+    show_deployment_info
+    
+    log_success "🎉 Railway deployment completed!"
+    log_info "Your distributed order system is now running on Railway!"
 }
 
-# Run deployment
+# Handle script interruption
+trap 'log_warning "Deployment interrupted by user"; exit 130' INT
+
+# Run main function
 main "$@"

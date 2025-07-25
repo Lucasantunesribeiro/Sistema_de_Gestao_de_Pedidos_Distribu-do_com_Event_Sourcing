@@ -1,0 +1,129 @@
+spring:
+  application:
+    name: payment-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  # RabbitMQ Configuration
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    connection-timeout: 30000
+    requested-heartbeat: 60
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          multiplier: 2
+        prefetch: 5
+        concurrency: 1
+        max-concurrency: 3
+
+# Server Configuration
+server:
+  port: 8082
+  servlet:
+    context-path: /api/payments
+  tomcat:
+    threads:
+      max: 100
+      min-spare: 10
+    connection-timeout: 20000
+    max-connections: 4096
+
+# Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    defaults:
+      enabled: true
+    rabbit:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    com.ordersystem.payment: INFO
+    org.springframework.amqp: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+  file:
+    name: logs/payment-service.log
+    max-size: 10MB
+    max-history: 30
+
+# Application Specific Configuration
+app:
+  rabbitmq:
+    connection-timeout: 30s
+    requested-heartbeat: 60s
+    channel-cache-size: 25
+    publisher-confirms: true
+    publisher-returns: true
+    max-retry-attempts: 3
+    initial-interval: 1s
+    multiplier: 2.0
+    max-interval: 10s
+  
+  resilience:
+    max-retries: 3
+    initial-delay: 1s
+    max-delay: 30s
+    backoff-multiplier: 2.0
+    failure-threshold: 5
+    circuit-breaker-timeout: 1m
+    rabbitmq-connection-timeout: 30s
+    health-check-interval: 30s
+    health-check-failure-threshold: 3
+
+# Payment Service Specific Configuration
+payment:
+  processing:
+    timeout: 30s
+    retry-attempts: 2
+    simulation:
+      enabled: true
+      success-rate: 0.9
+      processing-delay: 1s
+
+---
+# Docker Profile
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+logging:
+  level:
+    com.ordersystem.payment: DEBUG
+
+---
+# Railway Profile
+spring:
+  config:
+    activate:
+      on-profile: railway
+
+logging:
+  level:
+    com.ordersystem.payment: INFO
+    org.springframework.web: WARN

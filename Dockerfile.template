@@ -1,5 +1,6 @@
-# Enhanced Multi-stage Dockerfile for Order Service
-# Optimized build process with proper layer caching and runtime optimization
+# Enhanced Multi-stage Dockerfile Template for Microservices
+# This template provides optimized build process with proper layer caching
+# and runtime optimization for Java 17 Spring Boot applications
 
 # ============================================================================
 # BUILD STAGE - Maven build with shared-events optimization
@@ -17,14 +18,14 @@ COPY shared-events/ ./shared-events/
 RUN cd shared-events && mvn clean install -DskipTests
 
 # Copy service-specific pom.xml for dependency caching
-COPY services/order-service/pom.xml ./services/order-service/
-RUN cd services/order-service && mvn dependency:go-offline -B
+COPY services/SERVICE_NAME/pom.xml ./services/SERVICE_NAME/
+RUN cd services/SERVICE_NAME && mvn dependency:go-offline -B
 
 # Copy service source code
-COPY services/order-service/src ./services/order-service/src
+COPY services/SERVICE_NAME/src ./services/SERVICE_NAME/src
 
 # Build the service
-RUN cd services/order-service && mvn clean package -DskipTests -B
+RUN cd services/SERVICE_NAME && mvn clean package -DskipTests -B
 
 # ============================================================================
 # RUNTIME STAGE - Optimized JRE with health check support
@@ -44,14 +45,14 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 
 # Copy the built JAR from builder stage
-COPY --from=builder /app/services/order-service/target/*.jar app.jar
+COPY --from=builder /app/services/SERVICE_NAME/target/*.jar app.jar
 
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
 USER appuser
 
 # Expose service port
-EXPOSE 8081
+EXPOSE SERVICE_PORT
 
 # Configure JVM for containerized environment
 ENV JAVA_OPTS="-XX:+UseContainerSupport \
@@ -63,7 +64,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
 
 # Health check configuration
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8081/api/orders/health || exit 1
+    CMD curl -f http://localhost:SERVICE_PORT/api/SERVICE_PATH/health || exit 1
 
 # Start the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
