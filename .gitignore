@@ -107,3 +107,26 @@ temp/
 
 # Claude
 .claude/
+
+# Development scripts
+*.ps1
+dev-*.sh
+test-*.sh
+setup-*.sh
+quick-*.sh
+monitor-*.sh
+scripts/
+
+# Frontend build artifacts
+frontend/dist/
+frontend/node_modules/
+
+# Application data
+data/
+shared-events-output/
+
+# Backup files
+*.bak
+
+# Service minimal directories
+services/*-minimal/
