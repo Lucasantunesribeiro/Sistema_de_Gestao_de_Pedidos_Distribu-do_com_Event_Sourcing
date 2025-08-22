@@ -1,0 +1,137 @@
+# Railway Production Profile Configuration
+# Payment Service - Financial Transaction Processing
+
+spring:
+  application:
+    name: payment-service
+  
+  # RabbitMQ Configuration for Event Processing
+  rabbitmq:
+    url: ${RABBITMQ_URL}
+    connection-timeout: 30000
+    requested-heartbeat: 60
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 2000
+          max-attempts: 5
+          multiplier: 2
+        prefetch: 10
+        concurrency: 2
+        max-concurrency: 8
+        transaction-size: 1  # Important for financial transactions
+
+# Server Configuration
+server:
+  port: ${PORT:8082}
+  servlet:
+    context-path: /api/payments
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 15
+    connection-timeout: 20000
+    max-connections: 8000
+
+# Production Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    defaults:
+      enabled: true
+    rabbit:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      service: payment-service
+      environment: railway
+      version: ${APP_VERSION:1.0.0}
+
+# Production Logging - Enhanced for financial transactions
+logging:
+  level:
+    com.ordersystem.payment: INFO
+    org.springframework.amqp: WARN
+    # Enhanced logging for financial operations
+    com.ordersystem.payment.service.PaymentService: INFO
+    com.ordersystem.payment.service.PaymentGatewayService: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] [%logger{36}] - %msg%n"
+
+# Application Specific Configuration
+app:
+  payment:
+    # Gateway Configuration
+    gateway:
+      timeout: 30s
+      retry-attempts: 3
+      retry-delay: 2s
+      circuit-breaker:
+        enabled: true
+        failure-threshold: 5
+        recovery-timeout: 60s
+    
+    # Transaction Configuration
+    transaction:
+      timeout: 45s
+      max-amount: 50000.00
+      min-amount: 0.01
+      currency: BRL
+      
+    # Security Configuration
+    security:
+      encryption-enabled: true
+      audit-enabled: true
+      pci-compliance: true
+  
+  # Resilience Configuration
+  resilience:
+    circuit-breaker:
+      enabled: true
+      failure-rate-threshold: 50
+      wait-duration-in-open-state: 60s
+      sliding-window-size: 10
+      minimum-number-of-calls: 5
+    retry:
+      max-attempts: 3
+      wait-duration: 2s
+      exponential-backoff-multiplier: 2
+    timeout:
+      duration: 30s
+  
+  # RabbitMQ Configuration
+  rabbitmq:
+    connection-timeout: 30s
+    requested-heartbeat: 60s
+    channel-cache-size: 15
+    publisher-confirms: true
+    publisher-returns: true
+    max-retry-attempts: 5
+    initial-interval: 2s
+    multiplier: 2.0
+    max-interval: 20s
+
+# Security Configuration for Financial Data
+security:
+  cors:
+    allowed-origins: ${CORS_ORIGINS:https://*.railway.app}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: "*"
+    allow-credentials: true
+    max-age: 3600

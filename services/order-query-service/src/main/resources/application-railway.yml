@@ -1,0 +1,181 @@
+# Railway Production Profile Configuration
+# Order Query Service - CQRS Read Models
+
+spring:
+  application:
+    name: order-query-service
+  
+  # Production Database Configuration (Read Models)
+  datasource:
+    url: ${DATABASE_URL}
+    hikari:
+      # Railway optimized connection pool for read-heavy workload
+      maximum-pool-size: 35
+      minimum-idle: 20
+      connection-timeout: 8000
+      validation-timeout: 3000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      leak-detection-threshold: 60000
+      pool-name: QueryServiceRailwayCP
+      register-mbeans: true
+      auto-commit: true  # Read-only optimized
+      connection-test-query: SELECT 1
+      read-only: true    # Optimize for read operations
+
+  # JPA Configuration for Read Models
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        show_sql: false
+        connection:
+          provider_disables_autocommit: true
+        jdbc:
+          batch_size: 30
+          fetch_size: 100
+        cache:
+          use_second_level_cache: true
+          region:
+            factory_class: org.hibernate.cache.caffeine.CaffeineCacheRegionFactory
+
+  # Redis Cache Configuration
+  data:
+    redis:
+      url: ${REDIS_URL}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 3000ms
+
+  # RabbitMQ Configuration for Event Processing
+  rabbitmq:
+    url: ${RABBITMQ_URL}
+    connection-timeout: 30000
+    requested-heartbeat: 60
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 5
+          multiplier: 2
+        prefetch: 20
+        concurrency: 3
+        max-concurrency: 15
+
+# Server Configuration
+server:
+  port: ${PORT:8084}
+  servlet:
+    context-path: /api/query
+  tomcat:
+    threads:
+      max: 300  # Higher for read operations
+      min-spare: 25
+    connection-timeout: 20000
+    max-connections: 12000
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 512
+
+# Production Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,caches
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+      probes:
+        enabled: true
+    caches:
+      enabled: true
+  health:
+    defaults:
+      enabled: true
+    db:
+      enabled: true
+    rabbit:
+      enabled: true
+    redis:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      service: order-query-service
+      environment: railway
+      version: ${APP_VERSION:1.0.0}
+
+# Production Logging
+logging:
+  level:
+    com.ordersystem.query: INFO
+    org.springframework.cache: WARN
+    org.springframework.data.redis: WARN
+    org.springframework.amqp: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] [%logger{36}] - %msg%n"
+
+# Cache Configuration
+spring.cache:
+  type: redis
+  redis:
+    time-to-live: 300000  # 5 minutes
+    cache-null-values: false
+    key-prefix: "order-query:"
+    use-key-prefix: true
+
+# Application Specific Configuration
+app:
+  database:
+    maximum-pool-size: 35
+    minimum-idle: 20
+    connection-timeout: 8s
+    idle-timeout: 5m
+    max-lifetime: 20m
+    read-only: true
+  
+  cache:
+    default-ttl: 300
+    orders-ttl: 180
+    metrics-ttl: 60
+    enable-compression: true
+    max-entries: 10000
+  
+  resilience:
+    circuit-breaker:
+      enabled: true
+      failure-rate-threshold: 60
+      wait-duration-in-open-state: 30s
+      sliding-window-size: 20
+      minimum-number-of-calls: 10
+    retry:
+      max-attempts: 3
+      wait-duration: 1s
+      exponential-backoff-multiplier: 2
+    bulkhead:
+      max-concurrent-calls: 50
+      max-wait-duration: 10s
+
+# Performance Configuration
+performance:
+  query:
+    batch-size: 50
+    max-results: 1000
+    timeout: 30s
+  projection:
+    batch-update-size: 100
+    update-interval: 5s

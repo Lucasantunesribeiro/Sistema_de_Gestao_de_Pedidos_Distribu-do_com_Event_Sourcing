@@ -30,12 +30,12 @@ public class ApplicationHealthIndicator implements HealthIndicator {
     public Health health() {
         try {
             Map<String, Object> details = new HashMap<>();
-            
+
             // Service information
             details.put("service", "Inventory Service");
             details.put("version", "1.0.0");
             details.put("timestamp", Instant.now());
-            
+
             // Startup information
             if (startupHealthCheck.isReady()) {
                 details.put("startup", "READY");
@@ -47,15 +47,15 @@ public class ApplicationHealthIndicator implements HealthIndicator {
             } else {
                 details.put("startup", "NOT_READY");
             }
-            
+
             // Check RabbitMQ
             Health rabbitHealth = rabbitMQHealthIndicator.health();
             details.put("rabbitmq", rabbitHealth.getStatus().getCode());
-            
+
             // Determine overall health
-            boolean isHealthy = startupHealthCheck.isReady() && 
-                               rabbitHealth.getStatus().getCode().equals("UP");
-            
+            boolean isHealthy = startupHealthCheck.isReady() &&
+                    rabbitHealth.getStatus().getCode().equals("UP");
+
             if (isHealthy) {
                 details.put("status", "HEALTHY");
                 details.put("message", "Inventory Service is fully operational");
@@ -64,12 +64,12 @@ public class ApplicationHealthIndicator implements HealthIndicator {
             } else {
                 details.put("status", "UNHEALTHY");
                 details.put("message", "One or more dependencies are not available");
-                logger.warn("Inventory Service health check: UNHEALTHY - RabbitMQ: {}, Startup: {}", 
-                    rabbitHealth.getStatus().getCode(),
-                    startupHealthCheck.isReady() ? "READY" : "NOT_READY");
+                logger.warn("Inventory Service health check: UNHEALTHY - RabbitMQ: {}, Startup: {}",
+                        rabbitHealth.getStatus().getCode(),
+                        startupHealthCheck.isReady() ? "READY" : "NOT_READY");
                 return Health.down().withDetails(details).build();
             }
-            
+
         } catch (Exception e) {
             logger.error("Inventory Service application health check failed", e);
             return Health.down()
@@ -84,7 +84,7 @@ public class ApplicationHealthIndicator implements HealthIndicator {
         long hours = duration.toHours();
         long minutes = duration.toMinutesPart();
         long seconds = duration.toSecondsPart();
-        
+
         if (hours > 0) {
             return String.format("%dh %dm %ds", hours, minutes, seconds);
         } else if (minutes > 0) {

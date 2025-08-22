@@ -1,0 +1,191 @@
+package com.ordersystem.query.config;
+
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.context.junit.jupiter.SpringJUnitExtension;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.util.function.Predicate;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Tests for custom failure predicates
+ * Validates that business errors don't open circuit breakers
+ * while infrastructure errors do
+ */
+@ExtendWith(SpringJUnitExtension.class)
+@SpringBootTest(classes = {CircuitBreakerOptimizedConfig.class})
+class CircuitBreakerFailurePredicateTest {
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    private CircuitBreaker paymentCircuitBreaker;
+    private CircuitBreaker inventoryCircuitBreaker;
+    private CircuitBreaker databaseCircuitBreaker;
+
+    @BeforeEach
+    void setUp() {
+        paymentCircuitBreaker = circuitBreakerRegistry.circuitBreaker("payment-service");
+        inventoryCircuitBreaker = circuitBreakerRegistry.circuitBreaker("inventory-service");
+        databaseCircuitBreaker = circuitBreakerRegistry.circuitBreaker("database");
+    }
+
+    @Test
+    void paymentServiceShouldNotFailOnBusinessErrors() {
+        // Given
+        Predicate<Throwable> predicate = paymentCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        var businessError = new CircuitBreakerOptimizedConfig.PaymentDeclinedException("Card declined");
+        
+        // When
+        boolean shouldFail = predicate.test(businessError);
+        
+        // Then
+        assertThat(shouldFail).isFalse();
+    }
+
+    @Test
+    void paymentServiceShouldFailOnInfrastructureErrors() {
+        // Given
+        Predicate<Throwable> predicate = paymentCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        
+        // When & Then
+        assertThat(predicate.test(new ConnectException("Connection refused"))).isTrue();
+        assertThat(predicate.test(new SocketTimeoutException("Read timeout"))).isTrue();
+    }
+
+    @Test
+    void paymentServiceShouldFailOnServerErrors() {
+        // Given
+        Predicate<Throwable> predicate = paymentCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        var serverError = new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR);
+        
+        // When
+        boolean shouldFail = predicate.test(serverError);
+        
+        // Then
+        assertThat(shouldFail).isTrue();
+    }
+
+    @Test
+    void paymentServiceShouldFailOnRateLimit() {
+        // Given
+        Predicate<Throwable> predicate = paymentCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        var rateLimitError = new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS);
+        
+        // When
+        boolean shouldFail = predicate.test(rateLimitError);
+        
+        // Then
+        assertThat(shouldFail).isTrue();
+    }
+
+    @Test
+    void paymentServiceShouldNotFailOnClientErrors() {
+        // Given
+        Predicate<Throwable> predicate = paymentCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        var clientError = new HttpClientErrorException(HttpStatus.BAD_REQUEST);
+        
+        // When
+        boolean shouldFail = predicate.test(clientError);
+        
+        // Then
+        assertThat(shouldFail).isFalse();
+    }
+
+    @Test
+    void inventoryServiceShouldNotFailOnBusinessErrors() {
+        // Given
+        Predicate<Throwable> predicate = inventoryCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        var businessError = new CircuitBreakerOptimizedConfig.StockNotFoundException("Product not found");
+        
+        // When
+        boolean shouldFail = predicate.test(businessError);
+        
+        // Then
+        assertThat(shouldFail).isFalse();
+    }
+
+    @Test
+    void inventoryServiceShouldFailOnInfrastructureErrors() {
+        // Given
+        Predicate<Throwable> predicate = inventoryCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        
+        // When & Then
+        assertThat(predicate.test(new ConnectException("Connection refused"))).isTrue();
+        assertThat(predicate.test(new SocketTimeoutException("Read timeout"))).isTrue();
+        assertThat(predicate.test(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR))).isTrue();
+    }
+
+    @Test
+    void inventoryServiceShouldFailOnConnectionIssues() {
+        // Given
+        Predicate<Throwable> predicate = inventoryCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        var connectionError = new RuntimeException("Database connection failed");
+        
+        // When
+        boolean shouldFail = predicate.test(connectionError);
+        
+        // Then
+        assertThat(shouldFail).isTrue();
+    }
+
+    @Test
+    void databaseShouldNotFailOnSqlSyntaxErrors() {
+        // Given
+        Predicate<Throwable> predicate = databaseCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        var syntaxError = new RuntimeException("SQL syntax error near 'SELECT'");
+        
+        // When
+        boolean shouldFail = predicate.test(syntaxError);
+        
+        // Then
+        assertThat(shouldFail).isFalse();
+    }
+
+    @Test
+    void databaseShouldFailOnConnectionErrors() {
+        // Given
+        Predicate<Throwable> predicate = databaseCircuitBreaker.getCircuitBreakerConfig().getRecordFailurePredicate();
+        
+        // When & Then
+        assertThat(predicate.test(new ConnectException("Connection refused"))).isTrue();
+        assertThat(predicate.test(new SocketTimeoutException("Read timeout"))).isTrue();
+        assertThat(predicate.test(new RuntimeException("Connection timeout"))).isTrue();
+        assertThat(predicate.test(new RuntimeException("Database connection lost"))).isTrue();
+    }
+
+    @Test
+    void allCircuitBreakersShouldStartInClosedState() {
+        // When & Then
+        assertThat(paymentCircuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        assertThat(inventoryCircuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        assertThat(databaseCircuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+    }
+
+    @Test
+    void circuitBreakersShouldHaveCorrectMetrics() {
+        // When
+        var paymentMetrics = paymentCircuitBreaker.getMetrics();
+        var inventoryMetrics = inventoryCircuitBreaker.getMetrics();
+        var databaseMetrics = databaseCircuitBreaker.getMetrics();
+        
+        // Then
+        assertThat(paymentMetrics.getNumberOfSuccessfulCalls()).isEqualTo(0);
+        assertThat(paymentMetrics.getNumberOfFailedCalls()).isEqualTo(0);
+        assertThat(inventoryMetrics.getNumberOfSuccessfulCalls()).isEqualTo(0);
+        assertThat(inventoryMetrics.getNumberOfFailedCalls()).isEqualTo(0);
+        assertThat(databaseMetrics.getNumberOfSuccessfulCalls()).isEqualTo(0);
+        assertThat(databaseMetrics.getNumberOfFailedCalls()).isEqualTo(0);
+    }
+}

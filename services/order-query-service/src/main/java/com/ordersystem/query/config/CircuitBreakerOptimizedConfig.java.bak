@@ -1,0 +1,215 @@
+package com.ordersystem.query.config;
+
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.time.Duration;
+import java.util.function.Predicate;
+
+/**
+ * Optimized Circuit Breaker configuration for 99.9% service availability
+ * Per-service tuning based on SLA requirements and failure patterns
+ */
+@Configuration
+public class CircuitBreakerOptimizedConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(CircuitBreakerOptimizedConfig.class);
+
+    @Bean
+    public CircuitBreakerRegistry circuitBreakerRegistry() {
+        CircuitBreakerRegistry registry = CircuitBreakerRegistry.ofDefaults();
+        
+        // Configure payment service circuit breaker
+        registry.circuitBreaker("payment-service", createPaymentServiceConfig());
+        
+        // Configure inventory service circuit breaker  
+        registry.circuitBreaker("inventory-service", createInventoryServiceConfig());
+        
+        // Configure database circuit breaker
+        registry.circuitBreaker("database", createDatabaseConfig());
+        
+        // Add event listeners for monitoring
+        registry.getAllCircuitBreakers().forEach(this::addEventListener);
+        
+        return registry;
+    }
+
+    private CircuitBreakerConfig createPaymentServiceConfig() {
+        return CircuitBreakerConfig.custom()
+            .slidingWindowSize(20)
+            .failureRateThreshold(30.0f)                    // 30% de falhas abre circuit
+            .waitDurationInOpenState(Duration.ofSeconds(10)) // Aguarda 10s antes de tentar half-open
+            .permittedNumberOfCallsInHalfOpenState(5)
+            .minimumNumberOfCalls(10)                       // Mínimo para calcular rate
+            .slowCallDurationThreshold(Duration.ofSeconds(3)) // Calls > 3s são consideradas slow
+            .slowCallRateThreshold(50.0f)                   // 50% slow calls abre circuit
+            .recordFailure(paymentServiceFailurePredicate())
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+    }
+
+    private CircuitBreakerConfig createInventoryServiceConfig() {
+        return CircuitBreakerConfig.custom()
+            .slidingWindowSize(15)
+            .failureRateThreshold(40.0f)                    // Inventory pode ter mais tolerância
+            .waitDurationInOpenState(Duration.ofSeconds(5))  // Recovery mais rápido
+            .permittedNumberOfCallsInHalfOpenState(3)
+            .minimumNumberOfCalls(8)
+            .slowCallDurationThreshold(Duration.ofSeconds(1)) // Inventory deve ser mais rápido
+            .slowCallRateThreshold(60.0f)
+            .recordFailure(inventoryServiceFailurePredicate())
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+    }
+
+    private CircuitBreakerConfig createDatabaseConfig() {
+        return CircuitBreakerConfig.custom()
+            .slidingWindowSize(30)
+            .failureRateThreshold(20.0f)                    // Database menos tolerante
+            .waitDurationInOpenState(Duration.ofSeconds(30)) // Recovery mais conservador
+            .permittedNumberOfCallsInHalfOpenState(10)
+            .minimumNumberOfCalls(15)
+            .slowCallDurationThreshold(Duration.ofSeconds(2))
+            .slowCallRateThreshold(40.0f)
+            .recordFailure(databaseFailurePredicate())
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+    }
+
+    /**
+     * Custom failure predicate for payment service
+     * Não abre circuit para business logic errors
+     */
+    private Predicate<Throwable> paymentServiceFailurePredicate() {
+        return throwable -> {
+            // Não abrir circuit para business logic errors
+            if (throwable instanceof PaymentDeclinedException) {
+                log.debug("Payment declined - not a circuit breaker failure: {}", throwable.getMessage());
+                return false; // Valid business case
+            }
+            
+            // Abrir circuit para infrastructure errors
+            if (throwable instanceof ConnectException ||
+                throwable instanceof SocketTimeoutException ||
+                throwable instanceof java.net.HttpRetryException) {
+                log.warn("Infrastructure failure detected for payment service: {}", throwable.getMessage());
+                return true;
+            }
+            
+            // HTTP errors específicos
+            if (throwable instanceof HttpClientErrorException) {
+                HttpClientErrorException httpError = (HttpClientErrorException) throwable;
+                // 4xx não devem abrir circuit (except 429 rate limit)
+                boolean shouldFail = httpError.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS;
+                if (shouldFail) {
+                    log.warn("Rate limit detected for payment service: {}", httpError.getStatusCode());
+                }
+                return shouldFail;
+            }
+            
+            if (throwable instanceof HttpServerErrorException) {
+                // 5xx sempre abrem circuit
+                log.error("Server error detected for payment service: {}", throwable.getMessage());
+                return true;
+            }
+            
+            return false;
+        };
+    }
+
+    /**
+     * Custom failure predicate for inventory service
+     */
+    private Predicate<Throwable> inventoryServiceFailurePredicate() {
+        return throwable -> {
+            // Stock not found não deve abrir circuit
+            if (throwable instanceof StockNotFoundException) {
+                return false;
+            }
+            
+            // Infrastructure failures devem abrir circuit
+            if (throwable instanceof ConnectException ||
+                throwable instanceof SocketTimeoutException) {
+                log.warn("Infrastructure failure detected for inventory service: {}", throwable.getMessage());
+                return true;
+            }
+            
+            // Database connection issues
+            if (throwable.getMessage() != null && 
+                throwable.getMessage().contains("connection")) {
+                log.error("Database connection issue for inventory service: {}", throwable.getMessage());
+                return true;
+            }
+            
+            return throwable instanceof HttpServerErrorException;
+        };
+    }
+
+    /**
+     * Custom failure predicate for database
+     */
+    private Predicate<Throwable> databaseFailurePredicate() {
+        return throwable -> {
+            // SQL Syntax errors não devem abrir circuit
+            if (throwable.getMessage() != null && 
+                throwable.getMessage().contains("syntax error")) {
+                return false;
+            }
+            
+            // Connection timeouts e network issues devem abrir circuit
+            if (throwable instanceof SocketTimeoutException ||
+                throwable instanceof ConnectException ||
+                (throwable.getMessage() != null && 
+                 (throwable.getMessage().contains("connection") ||
+                  throwable.getMessage().contains("timeout")))) {
+                log.error("Database connectivity issue detected: {}", throwable.getMessage());
+                return true;
+            }
+            
+            return false;
+        };
+    }
+
+    private void addEventListener(CircuitBreaker circuitBreaker) {
+        circuitBreaker.getEventPublisher()
+            .onStateTransition(event -> 
+                log.info("Circuit breaker '{}' transitioned from {} to {}", 
+                    event.getCircuitBreakerName(),
+                    event.getStateTransition().getFromState(),
+                    event.getStateTransition().getToState())
+            )
+            .onFailureRateExceeded(event ->
+                log.warn("Circuit breaker '{}' failure rate exceeded: {}%",
+                    event.getCircuitBreakerName(),
+                    event.getFailureRate())
+            )
+            .onSlowCallRateExceeded(event ->
+                log.warn("Circuit breaker '{}' slow call rate exceeded: {}%",
+                    event.getCircuitBreakerName(),
+                    event.getSlowCallRate())
+            );
+    }
+
+    // Exception classes for business logic errors
+    public static class PaymentDeclinedException extends RuntimeException {
+        public PaymentDeclinedException(String message) {
+            super(message);
+        }
+    }
+
+    public static class StockNotFoundException extends RuntimeException {
+        public StockNotFoundException(String message) {
+            super(message);
+        }
+    }
+}

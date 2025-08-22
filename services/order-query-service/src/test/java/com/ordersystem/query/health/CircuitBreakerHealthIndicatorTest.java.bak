@@ -1,0 +1,244 @@
+package com.ordersystem.query.health;
+
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.actuator.health.Health;
+import org.springframework.boot.actuator.health.Status;
+
+import java.time.Duration;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
+/**
+ * Tests for circuit breaker health indicator integration
+ * Validates health checks based on circuit breaker states
+ */
+@ExtendWith(MockitoExtension.class)
+class CircuitBreakerHealthIndicatorTest {
+
+    @Mock
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    private CircuitBreakerHealthIndicator healthIndicator;
+    private CircuitBreaker paymentCircuitBreaker;
+    private CircuitBreaker inventoryCircuitBreaker;
+
+    @BeforeEach
+    void setUp() {
+        healthIndicator = new CircuitBreakerHealthIndicator(circuitBreakerRegistry);
+        
+        // Create circuit breakers with different configurations
+        paymentCircuitBreaker = CircuitBreaker.of("payment-service", 
+            CircuitBreakerConfig.custom()
+                .slidingWindowSize(10)
+                .failureRateThreshold(50.0f)
+                .build());
+                
+        inventoryCircuitBreaker = CircuitBreaker.of("inventory-service",
+            CircuitBreakerConfig.custom()
+                .slidingWindowSize(10)
+                .failureRateThreshold(40.0f)
+                .build());
+    }
+
+    @Test
+    void shouldReportHealthyWhenAllCircuitBreakersAreClosed() {
+        // Given
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(Set.of(paymentCircuitBreaker, inventoryCircuitBreaker));
+        
+        // When
+        Health health = healthIndicator.health();
+        
+        // Then
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(health.getDetails()).containsKey("payment-service_state");
+        assertThat(health.getDetails()).containsKey("inventory-service_state");
+        assertThat(health.getDetails().get("payment-service_state")).isEqualTo("CLOSED");
+        assertThat(health.getDetails().get("inventory-service_state")).isEqualTo("CLOSED");
+    }
+
+    @Test
+    void shouldReportUnhealthyWhenAnyCircuitBreakerIsOpen() {
+        // Given
+        // Force payment circuit breaker to open
+        for (int i = 0; i < 10; i++) {
+            try {
+                paymentCircuitBreaker.executeSupplier(() -> {
+                    throw new RuntimeException("Test failure");
+                });
+            } catch (Exception ignored) {
+                // Expected
+            }
+        }
+        
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(Set.of(paymentCircuitBreaker, inventoryCircuitBreaker));
+        
+        // When
+        Health health = healthIndicator.health();
+        
+        // Then
+        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(health.getDetails().get("payment-service_state")).isEqualTo("OPEN");
+        assertThat(health.getDetails().get("inventory-service_state")).isEqualTo("CLOSED");
+    }
+
+    @Test
+    void shouldIncludeFailureRateInHealthDetails() {
+        // Given
+        // Execute some successful calls
+        paymentCircuitBreaker.executeSupplier(() -> "success");
+        paymentCircuitBreaker.executeSupplier(() -> "success");
+        
+        // Execute some failed calls
+        try {
+            paymentCircuitBreaker.executeSupplier(() -> {
+                throw new RuntimeException("Test failure");
+            });
+        } catch (Exception ignored) {
+            // Expected
+        }
+        
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(Set.of(paymentCircuitBreaker));
+        
+        // When
+        Health health = healthIndicator.health();
+        
+        // Then
+        assertThat(health.getDetails()).containsKey("payment-service_failure_rate");
+        float failureRate = (Float) health.getDetails().get("payment-service_failure_rate");
+        assertThat(failureRate).isGreaterThan(0);
+    }
+
+    @Test
+    void shouldReportWarningForHalfOpenState() {
+        // Given
+        // First open the circuit breaker
+        for (int i = 0; i < 10; i++) {
+            try {
+                paymentCircuitBreaker.executeSupplier(() -> {
+                    throw new RuntimeException("Test failure");
+                });
+            } catch (Exception ignored) {
+                // Expected
+            }
+        }
+        
+        // Transition to half-open (this would normally happen after wait duration)
+        paymentCircuitBreaker.transitionToHalfOpenState();
+        
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(Set.of(paymentCircuitBreaker));
+        
+        // When
+        Health health = healthIndicator.health();
+        
+        // Then
+        assertThat(health.getStatus()).isEqualTo(Status.UNKNOWN);
+        assertThat(health.getDetails().get("payment-service_state")).isEqualTo("HALF_OPEN");
+    }
+
+    @Test
+    void shouldReportMetricsForAllCircuitBreakers() {
+        // Given
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(Set.of(paymentCircuitBreaker, inventoryCircuitBreaker));
+        
+        // When
+        Health health = healthIndicator.health();
+        
+        // Then
+        // Payment service metrics
+        assertThat(health.getDetails()).containsKey("payment-service_state");
+        assertThat(health.getDetails()).containsKey("payment-service_failure_rate");
+        assertThat(health.getDetails()).containsKey("payment-service_successful_calls");
+        assertThat(health.getDetails()).containsKey("payment-service_failed_calls");
+        
+        // Inventory service metrics
+        assertThat(health.getDetails()).containsKey("inventory-service_state");
+        assertThat(health.getDetails()).containsKey("inventory-service_failure_rate");
+        assertThat(health.getDetails()).containsKey("inventory-service_successful_calls");
+        assertThat(health.getDetails()).containsKey("inventory-service_failed_calls");
+    }
+
+    @Test
+    void shouldHandleEmptyCircuitBreakerRegistry() {
+        // Given
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(Set.of());
+        
+        // When
+        Health health = healthIndicator.health();
+        
+        // Then
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(health.getDetails()).containsKey("message");
+        assertThat(health.getDetails().get("message")).isEqualTo("No circuit breakers configured");
+    }
+
+    @Test
+    void shouldIncludeCallMetrics() {
+        // Given
+        // Execute various calls
+        paymentCircuitBreaker.executeSupplier(() -> "success1");
+        paymentCircuitBreaker.executeSupplier(() -> "success2");
+        paymentCircuitBreaker.executeSupplier(() -> "success3");
+        
+        try {
+            paymentCircuitBreaker.executeSupplier(() -> {
+                throw new RuntimeException("failure1");
+            });
+        } catch (Exception ignored) {
+            // Expected
+        }
+        
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(Set.of(paymentCircuitBreaker));
+        
+        // When
+        Health health = healthIndicator.health();
+        
+        // Then
+        assertThat(health.getDetails().get("payment-service_successful_calls")).isEqualTo(3L);
+        assertThat(health.getDetails().get("payment-service_failed_calls")).isEqualTo(1L);
+    }
+
+    @Test
+    void shouldCalculateOverallHealthStatus() {
+        // Given
+        CircuitBreaker openCircuitBreaker = CircuitBreaker.of("open-service");
+        CircuitBreaker closedCircuitBreaker = CircuitBreaker.of("closed-service");
+        
+        // Force one circuit breaker to open
+        for (int i = 0; i < 10; i++) {
+            try {
+                openCircuitBreaker.executeSupplier(() -> {
+                    throw new RuntimeException("Test failure");
+                });
+            } catch (Exception ignored) {
+                // Expected
+            }
+        }
+        
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(Set.of(openCircuitBreaker, closedCircuitBreaker));
+        
+        // When
+        Health health = healthIndicator.health();
+        
+        // Then
+        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(health.getDetails()).containsKey("overall_health");
+        assertThat(health.getDetails().get("overall_health")).isEqualTo("DEGRADED");
+    }
+}

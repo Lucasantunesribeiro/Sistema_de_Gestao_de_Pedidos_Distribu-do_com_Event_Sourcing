@@ -1,70 +1,63 @@
-# Enhanced Multi-stage Dockerfile Template for Microservices
-# This template provides optimized build process with proper layer caching
-# and runtime optimization for Java 17 Spring Boot applications
+# Multi-stage Dockerfile template for microservices
+# Usage: Replace {SERVICE_NAME} with actual service name (order-service, payment-service, etc.)
 
-# ============================================================================
-# BUILD STAGE - Maven build with shared-events optimization
-# ============================================================================
-FROM maven:3.9-openjdk-17-slim AS builder
-
-# Set working directory
+# Stage 1: Build shared-events
+FROM maven:3.9-openjdk-17 AS shared-builder
 WORKDIR /app
 
-# Copy parent pom.xml for dependency resolution
+# Copy parent pom and shared-events
 COPY pom.xml .
-
-# Copy and build shared-events first (this layer will be cached)
 COPY shared-events/ ./shared-events/
+
+# Build and install shared-events to local repository
 RUN cd shared-events && mvn clean install -DskipTests
 
-# Copy service-specific pom.xml for dependency caching
-COPY services/SERVICE_NAME/pom.xml ./services/SERVICE_NAME/
-RUN cd services/SERVICE_NAME && mvn dependency:go-offline -B
+# Stage 2: Build service
+FROM maven:3.9-openjdk-17 AS service-builder
+WORKDIR /app
 
-# Copy service source code
-COPY services/SERVICE_NAME/src ./services/SERVICE_NAME/src
+# Copy from shared-events builder
+COPY --from=shared-builder /root/.m2 /root/.m2
 
-# Build the service
-RUN cd services/SERVICE_NAME && mvn clean package -DskipTests -B
+# Copy parent pom
+COPY pom.xml .
 
-# ============================================================================
-# RUNTIME STAGE - Optimized JRE with health check support
-# ============================================================================
-FROM openjdk:17-jdk-slim AS runtime
+# Copy service source
+COPY services/{SERVICE_NAME}/ ./services/{SERVICE_NAME}/
 
-# Install curl for health checks and clean up in same layer
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get clean
+# Build service
+RUN cd services/{SERVICE_NAME} && mvn clean package -DskipTests
 
-# Create non-root user for security
+# Stage 3: Runtime
+FROM openjdk:17-jdk-slim
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Create app user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Set working directory
 WORKDIR /app
 
-# Copy the built JAR from builder stage
-COPY --from=builder /app/services/SERVICE_NAME/target/*.jar app.jar
+# Copy jar file
+COPY --from=service-builder /app/services/{SERVICE_NAME}/target/*.jar app.jar
 
-# Change ownership to non-root user
+# Change ownership
 RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
 USER appuser
 
-# Expose service port
-EXPOSE SERVICE_PORT
+# Expose port (will be overridden by specific service)
+EXPOSE 8080
 
-# Configure JVM for containerized environment
-ENV JAVA_OPTS="-XX:+UseContainerSupport \
-               -XX:MaxRAMPercentage=75.0 \
-               -XX:+UseG1GC \
-               -XX:+UseStringDeduplication \
-               -Djava.security.egd=file:/dev/./urandom \
-               -Dspring.profiles.active=docker"
+# Health check
+HEALTHCHECK --interval=30s --timeout=15s --start-period=90s --retries=3 \
+    CMD curl -f http://localhost:8080/api/{SERVICE_PATH}/health || exit 1
 
-# Health check configuration
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:SERVICE_PORT/api/SERVICE_PATH/health || exit 1
+# JVM options for containerized environment
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+UseStringDeduplication"
 
-# Start the application
+# Run application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

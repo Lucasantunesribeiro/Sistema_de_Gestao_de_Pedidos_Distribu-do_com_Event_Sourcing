@@ -1,0 +1,131 @@
+# Railway Production Profile Configuration
+# Inventory Service - Stock Management and Allocation
+
+spring:
+  application:
+    name: inventory-service
+  
+  # RabbitMQ Configuration for Event Processing
+  rabbitmq:
+    url: ${RABBITMQ_URL}
+    connection-timeout: 30000
+    requested-heartbeat: 60
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 5
+          multiplier: 2
+        prefetch: 15
+        concurrency: 3
+        max-concurrency: 12
+
+# Server Configuration
+server:
+  port: ${PORT:8083}
+  servlet:
+    context-path: /api/inventory
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 15
+    connection-timeout: 20000
+    max-connections: 8000
+
+# Production Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    defaults:
+      enabled: true
+    rabbit:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      service: inventory-service
+      environment: railway
+      version: ${APP_VERSION:1.0.0}
+
+# Production Logging
+logging:
+  level:
+    com.ordersystem.inventory: INFO
+    org.springframework.amqp: WARN
+    # Enhanced logging for inventory operations
+    com.ordersystem.inventory.service.InventoryService: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] [%logger{36}] - %msg%n"
+
+# Application Specific Configuration
+app:
+  inventory:
+    # Stock Management Configuration
+    stock:
+      reservation-timeout: 300s  # 5 minutes
+      low-stock-threshold: 10
+      reorder-point: 5
+      max-reservation-time: 900s  # 15 minutes
+      
+    # Allocation Configuration
+    allocation:
+      strategy: FIFO  # First In, First Out
+      batch-processing: true
+      batch-size: 50
+      processing-interval: 10s
+      
+    # Warehouse Configuration
+    warehouse:
+      locations: ["MAIN", "BACKUP"]
+      default-location: "MAIN"
+      allocation-priority: ["MAIN", "BACKUP"]
+  
+  # Resilience Configuration
+  resilience:
+    circuit-breaker:
+      enabled: true
+      failure-rate-threshold: 50
+      wait-duration-in-open-state: 30s
+      sliding-window-size: 15
+      minimum-number-of-calls: 10
+    retry:
+      max-attempts: 3
+      wait-duration: 1s
+      exponential-backoff-multiplier: 2
+    timeout:
+      duration: 20s
+  
+  # RabbitMQ Configuration
+  rabbitmq:
+    connection-timeout: 30s
+    requested-heartbeat: 60s
+    channel-cache-size: 20
+    publisher-confirms: true
+    publisher-returns: true
+    max-retry-attempts: 5
+    initial-interval: 1s
+    multiplier: 2.0
+    max-interval: 15s
+
+# Performance Configuration
+performance:
+  inventory:
+    cache-enabled: true
+    cache-ttl: 60s
+    bulk-update-size: 100
+    concurrent-reservations: 50
