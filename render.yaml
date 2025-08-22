@@ -1,47 +1,63 @@
 ﻿services:
   - type: web
     name: order-service
-    env: java
-    buildCommand: cd shared-events && mvn clean install -DskipTests && cd ../services/order-service && mvn clean package -DskipTests
-    startCommand: cd services/order-service && java -jar target/order-service-1.0.0.jar
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: java -jar order-service-1.0.0.jar
     envVars:
       - key: PORT
         value: 8081
       - key: SPRING_PROFILES_ACTIVE
         value: render
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ordersystem-db
+          property: connectionString
 
   - type: web
     name: payment-service
-    env: java
-    buildCommand: cd shared-events && mvn clean install -DskipTests && cd ../services/payment-service && mvn clean package -DskipTests
-    startCommand: cd services/payment-service && java -jar target/payment-service-1.0.0.jar
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: java -jar payment-service-1.0.0.jar
     envVars:
       - key: PORT
         value: 8082
       - key: SPRING_PROFILES_ACTIVE
         value: render
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ordersystem-db
+          property: connectionString
 
   - type: web
     name: inventory-service
-    env: java
-    buildCommand: cd shared-events && mvn clean install -DskipTests && cd ../services/inventory-service && mvn clean package -DskipTests
-    startCommand: cd services/inventory-service && java -jar target/inventory-service-1.0.0.jar
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: java -jar inventory-service-1.0.0.jar
     envVars:
       - key: PORT
         value: 8083
       - key: SPRING_PROFILES_ACTIVE
         value: render
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ordersystem-db
+          property: connectionString
 
   - type: web
     name: query-service
-    env: java
-    buildCommand: cd shared-events && mvn clean install -DskipTests && cd ../services/order-query-service && mvn clean package -DskipTests
-    startCommand: cd services/order-query-service && java -jar target/order-query-service-1.0.0.jar
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: java -jar order-query-service-1.0.0.jar
     envVars:
       - key: PORT
         value: 8084
       - key: SPRING_PROFILES_ACTIVE
         value: render
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ordersystem-db
+          property: connectionString
 
   - type: web
     name: frontend
@@ -51,6 +67,8 @@
     envVars:
       - key: PORT
         value: 3000
+      - key: VITE_API_URL
+        value: https://order-service.onrender.com
 
 databases:
   - name: ordersystem-db
