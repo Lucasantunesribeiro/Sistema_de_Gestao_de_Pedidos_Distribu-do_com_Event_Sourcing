@@ -30,7 +30,7 @@ public class PaymentEventPublisher {
             logger.info("Publishing PaymentProcessedEvent for order {}, correlationId: {}", 
                        event.getOrderId(), correlationId);
 
-            rabbitTemplate.convertAndSend("payment.exchange", "payment.processed", event, message -> {
+            rabbitTemplate.convertAndSend("order.exchange", "payment.processed", event, message -> {
                 message.getMessageProperties().setCorrelationId(correlationId);
                 message.getMessageProperties().setHeader("eventType", "PaymentProcessedEvent");
                 return message;
@@ -54,7 +54,7 @@ public class PaymentEventPublisher {
             logger.info("Publishing PaymentFailedEvent for order {}, correlationId: {}", 
                        event.getOrderId(), correlationId);
 
-            rabbitTemplate.convertAndSend("payment.exchange", "payment.failed", event, message -> {
+            rabbitTemplate.convertAndSend("order.exchange", "payment.failed", event, message -> {
                 message.getMessageProperties().setCorrelationId(correlationId);
                 message.getMessageProperties().setHeader("eventType", "PaymentFailedEvent");
                 return message;

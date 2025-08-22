@@ -3,6 +3,9 @@ package com.ordersystem.shared.events;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
+/**
+ * Command to release inventory reservation (compensation action)
+ */
 public class InventoryReleaseCommand {
     
     @JsonProperty("orderId")
@@ -11,15 +14,21 @@ public class InventoryReleaseCommand {
     @JsonProperty("items")
     private List<OrderItem> items;
     
+    @JsonProperty("reason")
+    private String reason;
+    
     @JsonProperty("timestamp")
     private String timestamp;
     
     // Default constructor for JSON deserialization
-    public InventoryReleaseCommand() {}
+    public InventoryReleaseCommand() {
+        this.timestamp = java.time.Instant.now().toString();
+    }
     
-    public InventoryReleaseCommand(String orderId, List<OrderItem> items) {
+    public InventoryReleaseCommand(String orderId, List<OrderItem> items, String reason) {
         this.orderId = orderId;
         this.items = items;
+        this.reason = reason;
         this.timestamp = java.time.Instant.now().toString();
     }
     
@@ -30,6 +39,19 @@ public class InventoryReleaseCommand {
     public List<OrderItem> getItems() { return items; }
     public void setItems(List<OrderItem> items) { this.items = items; }
     
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+    
     public String getTimestamp() { return timestamp; }
     public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+    
+    @Override
+    public String toString() {
+        return "InventoryReleaseCommand{" +
+                "orderId='" + orderId + '\'' +
+                ", items=" + items +
+                ", reason='" + reason + '\'' +
+                ", timestamp='" + timestamp + '\'' +
+                '}';
+    }
 } 

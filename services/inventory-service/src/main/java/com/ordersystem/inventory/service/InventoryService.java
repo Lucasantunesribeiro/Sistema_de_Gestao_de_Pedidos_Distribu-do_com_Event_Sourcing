@@ -1,72 +1,304 @@
 package com.ordersystem.inventory.service;
 
 import com.ordersystem.inventory.model.InventoryItem;
-import com.ordersystem.shared.events.OrderCreatedEvent;
-import com.ordersystem.shared.events.OrderItem;
-import com.ordersystem.shared.events.PaymentProcessedEvent;
+import com.ordersystem.inventory.model.StockReservation;
+import com.ordersystem.inventory.repository.InventoryRepository;
+import com.ordersystem.inventory.repository.StockReservationRepository;
+import com.ordersystem.shared.events.*;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.ConcurrentMap;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
+/**
+ * Main inventory service with complete Event Sourcing and CQRS implementation
+ */
 @Service
 public class InventoryService {
-
-    private final ConcurrentMap<String, InventoryItem> inventory = InventoryItem.getInventory();
-
-    public void reserveInventory(OrderCreatedEvent orderEvent) {
-        System.out.println("Reserving inventory for order: " + orderEvent.getOrderId());
+    
+    private static final Logger logger = LoggerFactory.getLogger(InventoryService.class);
+    
+    @Autowired
+    private InventoryRepository inventoryRepository;
+    
+    @Autowired
+    private StockReservationRepository reservationRepository;
+    
+    @Autowired
+    private StockAllocationService allocationService;
+    
+    @Autowired
+    private InventoryEventPublisher eventPublisher;
+    
+    @Value("${inventory.reservation.timeout.minutes:15}")
+    private int reservationTimeoutMinutes;
+    
+    /**
+     * Reserve inventory for an order (Saga Pattern)
+     */
+    @CircuitBreaker(name = "inventory-service", fallbackMethod = "fallbackReserveInventory")
+    @Retry(name = "inventory-service")
+    public void reserveInventory(InventoryReservationCommand command) {
+        logger.info("Processing inventory reservation for order: {}", command.getOrderId());
         
-        boolean allItemsReserved = true;
-        
-        for (OrderItem item : orderEvent.getItems()) {
-            InventoryItem inventoryItem = inventory.get(item.getProductId());
+        try {
+            // Use allocation service for atomic stock reservation
+            StockAllocationService.AllocationResult result = allocationService.allocateStock(
+                command.getItems(), 
+                command.getOrderId(), 
+                StockAllocationService.AllocationStrategy.FIFO
+            );
             
-            if (inventoryItem == null) {
-                System.out.println("Product not found in inventory: " + item.getProductId());
-                allItemsReserved = false;
-                break;
+            if (result.isSuccess()) {
+                // Create reservation record
+                String reservationId = UUID.randomUUID().toString();
+                List<StockReservation.ReservedItem> reservedItems = command.getItems().stream()
+                    .map(item -> new StockReservation.ReservedItem(
+                        item.getProductId(), 
+                        item.getProductName(), 
+                        item.getQuantity()
+                    ))
+                    .collect(Collectors.toList());
+                
+                StockReservation reservation = new StockReservation(
+                    reservationId,
+                    command.getOrderId(),
+                    command.getCustomerId(),
+                    reservedItems,
+                    reservationTimeoutMinutes
+                );
+                
+                reservationRepository.save(reservation);
+                
+                // Publish success event
+                eventPublisher.publishInventoryReserved(
+                    command.getOrderId(),
+                    command.getCustomerId(),
+                    command.getItems(),
+                    reservationId
+                );
+                
+                logger.info("Successfully reserved inventory for order {} with reservation {}", 
+                    command.getOrderId(), reservationId);
+                
+            } else {
+                // Publish failure event
+                String failureReason = String.join("; ", result.getFailures());
+                eventPublisher.publishInventoryReservationFailed(
+                    command.getOrderId(),
+                    command.getCustomerId(),
+                    command.getItems(),
+                    failureReason
+                );
+                
+                logger.warn("Failed to reserve inventory for order {}: {}", 
+                    command.getOrderId(), failureReason);
             }
             
-            if (!inventoryItem.canReserve(item.getQuantity())) {
-                System.out.println("Insufficient inventory for product: " + item.getProductId() + 
-                                 " (requested: " + item.getQuantity() + 
-                                 ", available: " + inventoryItem.getAvailableQuantity() + ")");
-                allItemsReserved = false;
-                break;
-            }
-        }
-        
-        if (allItemsReserved) {
-            // Reserve all items
-            for (OrderItem item : orderEvent.getItems()) {
-                InventoryItem inventoryItem = inventory.get(item.getProductId());
-                inventoryItem.reserve(item.getQuantity());
-                System.out.println("Reserved " + item.getQuantity() + " units of " + item.getProductName());
-            }
-        } else {
-            System.out.println("Failed to reserve inventory for order: " + orderEvent.getOrderId());
+        } catch (Exception e) {
+            logger.error("Error processing inventory reservation for order {}", command.getOrderId(), e);
+            
+            eventPublisher.publishInventoryReservationFailed(
+                command.getOrderId(),
+                command.getCustomerId(),
+                command.getItems(),
+                "Internal service error: " + e.getMessage()
+            );
         }
     }
-
-    public void processPaymentResult(PaymentProcessedEvent paymentEvent) {
-        System.out.println("Processing payment result for order: " + paymentEvent.getOrderId() + 
-                         " with status: " + paymentEvent.getPaymentStatus());
+    
+    /**
+     * Confirm inventory reservation (final allocation)
+     */
+    public void confirmReservation(InventoryConfirmationCommand command) {
+        logger.info("Confirming inventory reservation for order: {}", command.getOrderId());
         
-        // For demonstration, we'll assume we can retrieve the order items from somewhere
-        // In a real system, you'd store the reservation information
+        StockReservation reservation = reservationRepository.findByOrderId(command.getOrderId());
         
-        if ("APPROVED".equals(paymentEvent.getPaymentStatus())) {
-            System.out.println("Payment approved, confirming inventory reservation for order: " + 
-                             paymentEvent.getOrderId());
-            // In a real system, you'd confirm the reservation here
+        if (reservation != null && reservation.getStatus() == StockReservation.ReservationStatus.PENDING) {
+            // Convert reserved items to OrderItems for allocation service
+            List<OrderItem> items = reservation.getReservedItems().stream()
+                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity()))
+                .collect(Collectors.toList());
+            
+            // Confirm allocation
+            allocationService.confirmStock(items, command.getOrderId());
+            
+            // Update reservation status
+            reservation.confirm();
+            reservationRepository.save(reservation);
+            
+            logger.info("Confirmed inventory reservation {} for order {}", 
+                reservation.getReservationId(), command.getOrderId());
         } else {
-            System.out.println("Payment declined, releasing inventory reservation for order: " + 
-                             paymentEvent.getOrderId());
-            // In a real system, you'd release the reservation here
+            logger.warn("No valid reservation found for order {} to confirm", command.getOrderId());
         }
     }
-
+    
+    /**
+     * Release inventory reservation (compensation action)
+     */
+    public void releaseReservation(InventoryReleaseCommand command) {
+        logger.info("Releasing inventory reservation for order: {}", command.getOrderId());
+        
+        StockReservation reservation = reservationRepository.findByOrderId(command.getOrderId());
+        
+        if (reservation != null) {
+            // Convert reserved items to OrderItems for allocation service
+            List<OrderItem> items = reservation.getReservedItems().stream()
+                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity()))
+                .collect(Collectors.toList());
+            
+            // Release allocation
+            allocationService.releaseStock(items, command.getOrderId(), command.getReason());
+            
+            // Update reservation status
+            reservation.release();
+            reservationRepository.save(reservation);
+            
+            logger.info("Released inventory reservation {} for order {} - reason: {}", 
+                reservation.getReservationId(), command.getOrderId(), command.getReason());
+        } else {
+            logger.warn("No reservation found for order {} to release", command.getOrderId());
+        }
+    }
+    
+    /**
+     * Get inventory item details
+     */
     public InventoryItem getInventoryItem(String productId) {
-        return inventory.get(productId);
+        return inventoryRepository.findByProductId(productId);
+    }
+    
+    /**
+     * Get all inventory items
+     */
+    public Collection<InventoryItem> getAllInventoryItems() {
+        return inventoryRepository.findAll();
+    }
+    
+    /**
+     * Check stock availability without reservation
+     */
+    public boolean checkStockAvailability(List<OrderItem> items) {
+        return allocationService.checkAvailability(items);
+    }
+    
+    /**
+     * Get reservation by order ID
+     */
+    public StockReservation getReservationByOrderId(String orderId) {
+        return reservationRepository.findByOrderId(orderId);
+    }
+    
+    /**
+     * Scheduled task to clean up expired reservations
+     */
+    @Scheduled(fixedRate = 60000) // Run every minute
+    public void cleanupExpiredReservations() {
+        List<StockReservation> expiredReservations = reservationRepository.findExpiredReservations();
+        
+        for (StockReservation reservation : expiredReservations) {
+            logger.info("Cleaning up expired reservation {} for order {}", 
+                reservation.getReservationId(), reservation.getOrderId());
+            
+            // Convert reserved items to OrderItems for release
+            List<OrderItem> items = reservation.getReservedItems().stream()
+                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity()))
+                .collect(Collectors.toList());
+            
+            // Release the stock
+            allocationService.releaseStock(items, reservation.getOrderId(), "Reservation expired");
+            
+            // Mark as expired and remove
+            reservation.expire();
+            reservationRepository.delete(reservation.getReservationId());
+        }
+        
+        if (!expiredReservations.isEmpty()) {
+            logger.info("Cleaned up {} expired reservations", expiredReservations.size());
+        }
+    }
+    
+    /**
+     * Restock inventory
+     */
+    public void restockInventory(String productId, int quantity, String reason) {
+        InventoryItem item = inventoryRepository.findByProductId(productId);
+        
+        if (item != null) {
+            int previousQuantity = item.getAvailableQuantity();
+            allocationService.restock(productId, quantity, reason);
+            
+            // Publish inventory updated event
+            eventPublisher.publishInventoryUpdated(
+                productId, 
+                previousQuantity, 
+                item.getAvailableQuantity(), 
+                reason, 
+                InventoryStatus.IN_STOCK
+            );
+            
+            logger.info("Restocked {} units of product {} - reason: {}", quantity, productId, reason);
+        }
+    }
+    
+    // Fallback method for circuit breaker
+    public void fallbackReserveInventory(InventoryReservationCommand command, Exception ex) {
+        logger.error("Fallback: Failed to reserve inventory for order {} - service unavailable", 
+            command.getOrderId(), ex);
+        
+        eventPublisher.publishInventoryReservationFailed(
+            command.getOrderId(),
+            command.getCustomerId(),
+            command.getItems(),
+            "Service temporarily unavailable - please try again later"
+        );
+    }
+    
+    /**
+     * Get inventory statistics
+     */
+    public InventoryStats getInventoryStats() {
+        long totalProducts = inventoryRepository.getTotalProducts();
+        long totalAvailable = inventoryRepository.getTotalAvailableStock();
+        long totalReserved = inventoryRepository.getTotalReservedStock();
+        long pendingReservations = reservationRepository.countByStatus(StockReservation.ReservationStatus.PENDING);
+        long expiredReservations = reservationRepository.countExpired();
+        
+        return new InventoryStats(totalProducts, totalAvailable, totalReserved, 
+                                 pendingReservations, expiredReservations);
+    }
+    
+    public static class InventoryStats {
+        private final long totalProducts;
+        private final long totalAvailableStock;
+        private final long totalReservedStock;
+        private final long pendingReservations;
+        private final long expiredReservations;
+        
+        public InventoryStats(long totalProducts, long totalAvailableStock, long totalReservedStock,
+                             long pendingReservations, long expiredReservations) {
+            this.totalProducts = totalProducts;
+            this.totalAvailableStock = totalAvailableStock;
+            this.totalReservedStock = totalReservedStock;
+            this.pendingReservations = pendingReservations;
+            this.expiredReservations = expiredReservations;
+        }
+        
+        public long getTotalProducts() { return totalProducts; }
+        public long getTotalAvailableStock() { return totalAvailableStock; }
+        public long getTotalReservedStock() { return totalReservedStock; }
+        public long getPendingReservations() { return pendingReservations; }
+        public long getExpiredReservations() { return expiredReservations; }
     }
 }

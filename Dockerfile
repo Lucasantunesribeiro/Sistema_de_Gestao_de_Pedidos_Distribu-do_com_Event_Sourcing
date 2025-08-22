@@ -1,7 +1,7 @@
 FROM maven:3.8.5-openjdk-17 as build
 WORKDIR /app
 
-# Copy apenas o order-service
+# Copy apenas o order-service funcional
 COPY services/order-service/ services/order-service/
 
 # Build apenas o order-service

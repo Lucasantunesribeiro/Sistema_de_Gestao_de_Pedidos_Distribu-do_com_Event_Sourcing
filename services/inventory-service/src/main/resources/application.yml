@@ -97,11 +97,34 @@ app:
 
 # Inventory Service Specific Configuration
 inventory:
-  management:
-    initial-stock: 1000
-    low-stock-threshold: 10
-    reservation-timeout: 5m
-    cleanup-interval: 1h
+  reservation:
+    timeout:
+      minutes: 15
+  stock:
+    low-threshold: 5
+    reorder-threshold: 10
+    allocation-strategy: FIFO
+  cleanup:
+    expired-reservations:
+      interval: 60000  # 1 minute in milliseconds
+  notifications:
+    low-stock:
+      enabled: true
+      threshold: 5
+
+# RabbitMQ Exchange and Routing Configuration
+rabbitmq:
+  exchange:
+    inventory: inventory.exchange
+  routing:
+    inventory:
+      reserved: inventory.reserved
+      failed: inventory.failed
+      updated: inventory.updated
+  queues:
+    inventory-reservation: inventory.reservation.queue
+    inventory-confirmation: inventory.confirmation.queue
+    inventory-release: inventory.release.queue
 
 ---
 # Docker Profile
