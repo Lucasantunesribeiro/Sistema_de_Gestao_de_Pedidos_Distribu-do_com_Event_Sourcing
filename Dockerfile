@@ -1,7 +1,10 @@
 FROM maven:3.8.5-openjdk-17 as build
 WORKDIR /app
-COPY . .
-RUN mvn clean install -DskipTests -q
+
+# Copy apenas o order-service
+COPY services/order-service/ services/order-service/
+
+# Build apenas o order-service
 RUN cd services/order-service && mvn clean package -DskipTests -q
 
 FROM openjdk:17-jdk-alpine
