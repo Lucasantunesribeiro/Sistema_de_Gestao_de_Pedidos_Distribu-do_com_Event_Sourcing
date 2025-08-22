@@ -4,15 +4,8 @@ server:
 spring:
   profiles:
     active: render
-  datasource:
-    url: jdbc:h2:mem:testdb
-    driver-class-name: org.h2.Driver
-    
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    show-sql: false
 
 logging:
   level:
     com.ordersystem: INFO
+    root: WARN
