@@ -1,4 +1,5 @@
-﻿FROM openjdk:17-jdk-slim as builder
+﻿# Multi-stage build para Sistema de Gestao de Pedidos
+FROM maven:3.9.4-openjdk-17 as builder
 
 WORKDIR /app
 
@@ -6,25 +7,27 @@ WORKDIR /app
 COPY . .
 
 # Build shared-events first
-RUN cd shared-events && mvn clean install -DskipTests
+RUN cd shared-events && mvn clean install -DskipTests -q
 
-# Build all services
-RUN cd services/order-service && mvn clean package -DskipTests
-RUN cd services/payment-service && mvn clean package -DskipTests  
-RUN cd services/inventory-service && mvn clean package -DskipTests
-RUN cd services/order-query-service && mvn clean package -DskipTests
+# Build order-service (foco em um service primeiro)
+RUN cd services/order-service && mvn clean package -DskipTests -q
 
-FROM openjdk:17-jre-slim
+# Runtime stage
+FROM openjdk:17-jdk-slim
 
 WORKDIR /app
 
-# Copy built jars
-COPY --from=builder /app/services/order-service/target/order-service-1.0.0.jar ./
-COPY --from=builder /app/services/payment-service/target/payment-service-1.0.0.jar ./
-COPY --from=builder /app/services/inventory-service/target/inventory-service-1.0.0.jar ./
-COPY --from=builder /app/services/order-query-service/target/order-query-service-1.0.0.jar ./
+# Copy built jar
+COPY --from=builder /app/services/order-service/target/order-service-1.0.0.jar ./app.jar
+
+# Create non-root user
+RUN addgroup --system spring && adduser --system spring --ingroup spring
+USER spring:spring
 
 EXPOSE 8080
 
-# Default to order-service (will be overridden by render.yaml)
-CMD ["java", "-jar", "order-service-1.0.0.jar"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+CMD ["java", "-Xmx512m", "-jar", "app.jar"]

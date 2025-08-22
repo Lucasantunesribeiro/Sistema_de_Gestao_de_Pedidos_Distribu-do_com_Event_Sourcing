@@ -1,74 +1,18 @@
 ﻿services:
   - type: web
-    name: order-service
+    name: gestao-pedidos
     env: docker
     dockerfilePath: ./Dockerfile
-    dockerCommand: java -jar order-service-1.0.0.jar
+    healthCheckPath: /actuator/health
     envVars:
       - key: PORT
-        value: 8081
+        value: 8080
       - key: SPRING_PROFILES_ACTIVE
         value: render
       - key: DATABASE_URL
         fromDatabase:
           name: ordersystem-db
           property: connectionString
-
-  - type: web
-    name: payment-service
-    env: docker
-    dockerfilePath: ./Dockerfile
-    dockerCommand: java -jar payment-service-1.0.0.jar
-    envVars:
-      - key: PORT
-        value: 8082
-      - key: SPRING_PROFILES_ACTIVE
-        value: render
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ordersystem-db
-          property: connectionString
-
-  - type: web
-    name: inventory-service
-    env: docker
-    dockerfilePath: ./Dockerfile
-    dockerCommand: java -jar inventory-service-1.0.0.jar
-    envVars:
-      - key: PORT
-        value: 8083
-      - key: SPRING_PROFILES_ACTIVE
-        value: render
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ordersystem-db
-          property: connectionString
-
-  - type: web
-    name: query-service
-    env: docker
-    dockerfilePath: ./Dockerfile
-    dockerCommand: java -jar order-query-service-1.0.0.jar
-    envVars:
-      - key: PORT
-        value: 8084
-      - key: SPRING_PROFILES_ACTIVE
-        value: render
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ordersystem-db
-          property: connectionString
-
-  - type: web
-    name: frontend
-    env: node
-    buildCommand: cd frontend && npm install && npm run build
-    startCommand: cd frontend && npm run preview -- --port $PORT --host 0.0.0.0
-    envVars:
-      - key: PORT
-        value: 3000
-      - key: VITE_API_URL
-        value: https://order-service.onrender.com
 
 databases:
   - name: ordersystem-db

@@ -8,19 +8,34 @@ spring:
     url: ${DATABASE_URL:jdbc:h2:mem:testdb}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
       
   jpa:
     hibernate:
       ddl-auto: update
+    show-sql: false
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+    
+  application:
+    name: gestao-pedidos
 
 logging:
   level:
     com.ordersystem: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
     
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      
+# RabbitMQ desabilitado por enquanto
+rabbitmq:
+  enabled: false
