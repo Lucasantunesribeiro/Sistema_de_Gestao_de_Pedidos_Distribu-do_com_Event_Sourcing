@@ -1,20 +1,8 @@
-﻿services:
+services:
   - type: web
     name: gestao-pedidos
     env: docker
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /actuator/health
     envVars:
       - key: PORT
         value: 8080
-      - key: SPRING_PROFILES_ACTIVE
-        value: render
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ordersystem-db
-          property: connectionString
-
-databases:
-  - name: ordersystem-db
-    databaseName: ordersystem
-    user: ordersystem
