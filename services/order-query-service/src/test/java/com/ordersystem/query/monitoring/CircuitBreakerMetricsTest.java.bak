@@ -1,0 +1,220 @@
+package com.ordersystem.query.monitoring;
+
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.when;
+
+/**
+ * Tests for circuit breaker metrics and monitoring
+ * Validates metrics collection and state transition tracking
+ */
+@ExtendWith(MockitoExtension.class)
+class CircuitBreakerMetricsTest {
+
+    @Mock
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    private MeterRegistry meterRegistry;
+    private CircuitBreakerMetrics circuitBreakerMetrics;
+    private CircuitBreaker paymentCircuitBreaker;
+
+    @BeforeEach
+    void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
+        circuitBreakerMetrics = new CircuitBreakerMetrics(meterRegistry, circuitBreakerRegistry);
+        
+        // Create real circuit breaker for testing
+        paymentCircuitBreaker = CircuitBreaker.ofDefaults("payment-service");
+    }
+
+    @Test
+    void shouldRegisterCircuitBreakerStateGauge() {
+        // Given
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(java.util.Set.of(paymentCircuitBreaker));
+        
+        // When
+        circuitBreakerMetrics.bindMetrics();
+        
+        // Then
+        Gauge stateGauge = meterRegistry.find("circuit_breaker_state")
+            .tag("name", "payment-service")
+            .gauge();
+        
+        assertThat(stateGauge).isNotNull();
+        assertThat(stateGauge.value()).isEqualTo(0.0); // CLOSED = 0
+    }
+
+    @Test
+    void shouldRegisterFailureRateGauge() {
+        // Given
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(java.util.Set.of(paymentCircuitBreaker));
+        
+        // When
+        circuitBreakerMetrics.bindMetrics();
+        
+        // Then
+        Gauge failureRateGauge = meterRegistry.find("circuit_breaker_failure_rate")
+            .tag("name", "payment-service")
+            .gauge();
+        
+        assertThat(failureRateGauge).isNotNull();
+        assertThat(failureRateGauge.value()).isEqualTo(-1.0); // No calls yet
+    }
+
+    @Test
+    void shouldTrackSuccessfulCalls() {
+        // Given
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(java.util.Set.of(paymentCircuitBreaker));
+        circuitBreakerMetrics.bindMetrics();
+        
+        // When
+        paymentCircuitBreaker.executeSupplier(() -> "success");
+        
+        // Then
+        Counter successCounter = meterRegistry.find("circuit_breaker_calls_total")
+            .tag("name", "payment-service")
+            .tag("outcome", "success")
+            .counter();
+        
+        assertThat(successCounter).isNotNull();
+        assertThat(successCounter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void shouldTrackFailedCalls() {
+        // Given
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(java.util.Set.of(paymentCircuitBreaker));
+        circuitBreakerMetrics.bindMetrics();
+        
+        // When
+        try {
+            paymentCircuitBreaker.executeSupplier(() -> {
+                throw new RuntimeException("Test failure");
+            });
+        } catch (Exception ignored) {
+            // Expected
+        }
+        
+        // Then
+        Counter failureCounter = meterRegistry.find("circuit_breaker_calls_total")
+            .tag("name", "payment-service")
+            .tag("outcome", "failure")
+            .counter();
+        
+        assertThat(failureCounter).isNotNull();
+        assertThat(failureCounter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void shouldTrackStateTransitions() {
+        // Given
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(java.util.Set.of(paymentCircuitBreaker));
+        circuitBreakerMetrics.bindMetrics();
+        
+        // Force circuit breaker to open by exceeding failure threshold
+        for (int i = 0; i < 10; i++) {
+            try {
+                paymentCircuitBreaker.executeSupplier(() -> {
+                    throw new RuntimeException("Force failure");
+                });
+            } catch (Exception ignored) {
+                // Expected
+            }
+        }
+        
+        // Then
+        await().atMost(1, TimeUnit.SECONDS).untilAsserted(() -> {
+            Counter transitionCounter = meterRegistry.find("circuit_breaker_state_transitions_total")
+                .tag("name", "payment-service")
+                .tag("from_state", "CLOSED")
+                .tag("to_state", "OPEN")
+                .counter();
+            
+            assertThat(transitionCounter).isNotNull();
+            assertThat(transitionCounter.count()).isGreaterThan(0);
+        });
+    }
+
+    @Test
+    void shouldCalculateStateNumericValues() {
+        // When & Then
+        assertThat(circuitBreakerMetrics.getStateValue(CircuitBreaker.State.CLOSED)).isEqualTo(0);
+        assertThat(circuitBreakerMetrics.getStateValue(CircuitBreaker.State.OPEN)).isEqualTo(1);
+        assertThat(circuitBreakerMetrics.getStateValue(CircuitBreaker.State.HALF_OPEN)).isEqualTo(2);
+        assertThat(circuitBreakerMetrics.getStateValue(CircuitBreaker.State.FORCED_OPEN)).isEqualTo(3);
+        assertThat(circuitBreakerMetrics.getStateValue(CircuitBreaker.State.DISABLED)).isEqualTo(4);
+    }
+
+    @Test
+    void shouldTrackSlowCalls() {
+        // Given
+        CircuitBreaker slowCallCB = CircuitBreaker.of("slow-service", 
+            io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
+                .slowCallDurationThreshold(java.time.Duration.ofMillis(100))
+                .build());
+        
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(java.util.Set.of(slowCallCB));
+        circuitBreakerMetrics.bindMetrics();
+        
+        // When - simulate slow call
+        slowCallCB.executeSupplier(() -> {
+            try {
+                Thread.sleep(150); // Slow call
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return "slow success";
+        });
+        
+        // Then
+        Gauge slowCallRateGauge = meterRegistry.find("circuit_breaker_slow_call_rate")
+            .tag("name", "slow-service")
+            .gauge();
+        
+        assertThat(slowCallRateGauge).isNotNull();
+        assertThat(slowCallRateGauge.value()).isGreaterThan(0);
+    }
+
+    @Test
+    void shouldProvideMetricsForMultipleCircuitBreakers() {
+        // Given
+        CircuitBreaker inventoryCB = CircuitBreaker.ofDefaults("inventory-service");
+        when(circuitBreakerRegistry.getAllCircuitBreakers())
+            .thenReturn(java.util.Set.of(paymentCircuitBreaker, inventoryCB));
+        
+        // When
+        circuitBreakerMetrics.bindMetrics();
+        
+        // Then
+        assertThat(meterRegistry.find("circuit_breaker_state")
+            .tag("name", "payment-service").gauge()).isNotNull();
+        assertThat(meterRegistry.find("circuit_breaker_state")
+            .tag("name", "inventory-service").gauge()).isNotNull();
+        
+        assertThat(meterRegistry.find("circuit_breaker_failure_rate")
+            .tag("name", "payment-service").gauge()).isNotNull();
+        assertThat(meterRegistry.find("circuit_breaker_failure_rate")
+            .tag("name", "inventory-service").gauge()).isNotNull();
+    }
+}

@@ -1,0 +1,209 @@
+package com.ordersystem.query.health;
+
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuator.health.Health;
+import org.springframework.boot.actuator.health.HealthIndicator;
+import org.springframework.boot.actuator.health.Status;
+import org.springframework.stereotype.Component;
+
+/**
+ * Health indicator that integrates circuit breaker states
+ * Provides detailed health information for monitoring systems
+ */
+@Component
+public class CircuitBreakerHealthIndicator implements HealthIndicator {
+
+    private static final Logger log = LoggerFactory.getLogger(CircuitBreakerHealthIndicator.class);
+
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
+
+    @Autowired
+    public CircuitBreakerHealthIndicator(CircuitBreakerRegistry circuitBreakerRegistry) {
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
+    }
+
+    @Override
+    public Health health() {
+        log.debug("Checking circuit breaker health status");
+        
+        var circuitBreakers = circuitBreakerRegistry.getAllCircuitBreakers();
+        
+        if (circuitBreakers.isEmpty()) {
+            return Health.up()
+                .withDetail("message", "No circuit breakers configured")
+                .build();
+        }
+
+        Health.Builder builder = new Health.Builder();
+        boolean hasOpenCircuits = false;
+        boolean hasHalfOpenCircuits = false;
+        int totalCircuitBreakers = 0;
+        int healthyCircuitBreakers = 0;
+
+        for (CircuitBreaker circuitBreaker : circuitBreakers) {
+            String name = circuitBreaker.getName();
+            CircuitBreaker.State state = circuitBreaker.getState();
+            CircuitBreaker.Metrics metrics = circuitBreaker.getMetrics();
+            
+            totalCircuitBreakers++;
+            
+            // Add circuit breaker specific details
+            builder.withDetail(name + "_state", state.toString())
+                   .withDetail(name + "_failure_rate", metrics.getFailureRate())
+                   .withDetail(name + "_slow_call_rate", metrics.getSlowCallRate())
+                   .withDetail(name + "_successful_calls", metrics.getNumberOfSuccessfulCalls())
+                   .withDetail(name + "_failed_calls", metrics.getNumberOfFailedCalls())
+                   .withDetail(name + "_not_permitted_calls", metrics.getNumberOfNotPermittedCalls())
+                   .withDetail(name + "_slow_calls", metrics.getNumberOfSlowCalls());
+
+            // Determine health based on state
+            switch (state) {
+                case OPEN:
+                    hasOpenCircuits = true;
+                    log.warn("Circuit breaker '{}' is OPEN - service degraded", name);
+                    break;
+                case HALF_OPEN:
+                    hasHalfOpenCircuits = true;
+                    log.info("Circuit breaker '{}' is HALF_OPEN - testing recovery", name);
+                    break;
+                case CLOSED:
+                    healthyCircuitBreakers++;
+                    log.debug("Circuit breaker '{}' is CLOSED - healthy", name);
+                    break;
+                case FORCED_OPEN:
+                case DISABLED:
+                    log.info("Circuit breaker '{}' is {} - administrative state", name, state);
+                    break;
+            }
+        }
+
+        // Add overall health summary
+        builder.withDetail("total_circuit_breakers", totalCircuitBreakers)
+               .withDetail("healthy_circuit_breakers", healthyCircuitBreakers)
+               .withDetail("open_circuit_breakers", 
+                   totalCircuitBreakers - healthyCircuitBreakers - (hasHalfOpenCircuits ? 1 : 0));
+
+        // Determine overall health status
+        Status overallStatus;
+        String overallHealth;
+        
+        if (hasOpenCircuits) {
+            overallStatus = Status.DOWN;
+            overallHealth = "DEGRADED";
+            log.error("System health DEGRADED - {} circuit breaker(s) open", 
+                totalCircuitBreakers - healthyCircuitBreakers);
+        } else if (hasHalfOpenCircuits) {
+            overallStatus = Status.UNKNOWN;
+            overallHealth = "RECOVERING";
+            log.warn("System health RECOVERING - circuit breaker(s) in half-open state");
+        } else {
+            overallStatus = Status.UP;
+            overallHealth = "HEALTHY";
+            log.debug("System health HEALTHY - all circuit breakers closed");
+        }
+        
+        builder.withDetail("overall_health", overallHealth);
+
+        // Add health recommendations
+        if (hasOpenCircuits) {
+            builder.withDetail("recommendation", 
+                "Check external service connectivity and error rates. " +
+                "Circuit breakers will automatically recover when services stabilize.");
+        } else if (hasHalfOpenCircuits) {
+            builder.withDetail("recommendation", 
+                "Circuit breakers are testing service recovery. " +
+                "Monitor for successful recovery or return to open state.");
+        }
+
+        return builder.status(overallStatus).build();
+    }
+
+    /**
+     * Get simplified health summary for dashboard display
+     */
+    public CircuitBreakerHealthSummary getHealthSummary() {
+        var circuitBreakers = circuitBreakerRegistry.getAllCircuitBreakers();
+        
+        CircuitBreakerHealthSummary summary = new CircuitBreakerHealthSummary();
+        summary.setTotalCircuitBreakers(circuitBreakers.size());
+        
+        int openCount = 0;
+        int halfOpenCount = 0;
+        int closedCount = 0;
+        
+        for (CircuitBreaker cb : circuitBreakers) {
+            switch (cb.getState()) {
+                case OPEN:
+                case FORCED_OPEN:
+                    openCount++;
+                    break;
+                case HALF_OPEN:
+                    halfOpenCount++;
+                    break;
+                case CLOSED:
+                case DISABLED:
+                    closedCount++;
+                    break;
+            }
+        }
+        
+        summary.setOpenCircuitBreakers(openCount);
+        summary.setHalfOpenCircuitBreakers(halfOpenCount);
+        summary.setClosedCircuitBreakers(closedCount);
+        summary.setHealthy(openCount == 0);
+        
+        return summary;
+    }
+
+    /**
+     * Simplified health summary for monitoring dashboards
+     */
+    public static class CircuitBreakerHealthSummary {
+        private int totalCircuitBreakers;
+        private int openCircuitBreakers;
+        private int halfOpenCircuitBreakers;
+        private int closedCircuitBreakers;
+        private boolean isHealthy;
+        private long timestamp = System.currentTimeMillis();
+        
+        // Getters and setters
+        public int getTotalCircuitBreakers() { return totalCircuitBreakers; }
+        public void setTotalCircuitBreakers(int totalCircuitBreakers) { this.totalCircuitBreakers = totalCircuitBreakers; }
+        
+        public int getOpenCircuitBreakers() { return openCircuitBreakers; }
+        public void setOpenCircuitBreakers(int openCircuitBreakers) { this.openCircuitBreakers = openCircuitBreakers; }
+        
+        public int getHalfOpenCircuitBreakers() { return halfOpenCircuitBreakers; }
+        public void setHalfOpenCircuitBreakers(int halfOpenCircuitBreakers) { this.halfOpenCircuitBreakers = halfOpenCircuitBreakers; }
+        
+        public int getClosedCircuitBreakers() { return closedCircuitBreakers; }
+        public void setClosedCircuitBreakers(int closedCircuitBreakers) { this.closedCircuitBreakers = closedCircuitBreakers; }
+        
+        public boolean isHealthy() { return isHealthy; }
+        public void setHealthy(boolean healthy) { isHealthy = healthy; }
+        
+        public long getTimestamp() { return timestamp; }
+        public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+        
+        public String getHealthStatus() {
+            if (openCircuitBreakers > 0) {
+                return "DEGRADED";
+            } else if (halfOpenCircuitBreakers > 0) {
+                return "RECOVERING";
+            } else {
+                return "HEALTHY";
+            }
+        }
+        
+        public double getHealthPercentage() {
+            if (totalCircuitBreakers == 0) {
+                return 100.0;
+            }
+            return (double) closedCircuitBreakers / totalCircuitBreakers * 100.0;
+        }
+    }
+}

@@ -1,0 +1,120 @@
+services:
+  # PostgreSQL Database for Order Service (Event Store)
+  order-db:
+    image: postgres:15
+    container_name: order-db
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    networks:
+      - order-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_db -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # PostgreSQL Database for Order Query Service (Read Model)
+  query-db:
+    image: postgres:15
+    container_name: query-db
+    environment:
+      POSTGRES_DB: order_query_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - query_db_data:/var/lib/postgresql/data
+    networks:
+      - order-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_query_db -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    hostname: rabbitmq-server
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - order-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - order-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Frontend (Simplified)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.simple
+    container_name: frontend
+    ports:
+      - "3000:80"
+    networks:
+      - order-network
+    restart: unless-stopped
+
+  # Simple API Mock (for testing frontend)
+  api-mock:
+    image: nginx:alpine
+    container_name: api-mock
+    ports:
+      - "8080:80"
+    volumes:
+      - ./api-mock.conf:/etc/nginx/nginx.conf
+    networks:
+      - order-network
+    restart: unless-stopped
+
+volumes:
+  order_db_data:
+  query_db_data:
+  rabbitmq_data:
+  redis_data:
+
+networks:
+  order-network:
+    driver: bridge

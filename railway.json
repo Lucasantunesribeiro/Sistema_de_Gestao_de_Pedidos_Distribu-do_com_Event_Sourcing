@@ -1,21 +1,13 @@
 {
-  "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "services/order-service/Dockerfile"
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
     "numReplicas": 1,
     "sleepApplication": false,
     "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10
-  },
-  "environments": {
-    "production": {
-      "variables": {
-        "SPRING_PROFILES_ACTIVE": "railway",
-        "JAVA_OPTS": "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
-      }
-    }
+    "healthcheckPath": "/actuator/health",
+    "healthcheckTimeout": 300
   }
 }

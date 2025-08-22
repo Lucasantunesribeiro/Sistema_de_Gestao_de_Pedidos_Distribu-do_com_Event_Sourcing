@@ -11,14 +11,21 @@ spring:
     password: ${DATABASE_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
     hikari:
-      connection-timeout: 20000
-      maximum-pool-size: 10
-      minimum-idle: 5
+      # Otimizações para 1000 req/sec
+      connection-timeout: 10000
+      maximum-pool-size: 25
+      minimum-idle: 10
       idle-timeout: 300000
       max-lifetime: 1200000
       leak-detection-threshold: 60000
       pool-name: OrderServiceHikariCP
       register-mbeans: true
+      # Performance monitoring
+      validation-timeout: 5000
+      initialization-fail-timeout: 10000
+      # Connection properties otimizadas
+      connection-test-query: SELECT 1
+      auto-commit: false
 
   # JPA Configuration
   jpa:
@@ -93,6 +100,12 @@ management:
     export:
       prometheus:
         enabled: true
+    # Connection Pool Monitoring
+    hikaricp:
+      enabled: true
+    tags:
+      service: order-service
+      environment: ${SPRING_PROFILES_ACTIVE:local}
 
 # Logging Configuration
 logging:
@@ -112,12 +125,16 @@ logging:
 # Application Specific Configuration
 app:
   database:
-    maximum-pool-size: 10
-    minimum-idle: 5
-    connection-timeout: 20s
+    # Configurações otimizadas para performance
+    maximum-pool-size: 25
+    minimum-idle: 10
+    connection-timeout: 10s
     idle-timeout: 5m
     max-lifetime: 20m
     leak-detection-threshold: 60s
+    # Novas configurações de monitoring
+    pool-usage-threshold: 70
+    connection-acquire-increment: 2
   
   rabbitmq:
     connection-timeout: 30s
@@ -141,6 +158,29 @@ app:
     rabbitmq-connection-timeout: 30s
     health-check-interval: 30s
     health-check-failure-threshold: 3
+  
+  # Saga Configuration for Persistent State Management
+  saga:
+    # Recovery Service Configuration
+    recovery:
+      enabled: true
+      timeout-minutes: 5
+      max-retries: 3
+      cleanup-days: 30
+      batch-size: 100
+      
+    # Performance Targets
+    performance:
+      target-completion-rate: 99.9
+      max-duration-minutes: 10
+      alert-threshold-minutes: 5
+      
+    # Monitoring Configuration
+    monitoring:
+      enabled: true
+      metrics-interval: 30s
+      health-check-interval: 60s
+      detailed-logging: false
 
 ---
 # Docker Profile
@@ -163,8 +203,11 @@ spring:
       on-profile: railway
   datasource:
     hikari:
-      maximum-pool-size: 15
-      minimum-idle: 8
+      # Otimizações Railway para produção
+      maximum-pool-size: 30
+      minimum-idle: 15
+      connection-timeout: 8000
+      validation-timeout: 3000
   
 logging:
   level:

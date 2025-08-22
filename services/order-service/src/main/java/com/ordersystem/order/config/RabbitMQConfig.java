@@ -1,118 +1,40 @@
 package com.ordersystem.order.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
-import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.rabbit.retry.MessageRecoverer;
-import org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.backoff.ExponentialBackOffPolicy;
-import org.springframework.retry.policy.SimpleRetryPolicy;
-import org.springframework.retry.support.RetryTemplate;
 
-import java.time.Duration;
-
-/**
- * Enhanced RabbitMQ configuration with resilience patterns
- * Includes connection retry, message retry, and circuit breaker patterns
- */
 @Configuration
-@ConfigurationProperties(prefix = "app.rabbitmq")
 public class RabbitMQConfig {
 
-    private static final Logger logger = LoggerFactory.getLogger(RabbitMQConfig.class);
+    // Exchange names
+    public static final String ORDER_EXCHANGE = "order.exchange";
+    public static final String PAYMENT_EXCHANGE = "payment.exchange";
+    public static final String INVENTORY_EXCHANGE = "inventory.exchange";
 
-    public static final String FANOUT_EXCHANGE = "order.fanout";
-    public static final String DLX_EXCHANGE = "order.dlx";
-    public static final String DLQ_QUEUE = "order.dlq";
+    // Queue names
+    public static final String ORDER_CREATED_QUEUE = "order.created.queue";
+    public static final String PAYMENT_PROCESSED_QUEUE = "payment.processed.queue";
+    public static final String INVENTORY_RESERVED_QUEUE = "inventory.reserved.queue";
+    public static final String INVENTORY_RESERVATION_FAILED_QUEUE = "inventory.reservation.failed.queue";
 
-    @Value("${RABBITMQ_HOST:localhost}")
-    private String host;
+    // Routing keys
+    public static final String ORDER_CREATED_ROUTING_KEY = "order.created";
+    public static final String PAYMENT_PROCESSED_ROUTING_KEY = "payment.processed";
+    public static final String INVENTORY_RESERVED_ROUTING_KEY = "inventory.reserved";
+    public static final String INVENTORY_RESERVATION_FAILED_ROUTING_KEY = "inventory.reservation.failed";
 
-    @Value("${RABBITMQ_PORT:5672}")
-    private int port;
-
-    @Value("${RABBITMQ_USERNAME:guest}")
-    private String username;
-
-    @Value("${RABBITMQ_PASSWORD:guest}")
-    private String password;
-
-    // Connection settings
-    private Duration connectionTimeout = Duration.ofSeconds(30);
-    private Duration requestedHeartbeat = Duration.ofSeconds(60);
-    private int channelCacheSize = 25;
-    private boolean publisherConfirms = true;
-    private boolean publisherReturns = true;
-
-    // Retry settings
-    private int maxRetryAttempts = 3;
-    private Duration initialInterval = Duration.ofSeconds(1);
-    private double multiplier = 2.0;
-    private Duration maxInterval = Duration.ofSeconds(10);
+    // Dead Letter Queue configuration
+    public static final String DLQ_EXCHANGE = "dlq.exchange";
+    public static final String ORDER_DLQ = "order.dlq";
 
     @Bean
-    public ConnectionFactory connectionFactory() {
-        CachingConnectionFactory factory = new CachingConnectionFactory();
-        factory.setHost(host);
-        factory.setPort(port);
-        factory.setUsername(username);
-        factory.setPassword(password);
-        
-        // Connection resilience settings
-        factory.setConnectionTimeout((int) connectionTimeout.toMillis());
-        factory.setRequestedHeartBeat((int) requestedHeartbeat.getSeconds());
-        factory.setChannelCacheSize(channelCacheSize);
-        factory.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
-        factory.setPublisherReturns(publisherReturns);
-        
-        // Connection recovery settings
-        factory.getRabbitConnectionFactory().setAutomaticRecoveryEnabled(true);
-        factory.getRabbitConnectionFactory().setNetworkRecoveryInterval(5000);
-        factory.getRabbitConnectionFactory().setTopologyRecoveryEnabled(true);
-        
-        logger.info("RabbitMQ ConnectionFactory configured for {}:{}", host, port);
-        
-        return factory;
-    }
-
-    @Bean
-    public FanoutExchange fanoutExchange() {
-        return ExchangeBuilder.fanoutExchange(FANOUT_EXCHANGE)
-                .durable(true)
-                .build();
-    }
-
-    @Bean
-    public DirectExchange deadLetterExchange() {
-        return ExchangeBuilder.directExchange(DLX_EXCHANGE)
-                .durable(true)
-                .build();
-    }
-
-    @Bean
-    public Queue deadLetterQueue() {
-        return QueueBuilder.durable(DLQ_QUEUE)
-                .build();
-    }
-
-    @Bean
-    public Binding deadLetterBinding() {
-        return BindingBuilder.bind(deadLetterQueue())
-                .to(deadLetterExchange())
-                .with("failed");
-    }
-
-    @Bean
-    public Jackson2JsonMessageConverter jsonMessageConverter() {
+    public MessageConverter jsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
     }
 
@@ -120,23 +42,15 @@ public class RabbitMQConfig {
     public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(jsonMessageConverter());
-        template.setRetryTemplate(retryTemplate());
         template.setMandatory(true);
-        
-        // Publisher confirms and returns
         template.setConfirmCallback((correlationData, ack, cause) -> {
             if (!ack) {
-                logger.error("Message not delivered to exchange: {}", cause);
+                System.err.println("Message not delivered: " + cause);
             }
         });
-        
         template.setReturnsCallback(returned -> {
-            logger.error("Message returned: {} - {} - {}",
-                    returned.getMessage(),
-                    returned.getReplyCode(),
-                    returned.getReplyText());
+            System.err.println("Message returned: " + returned.getMessage());
         });
-        
         return template;
     }
 
@@ -145,111 +59,115 @@ public class RabbitMQConfig {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(jsonMessageConverter());
-        factory.setRetryTemplate(retryTemplate());
-        
-        // Listener container settings
-        factory.setConcurrentConsumers(1);
-        factory.setMaxConcurrentConsumers(5);
-        factory.setPrefetchCount(10);
         factory.setDefaultRequeueRejected(false);
-        
+        factory.setAcknowledgeMode(AcknowledgeMode.AUTO);
         return factory;
     }
 
+    // Exchanges
     @Bean
-    public RetryTemplate retryTemplate() {
-        RetryTemplate retryTemplate = new RetryTemplate();
-        
-        // Retry policy
-        SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy();
-        retryPolicy.setMaxAttempts(maxRetryAttempts);
-        retryTemplate.setRetryPolicy(retryPolicy);
-        
-        // Backoff policy
-        ExponentialBackOffPolicy backOffPolicy = new ExponentialBackOffPolicy();
-        backOffPolicy.setInitialInterval(initialInterval.toMillis());
-        backOffPolicy.setMultiplier(multiplier);
-        backOffPolicy.setMaxInterval(maxInterval.toMillis());
-        retryTemplate.setBackOffPolicy(backOffPolicy);
-        
-        return retryTemplate;
+    public TopicExchange orderExchange() {
+        return ExchangeBuilder.topicExchange(ORDER_EXCHANGE)
+                .durable(true)
+                .build();
     }
 
     @Bean
-    public MessageRecoverer messageRecoverer() {
-        return new RejectAndDontRequeueRecoverer();
+    public TopicExchange paymentExchange() {
+        return ExchangeBuilder.topicExchange(PAYMENT_EXCHANGE)
+                .durable(true)
+                .build();
     }
 
-    // Getters and setters for configuration properties
-    public Duration getConnectionTimeout() {
-        return connectionTimeout;
+    @Bean
+    public TopicExchange inventoryExchange() {
+        return ExchangeBuilder.topicExchange(INVENTORY_EXCHANGE)
+                .durable(true)
+                .build();
     }
 
-    public void setConnectionTimeout(Duration connectionTimeout) {
-        this.connectionTimeout = connectionTimeout;
+    @Bean
+    public DirectExchange dlqExchange() {
+        return ExchangeBuilder.directExchange(DLQ_EXCHANGE)
+                .durable(true)
+                .build();
     }
 
-    public Duration getRequestedHeartbeat() {
-        return requestedHeartbeat;
+    // Queues
+    @Bean
+    public Queue orderCreatedQueue() {
+        return QueueBuilder.durable(ORDER_CREATED_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLQ_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", ORDER_DLQ)
+                .withArgument("x-message-ttl", 300000) // 5 minutes TTL
+                .build();
     }
 
-    public void setRequestedHeartbeat(Duration requestedHeartbeat) {
-        this.requestedHeartbeat = requestedHeartbeat;
+    @Bean
+    public Queue paymentProcessedQueue() {
+        return QueueBuilder.durable(PAYMENT_PROCESSED_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLQ_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", ORDER_DLQ)
+                .withArgument("x-message-ttl", 300000)
+                .build();
     }
 
-    public int getChannelCacheSize() {
-        return channelCacheSize;
+    @Bean
+    public Queue inventoryReservedQueue() {
+        return QueueBuilder.durable(INVENTORY_RESERVED_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLQ_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", ORDER_DLQ)
+                .withArgument("x-message-ttl", 300000)
+                .build();
     }
 
-    public void setChannelCacheSize(int channelCacheSize) {
-        this.channelCacheSize = channelCacheSize;
+    @Bean
+    public Queue inventoryReservationFailedQueue() {
+        return QueueBuilder.durable(INVENTORY_RESERVATION_FAILED_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLQ_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", ORDER_DLQ)
+                .withArgument("x-message-ttl", 300000)
+                .build();
     }
 
-    public boolean isPublisherConfirms() {
-        return publisherConfirms;
+    @Bean
+    public Queue orderDlq() {
+        return QueueBuilder.durable(ORDER_DLQ).build();
     }
 
-    public void setPublisherConfirms(boolean publisherConfirms) {
-        this.publisherConfirms = publisherConfirms;
+    // Bindings
+    @Bean
+    public Binding orderCreatedBinding() {
+        return BindingBuilder.bind(orderCreatedQueue())
+                .to(orderExchange())
+                .with(ORDER_CREATED_ROUTING_KEY);
     }
 
-    public boolean isPublisherReturns() {
-        return publisherReturns;
+    @Bean
+    public Binding paymentProcessedBinding() {
+        return BindingBuilder.bind(paymentProcessedQueue())
+                .to(paymentExchange())
+                .with(PAYMENT_PROCESSED_ROUTING_KEY);
     }
 
-    public void setPublisherReturns(boolean publisherReturns) {
-        this.publisherReturns = publisherReturns;
+    @Bean
+    public Binding inventoryReservedBinding() {
+        return BindingBuilder.bind(inventoryReservedQueue())
+                .to(inventoryExchange())
+                .with(INVENTORY_RESERVED_ROUTING_KEY);
     }
 
-    public int getMaxRetryAttempts() {
-        return maxRetryAttempts;
+    @Bean
+    public Binding inventoryReservationFailedBinding() {
+        return BindingBuilder.bind(inventoryReservationFailedQueue())
+                .to(inventoryExchange())
+                .with(INVENTORY_RESERVATION_FAILED_ROUTING_KEY);
     }
 
-    public void setMaxRetryAttempts(int maxRetryAttempts) {
-        this.maxRetryAttempts = maxRetryAttempts;
-    }
-
-    public Duration getInitialInterval() {
-        return initialInterval;
-    }
-
-    public void setInitialInterval(Duration initialInterval) {
-        this.initialInterval = initialInterval;
-    }
-
-    public double getMultiplier() {
-        return multiplier;
-    }
-
-    public void setMultiplier(double multiplier) {
-        this.multiplier = multiplier;
-    }
-
-    public Duration getMaxInterval() {
-        return maxInterval;
-    }
-
-    public void setMaxInterval(Duration maxInterval) {
-        this.maxInterval = maxInterval;
+    @Bean
+    public Binding dlqBinding() {
+        return BindingBuilder.bind(orderDlq())
+                .to(dlqExchange())
+                .with(ORDER_DLQ);
     }
 }

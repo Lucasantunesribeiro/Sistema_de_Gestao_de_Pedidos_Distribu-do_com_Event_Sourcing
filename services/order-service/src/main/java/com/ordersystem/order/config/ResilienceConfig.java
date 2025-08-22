@@ -1,133 +1,90 @@
 package com.ordersystem.order.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.timelimiter.TimeLimiter;
+import io.github.resilience4j.timelimiter.TimeLimiterConfig;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.annotation.EnableRetry;
 
 import java.time.Duration;
 
-/**
- * Resilience configuration for database and external service connections
- * Provides centralized configuration for retry mechanisms and circuit breakers
- */
 @Configuration
-@EnableRetry
-@ConfigurationProperties(prefix = "app.resilience")
 public class ResilienceConfig {
 
-    // Retry configuration
-    private int maxRetries = 3;
-    private Duration initialDelay = Duration.ofSeconds(1);
-    private Duration maxDelay = Duration.ofSeconds(30);
-    private double backoffMultiplier = 2.0;
+    @Bean
+    public CircuitBreaker databaseCircuitBreaker() {
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .failureRateThreshold(50)
+                .waitDurationInOpenState(Duration.ofSeconds(30))
+                .slidingWindowSize(10)
+                .minimumNumberOfCalls(5)
+                .permittedNumberOfCallsInHalfOpenState(3)
+                .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                .recordExceptions(Exception.class)
+                .build();
 
-    // Circuit breaker configuration
-    private int failureThreshold = 5;
-    private Duration circuitBreakerTimeout = Duration.ofMinutes(1);
-    private int circuitBreakerResetTimeout = 60;
-
-    // Connection timeout configuration
-    private Duration databaseConnectionTimeout = Duration.ofSeconds(20);
-    private Duration rabbitmqConnectionTimeout = Duration.ofSeconds(30);
-    private Duration httpConnectionTimeout = Duration.ofSeconds(10);
-
-    // Health check configuration
-    private Duration healthCheckInterval = Duration.ofSeconds(30);
-    private int healthCheckFailureThreshold = 3;
-
-    public int getMaxRetries() {
-        return maxRetries;
+        return CircuitBreaker.of("database", config);
     }
 
-    public void setMaxRetries(int maxRetries) {
-        this.maxRetries = maxRetries;
+    @Bean
+    public CircuitBreaker messageBrokerCircuitBreaker() {
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .failureRateThreshold(60)
+                .waitDurationInOpenState(Duration.ofSeconds(20))
+                .slidingWindowSize(8)
+                .minimumNumberOfCalls(3)
+                .permittedNumberOfCallsInHalfOpenState(2)
+                .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                .recordExceptions(Exception.class)
+                .build();
+
+        return CircuitBreaker.of("messageBroker", config);
     }
 
-    public Duration getInitialDelay() {
-        return initialDelay;
+    @Bean
+    public Retry databaseRetry() {
+        RetryConfig config = RetryConfig.custom()
+                .maxAttempts(3)
+                .waitDuration(Duration.ofSeconds(1))
+                .intervalFunction(attempt -> Duration.ofSeconds((long) Math.pow(2, attempt)).toMillis())
+                .retryExceptions(Exception.class)
+                .build();
+
+        return Retry.of("database", config);
     }
 
-    public void setInitialDelay(Duration initialDelay) {
-        this.initialDelay = initialDelay;
+    @Bean
+    public Retry messageBrokerRetry() {
+        RetryConfig config = RetryConfig.custom()
+                .maxAttempts(3)
+                .waitDuration(Duration.ofMillis(500))
+                .intervalFunction(attempt -> Duration.ofMillis(500 * attempt).toMillis())
+                .retryExceptions(Exception.class)
+                .build();
+
+        return Retry.of("messageBroker", config);
     }
 
-    public Duration getMaxDelay() {
-        return maxDelay;
+    @Bean
+    public TimeLimiter databaseTimeLimiter() {
+        TimeLimiterConfig config = TimeLimiterConfig.custom()
+                .timeoutDuration(Duration.ofSeconds(30))
+                .cancelRunningFuture(true)
+                .build();
+
+        return TimeLimiter.of("database", config);
     }
 
-    public void setMaxDelay(Duration maxDelay) {
-        this.maxDelay = maxDelay;
-    }
+    @Bean
+    public TimeLimiter messageBrokerTimeLimiter() {
+        TimeLimiterConfig config = TimeLimiterConfig.custom()
+                .timeoutDuration(Duration.ofSeconds(10))
+                .cancelRunningFuture(true)
+                .build();
 
-    public double getBackoffMultiplier() {
-        return backoffMultiplier;
-    }
-
-    public void setBackoffMultiplier(double backoffMultiplier) {
-        this.backoffMultiplier = backoffMultiplier;
-    }
-
-    public int getFailureThreshold() {
-        return failureThreshold;
-    }
-
-    public void setFailureThreshold(int failureThreshold) {
-        this.failureThreshold = failureThreshold;
-    }
-
-    public Duration getCircuitBreakerTimeout() {
-        return circuitBreakerTimeout;
-    }
-
-    public void setCircuitBreakerTimeout(Duration circuitBreakerTimeout) {
-        this.circuitBreakerTimeout = circuitBreakerTimeout;
-    }
-
-    public int getCircuitBreakerResetTimeout() {
-        return circuitBreakerResetTimeout;
-    }
-
-    public void setCircuitBreakerResetTimeout(int circuitBreakerResetTimeout) {
-        this.circuitBreakerResetTimeout = circuitBreakerResetTimeout;
-    }
-
-    public Duration getDatabaseConnectionTimeout() {
-        return databaseConnectionTimeout;
-    }
-
-    public void setDatabaseConnectionTimeout(Duration databaseConnectionTimeout) {
-        this.databaseConnectionTimeout = databaseConnectionTimeout;
-    }
-
-    public Duration getRabbitmqConnectionTimeout() {
-        return rabbitmqConnectionTimeout;
-    }
-
-    public void setRabbitmqConnectionTimeout(Duration rabbitmqConnectionTimeout) {
-        this.rabbitmqConnectionTimeout = rabbitmqConnectionTimeout;
-    }
-
-    public Duration getHttpConnectionTimeout() {
-        return httpConnectionTimeout;
-    }
-
-    public void setHttpConnectionTimeout(Duration httpConnectionTimeout) {
-        this.httpConnectionTimeout = httpConnectionTimeout;
-    }
-
-    public Duration getHealthCheckInterval() {
-        return healthCheckInterval;
-    }
-
-    public void setHealthCheckInterval(Duration healthCheckInterval) {
-        this.healthCheckInterval = healthCheckInterval;
-    }
-
-    public int getHealthCheckFailureThreshold() {
-        return healthCheckFailureThreshold;
-    }
-
-    public void setHealthCheckFailureThreshold(int healthCheckFailureThreshold) {
-        this.healthCheckFailureThreshold = healthCheckFailureThreshold;
+        return TimeLimiter.of("messageBroker", config);
     }
 }

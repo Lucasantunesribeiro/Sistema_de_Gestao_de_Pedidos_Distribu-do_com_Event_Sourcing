@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestão de Pedidos - Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        header {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1rem 0;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+        
+        nav {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            list-style: none;
+        }
+        
+        .nav-links a {
+            text-decoration: none;
+            color: #64748b;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+        
+        .nav-links a:hover,
+        .nav-links a.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        main {
+            padding: 2rem 0;
+        }
+        
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-label {
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+        
+        .data-table {
+            background: white;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .table-header {
+            background: #f8fafc;
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: 600;
+        }
+        
+        .table-content {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .table-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 100px;
+            gap: 1rem;
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            align-items: center;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-align: center;
+        }
+        
+        .status-completed {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .status-pending {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-failed {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #64748b;
+        }
+        
+        .create-order-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            margin-bottom: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 1rem;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .btn {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .btn:hover {
+            background-color: #2563eb;
+        }
+        
+        .btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        @media (max-width: 768px) {
+            .nav-links {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .table-row {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">Sistema de Pedidos</div>
+                <ul class="nav-links">
+                    <li><a href="#" onclick="showPage('dashboard')" class="active" data-page="dashboard">Dashboard</a></li>
+                    <li><a href="#" onclick="showPage('orders')" data-page="orders">Pedidos</a></li>
+                    <li><a href="#" onclick="showPage('payments')" data-page="payments">Pagamentos</a></li>
+                    <li><a href="#" onclick="showPage('inventory')" data-page="inventory">Estoque</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <!-- Dashboard Page -->
+            <div id="dashboard" class="page active">
+                <h1 style="margin-bottom: 2rem; font-size: 2rem; font-weight: bold;">Dashboard</h1>
+                
+                <div class="dashboard-grid" id="metrics-grid">
+                    <div class="loading">Carregando métricas...</div>
+                </div>
+                
+                <div class="data-table">
+                    <div class="table-header">Pedidos Recentes</div>
+                    <div class="table-content">
+                        <div class="table-row" style="background: #f8fafc; font-weight: 600;">
+                            <div>ID do Pedido</div>
+                            <div>Cliente</div>
+                            <div>Valor</div>
+                            <div>Status</div>
+                        </div>
+                        <div id="recent-orders">
+                            <div class="loading">Carregando pedidos...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Page -->
+            <div id="orders" class="page">
+                <h1 style="margin-bottom: 2rem; font-size: 2rem; font-weight: bold;">Gestão de Pedidos</h1>
+                
+                <div class="create-order-form">
+                    <h2 style="margin-bottom: 1rem;">Criar Novo Pedido</h2>
+                    <form id="create-order-form">
+                        <div class="form-group">
+                            <label class="form-label" for="customerId">ID do Cliente:</label>
+                            <input type="text" id="customerId" class="form-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="productId">ID do Produto:</label>
+                            <input type="text" id="productId" class="form-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="quantity">Quantidade:</label>
+                            <input type="number" id="quantity" class="form-input" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="unitPrice">Preço Unitário:</label>
+                            <input type="number" id="unitPrice" class="form-input" step="0.01" min="0" required>
+                        </div>
+                        <button type="submit" class="btn" id="create-order-btn">Criar Pedido</button>
+                    </form>
+                </div>
+                
+                <div class="data-table">
+                    <div class="table-header">Todos os Pedidos</div>
+                    <div class="table-content" id="orders-table">
+                        <div class="loading">Carregando pedidos...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payments Page -->
+            <div id="payments" class="page">
+                <h1 style="margin-bottom: 2rem; font-size: 2rem; font-weight: bold;">Pagamentos</h1>
+                
+                <div class="data-table">
+                    <div class="table-header">Histórico de Pagamentos</div>
+                    <div class="table-content" id="payments-table">
+                        <div class="loading">Carregando pagamentos...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Page -->
+            <div id="inventory" class="page">
+                <h1 style="margin-bottom: 2rem; font-size: 2rem; font-weight: bold;">Controle de Estoque</h1>
+                
+                <div class="data-table">
+                    <div class="table-header">Produtos em Estoque</div>
+                    <div class="table-content" id="inventory-table">
+                        <div class="loading">Carregando estoque...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        
+        // Navigation
+        function showPage(pageId) {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-links a').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Show selected page
+            document.getElementById(pageId).classList.add('active');
+            
+            // Add active class to clicked nav link
+            document.querySelector(`[data-page="${pageId}"]`).classList.add('active');
+            
+            // Load page data
+            loadPageData(pageId);
+        }
+        
+        // Load data for specific page
+        function loadPageData(pageId) {
+            switch(pageId) {
+                case 'dashboard':
+                    loadDashboardData();
+                    break;
+                case 'orders':
+                    loadOrdersData();
+                    break;
+                case 'payments':
+                    loadPaymentsData();
+                    break;
+                case 'inventory':
+                    loadInventoryData();
+                    break;
+            }
+        }
+        
+        // Dashboard data
+        async function loadDashboardData() {
+            try {
+                const [ordersRes, metricsRes] = await Promise.all([
+                    fetch(`${API_BASE}/orders`),
+                    fetch(`${API_BASE}/dashboard/metrics`)
+                ]);
+                
+                const orders = await ordersRes.json();
+                const metrics = await metricsRes.json();
+                
+                // Update metrics
+                document.getElementById('metrics-grid').innerHTML = `
+                    <div class="metric-card">
+                        <div class="metric-value">${metrics.totalOrders}</div>
+                        <div class="metric-label">Total de Pedidos</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">R$ ${metrics.totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                        <div class="metric-label">Receita Total</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${metrics.pendingOrders}</div>
+                        <div class="metric-label">Pedidos Pendentes</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${orders.length}</div>
+                        <div class="metric-label">Pedidos Hoje</div>
+                    </div>
+                `;
+                
+                // Update recent orders
+                const recentOrders = orders.slice(0, 5);
+                document.getElementById('recent-orders').innerHTML = recentOrders.map(order => `
+                    <div class="table-row">
+                        <div>#${order.orderId}</div>
+                        <div>${order.customerId}</div>
+                        <div>R$ ${order.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                        <div><span class="status-badge status-${order.status.toLowerCase()}">${order.status}</span></div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                document.getElementById('metrics-grid').innerHTML = '<div class="loading">Erro ao carregar dados</div>';
+            }
+        }
+        
+        // Orders data
+        async function loadOrdersData() {
+            try {
+                const response = await fetch(`${API_BASE}/orders`);
+                const orders = await response.json();
+                
+                document.getElementById('orders-table').innerHTML = `
+                    <div class="table-row" style="background: #f8fafc; font-weight: 600;">
+                        <div>ID</div>
+                        <div>Cliente</div>
+                        <div>Valor</div>
+                        <div>Status</div>
+                    </div>
+                    ${orders.map(order => `
+                        <div class="table-row">
+                            <div>#${order.orderId}</div>
+                            <div>${order.customerId}</div>
+                            <div>R$ ${order.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                            <div><span class="status-badge status-${order.status.toLowerCase()}">${order.status}</span></div>
+                        </div>
+                    `).join('')}
+                `;
+                
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                document.getElementById('orders-table').innerHTML = '<div class="loading">Erro ao carregar pedidos</div>';
+            }
+        }
+        
+        // Payments data
+        async function loadPaymentsData() {
+            try {
+                const response = await fetch(`${API_BASE}/payments`);
+                const payments = await response.json();
+                
+                document.getElementById('payments-table').innerHTML = `
+                    <div class="table-row" style="background: #f8fafc; font-weight: 600;">
+                        <div>ID</div>
+                        <div>Pedido</div>
+                        <div>Valor</div>
+                        <div>Status</div>
+                    </div>
+                    ${payments.map(payment => `
+                        <div class="table-row">
+                            <div>#${payment.paymentId}</div>
+                            <div>#${payment.orderId}</div>
+                            <div>R$ ${payment.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                            <div><span class="status-badge status-${payment.status.toLowerCase()}">${payment.status}</span></div>
+                        </div>
+                    `).join('')}
+                `;
+                
+            } catch (error) {
+                console.error('Error loading payments:', error);
+                document.getElementById('payments-table').innerHTML = '<div class="loading">Erro ao carregar pagamentos</div>';
+            }
+        }
+        
+        // Inventory data
+        async function loadInventoryData() {
+            try {
+                const response = await fetch(`${API_BASE}/inventory`);
+                const inventory = await response.json();
+                
+                document.getElementById('inventory-table').innerHTML = `
+                    <div class="table-row" style="background: #f8fafc; font-weight: 600;">
+                        <div>Produto</div>
+                        <div>Disponível</div>
+                        <div>Reservado</div>
+                        <div>Total</div>
+                    </div>
+                    ${inventory.map(item => `
+                        <div class="table-row">
+                            <div>${item.productName} (#${item.productId})</div>
+                            <div>${item.availableQuantity}</div>
+                            <div>${item.reservedQuantity}</div>
+                            <div>${item.totalQuantity}</div>
+                        </div>
+                    `).join('')}
+                `;
+                
+            } catch (error) {
+                console.error('Error loading inventory:', error);
+                document.getElementById('inventory-table').innerHTML = '<div class="loading">Erro ao carregar estoque</div>';
+            }
+        }
+        
+        // Create order form handler
+        document.getElementById('create-order-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('create-order-btn');
+            btn.disabled = true;
+            btn.textContent = 'Criando...';
+            
+            const formData = {
+                customerId: document.getElementById('customerId').value,
+                items: [{
+                    productId: document.getElementById('productId').value,
+                    quantity: parseInt(document.getElementById('quantity').value),
+                    unitPrice: parseFloat(document.getElementById('unitPrice').value)
+                }]
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (response.ok) {
+                    alert('Pedido criado com sucesso!');
+                    document.getElementById('create-order-form').reset();
+                    loadOrdersData();
+                } else {
+                    alert('Erro ao criar pedido');
+                }
+                
+            } catch (error) {
+                console.error('Error creating order:', error);
+                alert('Erro ao criar pedido');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Criar Pedido';
+            }
+        });
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboardData();
+        });
+        
+        // Auto-refresh dashboard every 30 seconds
+        setInterval(() => {
+            if (document.getElementById('dashboard').classList.contains('active')) {
+                loadDashboardData();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

@@ -8,6 +8,8 @@ import com.ordersystem.shared.events.OrderItem;
 import com.ordersystem.shared.events.OrderStatusUpdatedEvent;
 import com.ordersystem.shared.events.PaymentProcessedEvent;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,9 @@ public class OrderQueryService {
 
     @Autowired
     private OrderReadModelRepository orderReadModelRepository;
+
+    @Autowired
+    private CacheInvalidationService cacheInvalidationService;
 
     public void handleOrderCreated(OrderCreatedEvent event) {
         OrderReadModel orderReadModel = new OrderReadModel(
@@ -53,6 +58,10 @@ public class OrderQueryService {
             order.setStatus(event.getNewStatus());
             order.setLastUpdated(LocalDateTime.now());
             orderReadModelRepository.save(order);
+            
+            // Invalidate cache after updating the order
+            cacheInvalidationService.handleOrderStatusUpdated(event);
+            
             System.out.println("Order status updated in read model: " + event.getOrderId() + 
                              " -> " + event.getNewStatus());
         }
@@ -74,27 +83,36 @@ public class OrderQueryService {
             }
             
             orderReadModelRepository.save(order);
+            
+            // Invalidate cache after processing payment
+            cacheInvalidationService.handlePaymentProcessed(event);
+            
             System.out.println("Payment processed in read model: " + event.getOrderId() + 
                              " -> " + event.getPaymentStatus());
         }
     }
 
+    @Cacheable(value = "orders", key = "'findAllOrderByCreatedAtDesc'")
     public List<OrderReadModel> getAllOrders() {
         return orderReadModelRepository.findAllOrderByCreatedAtDesc();
     }
 
+    @Cacheable(value = "single-order", key = "#orderId")
     public Optional<OrderReadModel> getOrderById(String orderId) {
         return orderReadModelRepository.findById(orderId);
     }
 
+    @Cacheable(value = "customer-orders", key = "#customerId")
     public List<OrderReadModel> getOrdersByCustomerId(String customerId) {
         return orderReadModelRepository.findByCustomerId(customerId);
     }
 
+    @Cacheable(value = "status-orders", key = "#status")
     public List<OrderReadModel> getOrdersByStatus(String status) {
         return orderReadModelRepository.findByStatus(status);
     }
 
+    @Cacheable(value = "customer-orders", key = "#customerId + '::' + #status")
     public List<OrderReadModel> getOrdersByCustomerIdAndStatus(String customerId, String status) {
         return orderReadModelRepository.findByCustomerIdAndStatus(customerId, status);
     }

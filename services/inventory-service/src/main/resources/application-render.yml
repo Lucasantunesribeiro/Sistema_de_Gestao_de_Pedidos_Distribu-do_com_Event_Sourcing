@@ -1,0 +1,26 @@
+﻿server:
+  port: ${PORT:8080}
+
+spring:
+  profiles:
+    active: render
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:testdb}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+logging:
+  level:
+    com.ordersystem: INFO
+    
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

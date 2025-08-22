@@ -1,0 +1,340 @@
+package com.ordersystem.query.performance;
+
+import com.ordersystem.query.dto.PaymentRequest;
+import com.ordersystem.query.dto.PaymentResult;
+import com.ordersystem.query.service.ResilientQueryService;
+import com.ordersystem.query.service.ExternalPaymentService;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.junit.jupiter.SpringJUnitExtension;
+
+import java.net.SocketTimeoutException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+/**
+ * Performance tests to validate 99.9% availability targets
+ * Tests system behavior under load with failures
+ */
+@ExtendWith(SpringJUnitExtension.class)
+@SpringBootTest
+class AvailabilityPerformanceTest {
+
+    @Autowired
+    private ResilientQueryService resilientQueryService;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    @MockBean
+    private ExternalPaymentService externalPaymentService;
+
+    private CircuitBreaker paymentCircuitBreaker;
+
+    @BeforeEach
+    void setUp() {
+        paymentCircuitBreaker = circuitBreakerRegistry.circuitBreaker("payment-service");
+        paymentCircuitBreaker.reset();
+    }
+
+    @Test
+    void shouldMaintain99_9PercentAvailabilityDuringFailures() throws Exception {
+        // Test parameters for 99.9% availability
+        final int totalRequests = 1000;
+        final int concurrentThreads = 10;
+        final double targetAvailability = 99.9; // 99.9%
+        final int maxAllowedFailures = (int) Math.ceil(totalRequests * (100 - targetAvailability) / 100); // 1 failure allowed
+        
+        // Simulate service with 2% failure rate (should trigger fallbacks)
+        AtomicInteger callCount = new AtomicInteger(0);
+        when(externalPaymentService.processPayment(any()))
+            .then(invocation -> {
+                int count = callCount.incrementAndGet();
+                if (count % 50 == 0) { // 2% failure rate
+                    throw new SocketTimeoutException("Simulated timeout");
+                }
+                return PaymentResult.success("Payment processed", "txn-" + count);
+            });
+
+        // Execute load test
+        ExecutorService executor = Executors.newFixedThreadPool(concurrentThreads);
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger fallbackCount = new AtomicInteger(0);
+        AtomicInteger failureCount = new AtomicInteger(0);
+        AtomicLong totalResponseTime = new AtomicLong(0);
+
+        CompletableFuture<Void>[] futures = new CompletableFuture[totalRequests];
+        
+        long testStartTime = System.currentTimeMillis();
+        
+        for (int i = 0; i < totalRequests; i++) {
+            final int requestId = i;
+            futures[i] = CompletableFuture.runAsync(() -> {
+                long requestStartTime = System.currentTimeMillis();
+                try {
+                    PaymentRequest request = new PaymentRequest("load-test-" + requestId, 100.0, "USD");
+                    PaymentResult result = resilientQueryService.processPayment(request).get(5, TimeUnit.SECONDS);
+                    
+                    long responseTime = System.currentTimeMillis() - requestStartTime;
+                    totalResponseTime.addAndGet(responseTime);
+                    
+                    if ("SUCCESS".equals(result.getStatus())) {
+                        successCount.incrementAndGet();
+                    } else if ("QUEUED".equals(result.getStatus()) || "PENDING_APPROVAL".equals(result.getStatus())) {
+                        fallbackCount.incrementAndGet();
+                    } else {
+                        failureCount.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    failureCount.incrementAndGet();
+                    totalResponseTime.addAndGet(System.currentTimeMillis() - requestStartTime);
+                }
+            }, executor);
+        }
+
+        // Wait for all requests to complete
+        CompletableFuture.allOf(futures).get(60, TimeUnit.SECONDS);
+        
+        long testDuration = System.currentTimeMillis() - testStartTime;
+        
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+
+        // Calculate metrics
+        double availabilityPercentage = ((double) (totalRequests - failureCount.get()) / totalRequests) * 100;
+        double averageResponseTime = (double) totalResponseTime.get() / totalRequests;
+        double throughput = (double) totalRequests / (testDuration / 1000.0);
+
+        // Log results
+        System.out.println("=== Availability Performance Test Results ===");
+        System.out.println("Total Requests: " + totalRequests);
+        System.out.println("Successful Requests: " + successCount.get());
+        System.out.println("Fallback Requests: " + fallbackCount.get());
+        System.out.println("Failed Requests: " + failureCount.get());
+        System.out.println("Availability: " + String.format("%.2f%%", availabilityPercentage));
+        System.out.println("Average Response Time: " + String.format("%.2f ms", averageResponseTime));
+        System.out.println("Throughput: " + String.format("%.2f req/sec", throughput));
+        System.out.println("Test Duration: " + testDuration + " ms");
+
+        // Validate availability targets
+        assertThat(availabilityPercentage).isGreaterThanOrEqualTo(targetAvailability);
+        assertThat(failureCount.get()).isLessThanOrEqualTo(maxAllowedFailures);
+        
+        // Validate performance targets  
+        assertThat(averageResponseTime).isLessThan(200); // < 200ms average response time
+        assertThat(throughput).isGreaterThan(10); // > 10 req/sec throughput
+        
+        // Validate graceful degradation (fallbacks used)
+        assertThat(fallbackCount.get()).isGreaterThan(0); // Some requests should use fallback
+        
+        // Validate circuit breaker behavior
+        float finalFailureRate = paymentCircuitBreaker.getMetrics().getFailureRate();
+        assertThat(finalFailureRate).isLessThan(30.0f); // Should not exceed threshold
+    }
+
+    @Test
+    void shouldRecoverQuicklyAfterServiceOutage() throws Exception {
+        // Test parameters for recovery time
+        final int warmupRequests = 50;
+        final int outageRequests = 100;
+        final int recoveryRequests = 50;
+        final long maxRecoveryTime = 30000; // 30 seconds
+        
+        AtomicInteger phase = new AtomicInteger(1); // 1=warmup, 2=outage, 3=recovery
+        AtomicInteger requestCount = new AtomicInteger(0);
+        
+        when(externalPaymentService.processPayment(any()))
+            .then(invocation -> {
+                int count = requestCount.incrementAndGet();
+                int currentPhase = phase.get();
+                
+                if (currentPhase == 1 && count <= warmupRequests) {
+                    // Warmup phase - all succeed
+                    return PaymentResult.success("Warmup success", "txn-warmup-" + count);
+                } else if (currentPhase == 2 || (currentPhase == 1 && count > warmupRequests)) {
+                    if (currentPhase == 1) phase.set(2); // Transition to outage
+                    if (count <= warmupRequests + outageRequests) {
+                        // Outage phase - all fail
+                        throw new SocketTimeoutException("Service outage");
+                    } else {
+                        // Transition to recovery
+                        phase.set(3);
+                        return PaymentResult.success("Recovery success", "txn-recovery-" + count);
+                    }
+                } else {
+                    // Recovery phase - all succeed
+                    return PaymentResult.success("Recovery success", "txn-recovery-" + count);
+                }
+            });
+
+        long testStartTime = System.currentTimeMillis();
+        
+        // Phase 1: Warmup (establish healthy baseline)
+        for (int i = 0; i < warmupRequests; i++) {
+            PaymentRequest request = new PaymentRequest("warmup-" + i, 100.0, "USD");
+            PaymentResult result = resilientQueryService.processPayment(request).get(5, TimeUnit.SECONDS);
+            assertThat(result.getStatus()).isEqualTo("SUCCESS");
+        }
+        
+        long outageStartTime = System.currentTimeMillis();
+        
+        // Phase 2: Outage (trigger circuit breaker)
+        for (int i = 0; i < outageRequests; i++) {
+            PaymentRequest request = new PaymentRequest("outage-" + i, 100.0, "USD");
+            try {
+                PaymentResult result = resilientQueryService.processPayment(request).get(5, TimeUnit.SECONDS);
+                // Should get fallback responses
+                assertThat(result.getStatus()).isIn("QUEUED", "PENDING_APPROVAL");
+            } catch (Exception e) {
+                // Some may timeout, but system should remain responsive
+            }
+        }
+        
+        // Wait for circuit breaker to open
+        await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+            assertThat(paymentCircuitBreaker.getState()).isEqualTo(CircuitBreaker.State.OPEN);
+        });
+        
+        long recoveryStartTime = System.currentTimeMillis();
+        
+        // Phase 3: Recovery (service comes back)
+        // Wait for circuit breaker to transition to half-open and then closed
+        await().atMost(maxRecoveryTime, TimeUnit.MILLISECONDS).untilAsserted(() -> {
+            assertThat(paymentCircuitBreaker.getState()).isIn(
+                CircuitBreaker.State.HALF_OPEN, 
+                CircuitBreaker.State.CLOSED
+            );
+        });
+        
+        // Execute recovery requests
+        int successfulRecoveryRequests = 0;
+        for (int i = 0; i < recoveryRequests; i++) {
+            try {
+                PaymentRequest request = new PaymentRequest("recovery-" + i, 100.0, "USD");
+                PaymentResult result = resilientQueryService.processPayment(request).get(5, TimeUnit.SECONDS);
+                if ("SUCCESS".equals(result.getStatus())) {
+                    successfulRecoveryRequests++;
+                }
+            } catch (Exception e) {
+                // Some requests may still fail during recovery
+            }
+        }
+        
+        long totalRecoveryTime = System.currentTimeMillis() - recoveryStartTime;
+        long totalTestTime = System.currentTimeMillis() - testStartTime;
+        
+        System.out.println("=== Recovery Performance Test Results ===");
+        System.out.println("Outage Duration: " + (recoveryStartTime - outageStartTime) + " ms");
+        System.out.println("Recovery Time: " + totalRecoveryTime + " ms");
+        System.out.println("Total Test Time: " + totalTestTime + " ms");
+        System.out.println("Successful Recovery Requests: " + successfulRecoveryRequests + "/" + recoveryRequests);
+        System.out.println("Final Circuit State: " + paymentCircuitBreaker.getState());
+        
+        // Validate recovery targets
+        assertThat(totalRecoveryTime).isLessThan(maxRecoveryTime);
+        assertThat(successfulRecoveryRequests).isGreaterThan(recoveryRequests * 0.8); // 80% success rate during recovery
+        
+        // Eventually circuit should be closed
+        await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+            assertThat(paymentCircuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        });
+    }
+
+    @Test
+    void shouldMaintainPerformanceUnderLoad() throws Exception {
+        // High load test with mixed success/failure scenarios
+        final int totalRequests = 500;
+        final int concurrentThreads = 20;
+        final long maxResponseTime = 1000; // 1 second max response time
+        final double minThroughput = 50; // 50 req/sec minimum
+        
+        // Configure service with 95% success rate
+        AtomicInteger callCount = new AtomicInteger(0);
+        when(externalPaymentService.processPayment(any()))
+            .then(invocation -> {
+                int count = callCount.incrementAndGet();
+                
+                // Add some processing delay
+                Thread.sleep(10);
+                
+                if (count % 20 == 0) { // 5% failure rate
+                    throw new SocketTimeoutException("Load test timeout");
+                }
+                return PaymentResult.success("Load test success", "txn-load-" + count);
+            });
+
+        ExecutorService executor = Executors.newFixedThreadPool(concurrentThreads);
+        AtomicLong totalResponseTime = new AtomicLong(0);
+        AtomicLong maxSingleResponseTime = new AtomicLong(0);
+        AtomicInteger completedRequests = new AtomicInteger(0);
+        
+        long testStartTime = System.currentTimeMillis();
+        
+        CompletableFuture<Void>[] futures = new CompletableFuture[totalRequests];
+        
+        for (int i = 0; i < totalRequests; i++) {
+            final int requestId = i;
+            futures[i] = CompletableFuture.runAsync(() -> {
+                long requestStartTime = System.currentTimeMillis();
+                try {
+                    PaymentRequest request = new PaymentRequest("load-" + requestId, 100.0, "USD");
+                    resilientQueryService.processPayment(request).get(10, TimeUnit.SECONDS);
+                    
+                    long responseTime = System.currentTimeMillis() - requestStartTime;
+                    totalResponseTime.addAndGet(responseTime);
+                    maxSingleResponseTime.updateAndGet(val -> Math.max(val, responseTime));
+                    completedRequests.incrementAndGet();
+                    
+                } catch (Exception e) {
+                    // Even failures should complete quickly
+                    long responseTime = System.currentTimeMillis() - requestStartTime;
+                    totalResponseTime.addAndGet(responseTime);
+                    completedRequests.incrementAndGet();
+                }
+            }, executor);
+        }
+        
+        // Wait for all requests
+        CompletableFuture.allOf(futures).get(30, TimeUnit.SECONDS);
+        
+        long testDuration = System.currentTimeMillis() - testStartTime;
+        
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+        
+        // Calculate performance metrics
+        double averageResponseTime = (double) totalResponseTime.get() / completedRequests.get();
+        double throughput = (double) completedRequests.get() / (testDuration / 1000.0);
+        
+        System.out.println("=== Load Performance Test Results ===");
+        System.out.println("Completed Requests: " + completedRequests.get() + "/" + totalRequests);
+        System.out.println("Average Response Time: " + String.format("%.2f ms", averageResponseTime));
+        System.out.println("Max Response Time: " + maxSingleResponseTime.get() + " ms");
+        System.out.println("Throughput: " + String.format("%.2f req/sec", throughput));
+        System.out.println("Test Duration: " + testDuration + " ms");
+        
+        // Validate performance targets
+        assertThat(averageResponseTime).isLessThan(200); // < 200ms average
+        assertThat(maxSingleResponseTime.get()).isLessThan(maxResponseTime); // < 1s max
+        assertThat(throughput).isGreaterThan(minThroughput); // > 50 req/sec
+        assertThat(completedRequests.get()).isEqualTo(totalRequests); // All requests complete
+        
+        // Validate circuit breaker remained stable under load
+        assertThat(paymentCircuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+    }
+}

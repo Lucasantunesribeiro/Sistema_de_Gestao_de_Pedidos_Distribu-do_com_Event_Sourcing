@@ -1,0 +1,225 @@
+package com.ordersystem.query.service;
+
+import com.ordersystem.query.dto.OrderSummary;
+import com.ordersystem.query.dto.StockLevel;
+import com.ordersystem.query.dto.PaymentResult;
+import com.ordersystem.query.dto.PaymentRequest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.client.HttpServerErrorException;
+
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
+/**
+ * Tests for intelligent fallback strategies
+ * Validates graceful degradation during service outages
+ */
+@ExtendWith(MockitoExtension.class)
+class ResilientQueryServiceTest {
+
+    @Mock
+    private ExternalPaymentService externalPaymentService;
+    
+    @Mock
+    private ExternalInventoryService externalInventoryService;
+    
+    @Mock
+    private CacheService cacheService;
+    
+    @Mock
+    private PaymentQueueService paymentQueueService;
+    
+    @Mock
+    private BackupPaymentProvider backupPaymentProvider;
+
+    private ResilientQueryService resilientQueryService;
+
+    @BeforeEach
+    void setUp() {
+        resilientQueryService = new ResilientQueryService(
+            externalPaymentService,
+            externalInventoryService,
+            cacheService,
+            paymentQueueService,
+            backupPaymentProvider
+        );
+    }
+
+    @Test
+    void shouldFallbackToQueueWhenPaymentServiceTemporarilyDown() throws ExecutionException, InterruptedException {
+        // Given
+        PaymentRequest request = new PaymentRequest("order-123", 100.0, "USD");
+        when(externalPaymentService.processPayment(any()))
+            .thenThrow(new SocketTimeoutException("Service temporarily unavailable"));
+        
+        // When
+        CompletableFuture<PaymentResult> result = resilientQueryService.processPayment(request);
+        
+        // Then
+        PaymentResult paymentResult = result.get();
+        assertThat(paymentResult.getStatus()).isEqualTo("QUEUED");
+        assertThat(paymentResult.getMessage()).contains("Payment queued for retry");
+    }
+
+    @Test
+    void shouldFallbackToBackupProviderWhenMainProviderFails() throws ExecutionException, InterruptedException {
+        // Given
+        PaymentRequest request = new PaymentRequest("order-123", 100.0, "USD");
+        when(externalPaymentService.processPayment(any()))
+            .thenThrow(new HttpServerErrorException(org.springframework.http.HttpStatus.BAD_GATEWAY));
+        when(backupPaymentProvider.processPayment(any()))
+            .thenReturn(CompletableFuture.completedFuture(
+                new PaymentResult("SUCCESS", "Processed by backup provider", "txn-backup-123")));
+        
+        // When
+        CompletableFuture<PaymentResult> result = resilientQueryService.processPayment(request);
+        
+        // Then
+        PaymentResult paymentResult = result.get();
+        assertThat(paymentResult.getStatus()).isEqualTo("SUCCESS");
+        assertThat(paymentResult.getMessage()).contains("backup provider");
+    }
+
+    @Test
+    void shouldRequireManualApprovalWhenAllPaymentOptionsExhausted() throws ExecutionException, InterruptedException {
+        // Given
+        PaymentRequest request = new PaymentRequest("order-123", 100.0, "USD");
+        when(externalPaymentService.processPayment(any()))
+            .thenThrow(new ConnectException("All payment providers down"));
+        when(backupPaymentProvider.processPayment(any()))
+            .thenThrow(new ConnectException("Backup provider also down"));
+        
+        // When
+        CompletableFuture<PaymentResult> result = resilientQueryService.processPayment(request);
+        
+        // Then
+        PaymentResult paymentResult = result.get();
+        assertThat(paymentResult.getStatus()).isEqualTo("PENDING_APPROVAL");
+        assertThat(paymentResult.getMessage()).contains("manual approval");
+    }
+
+    @Test
+    void shouldFallbackToCachedDataForInventoryCheck() {
+        // Given
+        String productId = "product-123";
+        when(externalInventoryService.checkStockLevel(anyString()))
+            .thenThrow(new SocketTimeoutException("Inventory service timeout"));
+        
+        StockLevel cachedLevel = new StockLevel(productId, 10, false);
+        when(cacheService.getCachedStockLevel(productId))
+            .thenReturn(Optional.of(cachedLevel));
+        
+        // When
+        StockLevel result = resilientQueryService.checkStockLevel(productId);
+        
+        // Then
+        assertThat(result).isEqualTo(cachedLevel);
+        assertThat(result.getQuantity()).isEqualTo(10);
+        assertThat(result.isStale()).isFalse();
+    }
+
+    @Test
+    void shouldUseConservativeEstimateWhenCacheStale() {
+        // Given
+        String productId = "product-123";
+        when(externalInventoryService.checkStockLevel(anyString()))
+            .thenThrow(new ConnectException("Service unavailable"));
+        
+        StockLevel staleLevel = new StockLevel(productId, 20, true);
+        when(cacheService.getCachedStockLevel(productId))
+            .thenReturn(Optional.of(staleLevel));
+        
+        // When
+        StockLevel result = resilientQueryService.checkStockLevel(productId);
+        
+        // Then
+        assertThat(result.getProductId()).isEqualTo(productId);
+        assertThat(result.getQuantity()).isEqualTo(5); // Conservative estimate
+        assertThat(result.isEstimated()).isTrue();
+    }
+
+    @Test
+    void shouldQueueInventoryReservationWhenServiceDown() {
+        // Given
+        String productId = "product-123";
+        int quantity = 3;
+        when(externalInventoryService.reserveStock(anyString(), any(Integer.class)))
+            .thenThrow(new HttpServerErrorException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+        
+        // When
+        var result = resilientQueryService.reserveStock(productId, quantity);
+        
+        // Then
+        assertThat(result.getStatus()).isEqualTo("DEFERRED");
+        assertThat(result.getMessage()).contains("reservation queued");
+    }
+
+    @Test
+    void shouldProvideGracefulDegradationForOrderSummaries() {
+        // Given
+        String orderId = "order-123";
+        when(externalPaymentService.getPaymentStatus(anyString()))
+            .thenThrow(new SocketTimeoutException("Payment service down"));
+        when(externalInventoryService.getReservationStatus(anyString()))
+            .thenThrow(new ConnectException("Inventory service down"));
+        
+        // When
+        OrderSummary result = resilientQueryService.getOrderSummary(orderId);
+        
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getOrderId()).isEqualTo(orderId);
+        assertThat(result.getPaymentStatus()).isEqualTo("UNKNOWN");
+        assertThat(result.getInventoryStatus()).isEqualTo("UNKNOWN");
+        assertThat(result.hasPartialData()).isTrue();
+    }
+
+    @Test
+    void shouldRecoverGracefullyFromCircuitBreakerOpen() throws ExecutionException, InterruptedException {
+        // Given
+        PaymentRequest request = new PaymentRequest("order-123", 100.0, "USD");
+        
+        // Simulate circuit breaker open
+        when(externalPaymentService.processPayment(any()))
+            .thenThrow(new RuntimeException("Circuit breaker is OPEN"));
+        
+        // When
+        CompletableFuture<PaymentResult> result = resilientQueryService.processPayment(request);
+        
+        // Then
+        PaymentResult paymentResult = result.get();
+        assertThat(paymentResult.getStatus()).isIn("QUEUED", "PENDING_APPROVAL");
+    }
+
+    @Test
+    void shouldMaintainPerformanceMetricsDuringFallback() {
+        // Given
+        String productId = "product-123";
+        long startTime = System.currentTimeMillis();
+        
+        when(externalInventoryService.checkStockLevel(anyString()))
+            .thenThrow(new SocketTimeoutException("Service timeout"));
+        when(cacheService.getCachedStockLevel(productId))
+            .thenReturn(Optional.of(new StockLevel(productId, 5, false)));
+        
+        // When
+        StockLevel result = resilientQueryService.checkStockLevel(productId);
+        long duration = System.currentTimeMillis() - startTime;
+        
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(duration).isLessThan(200); // Fallback should be fast
+    }
+}
