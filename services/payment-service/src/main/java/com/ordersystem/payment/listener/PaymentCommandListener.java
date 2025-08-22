@@ -21,42 +21,76 @@ public class PaymentCommandListener {
     @Autowired
     private PaymentService paymentService;
 
-    @RabbitListener(queues = "payment.process.queue")
+    @RabbitListener(queues = "payment.processing.queue", 
+                containerFactory = "rabbitListenerContainerFactory")
     public void handlePaymentProcessingCommand(@Payload PaymentProcessingCommand command,
-                                             @Header(value = "X-Correlation-ID", required = false) String correlationId) {
+                                             @Header(value = "correlationId", required = false) String correlationId) {
         
-        if (correlationId != null) {
-            MDC.put("correlationId", correlationId);
+        // Set correlation ID for tracking
+        if (correlationId == null) {
+            correlationId = java.util.UUID.randomUUID().toString();
         }
+        MDC.put("correlationId", correlationId);
         
         try {
-            logger.info("Processing PaymentProcessingCommand for order {}, amount: {}, correlationId: {}", 
-                       command.getOrderId(), command.getTotalAmount(), correlationId);
+            logger.info("[{}] Received PaymentProcessingCommand for order {}, customer: {}, amount: {}", 
+                       correlationId, command.getOrderId(), command.getCustomerId(), command.getTotalAmount());
 
-            // Get amount as BigDecimal
-            BigDecimal amount = command.getTotalAmount();
-            
-            // Default payment method for simulation
-            String paymentMethod = "CREDIT_CARD";
+            // Validate command
+            if (command.getOrderId() == null || command.getTotalAmount() == null) {
+                logger.error("[{}] Invalid PaymentProcessingCommand: missing required fields", correlationId);
+                return;
+            }
+
+            // Check if payment already exists to avoid duplicate processing
+            try {
+                paymentService.getPaymentByOrderId(command.getOrderId());
+                logger.warn("[{}] Payment already exists for order {}, skipping processing", 
+                           correlationId, command.getOrderId());
+                return;
+            } catch (com.ordersystem.payment.exception.PaymentNotFoundException e) {
+                // No payment exists, proceed with processing
+                logger.debug("[{}] No existing payment found for order {}, proceeding with processing", 
+                            correlationId, command.getOrderId());
+            }
+
+            // Default payment method for simulation (could be enhanced to get from command)
+            String paymentMethod = determinePaymentMethod(command);
 
             // Process payment asynchronously
-            paymentService.processPayment(command.getOrderId(), amount, paymentMethod)
+            paymentService.processPayment(command.getOrderId(), command.getTotalAmount(), paymentMethod)
                     .thenAccept(payment -> {
-                        logger.info("PaymentProcessingCommand completed for order {}, payment: {}", 
-                                   command.getOrderId(), payment.getPaymentId());
+                        MDC.put("correlationId", correlationId);
+                        logger.info("[{}] PaymentProcessingCommand completed successfully for order {}, payment: {}, status: {}", 
+                                   correlationId, command.getOrderId(), payment.getPaymentId(), payment.getStatus());
+                        MDC.clear();
                     })
                     .exceptionally(throwable -> {
-                        logger.error("PaymentProcessingCommand failed for order {}: {}", 
-                                    command.getOrderId(), throwable.getMessage(), throwable);
+                        MDC.put("correlationId", correlationId);
+                        logger.error("[{}] PaymentProcessingCommand failed for order {}: {}", 
+                                    correlationId, command.getOrderId(), throwable.getMessage(), throwable);
+                        MDC.clear();
                         return null;
                     });
 
+            logger.debug("[{}] PaymentProcessingCommand handling initiated for order {}", 
+                        correlationId, command.getOrderId());
+
         } catch (Exception e) {
-            logger.error("Error processing PaymentProcessingCommand for order {}: {}", 
-                        command.getOrderId(), e.getMessage(), e);
-            throw e;
+            logger.error("[{}] Error processing PaymentProcessingCommand for order {}: {}", 
+                        correlationId, command.getOrderId(), e.getMessage(), e);
+            // In a production system, you might want to send to a dead letter queue here
         } finally {
             MDC.clear();
         }
+    }
+
+    /**
+     * Determines payment method based on command or applies default logic
+     */
+    private String determinePaymentMethod(PaymentProcessingCommand command) {
+        // In a real system, this could come from the command or customer preferences
+        // For now, we'll use a default method
+        return "CREDIT_CARD";
     }
 }

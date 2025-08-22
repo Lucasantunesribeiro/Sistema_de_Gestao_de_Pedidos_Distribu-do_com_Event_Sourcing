@@ -1,24 +1,59 @@
 package com.ordersystem.payment.model;
 
 import com.ordersystem.shared.events.PaymentStatus;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Entity
+@Table(name = "payments")
 public class Payment {
     
+    @Id
+    @Column(name = "payment_id", nullable = false, length = 36)
     private String paymentId;
+    
+    @NotNull
+    @Column(name = "order_id", nullable = false, length = 36)
     private String orderId;
+    
+    @NotNull
+    @Positive
+    @Column(name = "amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
     private PaymentStatus status;
+    
+    @Column(name = "payment_method", length = 50)
     private String paymentMethod;
+    
+    @Column(name = "gateway_transaction_id", length = 100)
     private String gatewayTransactionId;
+    
+    @Column(name = "failure_reason", length = 500)
     private String failureReason;
+    
+    @Column(name = "error_code", length = 50)
     private String errorCode;
+    
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+    
+    @Column(name = "processed_at")
     private LocalDateTime processedAt;
+    
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+    
+    @Column(name = "retry_count", nullable = false)
     private int retryCount;
+    
+    @Column(name = "correlation_id", length = 36)
     private String correlationId;
 
     // Default constructor

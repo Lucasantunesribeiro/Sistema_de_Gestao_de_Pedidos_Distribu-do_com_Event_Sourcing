@@ -1,8 +1,11 @@
 package com.ordersystem.payment.service;
 
 import com.ordersystem.payment.exception.PaymentProcessingException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,27 +20,29 @@ public class PaymentGatewayService {
 
     private static final Logger logger = LoggerFactory.getLogger(PaymentGatewayService.class);
 
-    @Value("${payment.processing.simulation.enabled:true}")
+    @Value("${payment.gateway.mock.enabled:true}")
     private boolean simulationEnabled;
 
-    @Value("${payment.processing.simulation.success-rate:0.9}")
-    private double successRate;
+    @Value("${payment.gateway.mock.success-rate:80}")
+    private int successRatePercent;
 
-    @Value("${payment.processing.simulation.processing-delay:1000}")
-    private long processingDelayMs;
+    @Value("${payment.gateway.timeout:30s}")
+    private String gatewayTimeout;
 
     private final Random random = new Random();
 
+    @CircuitBreaker(name = "payment-gateway", fallbackMethod = "fallbackPaymentProcessing")
+    @Retry(name = "payment-gateway")
     public CompletableFuture<PaymentGatewayResponse> processPayment(String orderId, BigDecimal amount, String paymentMethod) {
-        logger.info("Processing payment for order {}, amount: {}, method: {}", orderId, amount, paymentMethod);
+        String correlationId = MDC.get("correlationId");
+        logger.info("[{}] Processing payment for order {}, amount: {}, method: {}", 
+                    correlationId, orderId, amount, paymentMethod);
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // Simulate processing delay
-                if (simulationEnabled) {
-                    TimeUnit.MILLISECONDS.sleep(processingDelayMs);
-                }
-
+                // Set correlation ID in async context
+                MDC.put("correlationId", correlationId);
+                
                 // Validate amount
                 if (amount.compareTo(BigDecimal.ZERO) <= 0) {
                     throw new PaymentProcessingException(orderId, "Invalid amount: " + amount, "INVALID_AMOUNT");
@@ -48,33 +53,51 @@ public class PaymentGatewayService {
                     throw new PaymentProcessingException(orderId, "Payment method is required", "MISSING_PAYMENT_METHOD");
                 }
 
-                // Simulate payment processing
+                // Process payment based on mode
                 if (simulationEnabled) {
                     return simulatePaymentProcessing(orderId, amount, paymentMethod);
                 } else {
-                    // In a real implementation, this would call the actual payment gateway
                     return processRealPayment(orderId, amount, paymentMethod);
                 }
 
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new PaymentProcessingException(orderId, "Payment processing interrupted", "PROCESSING_INTERRUPTED");
             } catch (PaymentProcessingException e) {
+                logger.warn("[{}] Payment processing failed for order {}: {}", correlationId, orderId, e.getMessage());
                 throw e;
             } catch (Exception e) {
-                logger.error("Unexpected error processing payment for order {}: {}", orderId, e.getMessage(), e);
+                logger.error("[{}] Unexpected error processing payment for order {}: {}", correlationId, orderId, e.getMessage(), e);
                 throw new PaymentProcessingException(orderId, "Unexpected error during payment processing", "GATEWAY_ERROR");
+            } finally {
+                MDC.clear();
             }
         });
+    }
+
+    /**
+     * Fallback method for circuit breaker
+     */
+    public CompletableFuture<PaymentGatewayResponse> fallbackPaymentProcessing(String orderId, BigDecimal amount, String paymentMethod, Exception ex) {
+        logger.error("Payment gateway circuit breaker activated for order {}: {}", orderId, ex.getMessage());
+        
+        return CompletableFuture.completedFuture(
+            PaymentGatewayResponse.declined("Gateway temporarily unavailable", "GATEWAY_UNAVAILABLE")
+        );
     }
 
     private PaymentGatewayResponse simulatePaymentProcessing(String orderId, BigDecimal amount, String paymentMethod) {
         logger.debug("Simulating payment processing for order {}", orderId);
 
-        // Simulate different failure scenarios
-        double randomValue = random.nextDouble();
+        try {
+            // Simulate processing delay (1-3 seconds)
+            TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt(2000));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new PaymentProcessingException(orderId, "Payment processing interrupted", "PROCESSING_INTERRUPTED");
+        }
 
-        if (randomValue > successRate) {
+        // Simulate different failure scenarios
+        int randomValue = random.nextInt(100);
+
+        if (randomValue >= successRatePercent) {
             // Simulate various failure reasons
             String[] failureReasons = {
                 "Insufficient funds",

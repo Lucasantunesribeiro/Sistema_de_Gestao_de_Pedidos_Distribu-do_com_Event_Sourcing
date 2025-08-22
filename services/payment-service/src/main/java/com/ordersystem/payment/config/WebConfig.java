@@ -14,18 +14,18 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
+        registry.addMapping("/**")
                 .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders("*")
                 .allowCredentials(true)
-                .exposedHeaders("X-Correlation-ID", "X-Total-Count")
+                .exposedHeaders("correlationId", "X-Total-Count")
                 .maxAge(3600);
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(correlationIdInterceptor)
-                .addPathPatterns("/api/**");
+                .addPathPatterns("/payments/**", "/actuator/**");
     }
 }

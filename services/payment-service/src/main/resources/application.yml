@@ -3,6 +3,42 @@ spring:
     name: payment-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
+  
+  # Database Configuration
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:paymentdb}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
+    hikari:
+      connection-timeout: 10000
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
+        format_sql: false
+        show_sql: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        cache:
+          use_second_level_cache: false
+
+  # H2 Console (for development)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
 
   # RabbitMQ Configuration
   rabbitmq:
@@ -21,21 +57,20 @@ spring:
           initial-interval: 1000
           max-attempts: 3
           multiplier: 2
-        prefetch: 5
-        concurrency: 1
-        max-concurrency: 3
+        prefetch: 10
+        concurrency: 2
+        max-concurrency: 5
 
 # Server Configuration
 server:
   port: 8082
   servlet:
-    context-path: /api/payments
+    context-path: /
   tomcat:
     threads:
-      max: 100
+      max: 200
       min-spare: 10
     connection-timeout: 20000
-    max-connections: 4096
 
 # Management and Monitoring
 management:
@@ -51,59 +86,75 @@ management:
   health:
     defaults:
       enabled: true
+    db:
+      enabled: true
     rabbit:
       enabled: true
   metrics:
     export:
       prometheus:
         enabled: true
+    tags:
+      service: payment-service
+      environment: ${SPRING_PROFILES_ACTIVE:local}
 
 # Logging Configuration
 logging:
   level:
     com.ordersystem.payment: INFO
     org.springframework.amqp: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
-  file:
-    name: logs/payment-service.log
-    max-size: 10MB
-    max-history: 30
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
 
-# Application Specific Configuration
-app:
-  rabbitmq:
-    connection-timeout: 30s
-    requested-heartbeat: 60s
-    channel-cache-size: 25
-    publisher-confirms: true
-    publisher-returns: true
-    max-retry-attempts: 3
-    initial-interval: 1s
-    multiplier: 2.0
-    max-interval: 10s
-  
-  resilience:
-    max-retries: 3
-    initial-delay: 1s
-    max-delay: 30s
-    backoff-multiplier: 2.0
-    failure-threshold: 5
-    circuit-breaker-timeout: 1m
-    rabbitmq-connection-timeout: 30s
-    health-check-interval: 30s
-    health-check-failure-threshold: 3
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET_KEY:defaultSecretForLocalDev}
+  access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:900000}  # 15 minutes
+  refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:604800000}  # 7 days
 
-# Payment Service Specific Configuration
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      payment-gateway:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        minimum-number-of-calls: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+        
+  retry:
+    instances:
+      payment-gateway:
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - com.ordersystem.payment.exception.PaymentGatewayException
+
+# Payment Gateway Configuration
 payment:
-  processing:
+  gateway:
     timeout: 30s
-    retry-attempts: 2
-    simulation:
+    max-retries: 3
+    mock:
       enabled: true
-      success-rate: 0.9
-      processing-delay: 1s
+      success-rate: 80  # 80% success rate for simulation
+    stripe:
+      secret-key: ${STRIPE_SECRET_KEY:sk_test_mock}
+      public-key: ${STRIPE_PUBLIC_KEY:pk_test_mock}
+      webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_mock}
+    paypal:
+      client-id: ${PAYPAL_CLIENT_ID:mock_client_id}
+      client-secret: ${PAYPAL_CLIENT_SECRET:mock_client_secret}
+      mode: ${PAYPAL_MODE:sandbox}
 
 ---
 # Docker Profile
@@ -111,19 +162,76 @@ spring:
   config:
     activate:
       on-profile: docker
-
-logging:
-  level:
-    com.ordersystem.payment: DEBUG
+  datasource:
+    url: jdbc:postgresql://payment-db:5432/paymentdb
+    username: postgres
+    password: password
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
 
 ---
-# Railway Profile
+# Render Profile
 spring:
   config:
     activate:
-      on-profile: railway
+      on-profile: render
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:paymentdb}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
+  jpa:
+    properties:
+      hibernate:
+        dialect: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 logging:
   level:
     com.ordersystem.payment: INFO
-    org.springframework.web: WARN
+
+---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: production
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.postgresql.dialect.PostgreSQLDialect
+        show_sql: false
+        format_sql: false
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+
+payment:
+  gateway:
+    mock:
+      enabled: false
+
+logging:
+  level:
+    com.ordersystem.payment: WARN
+    org.springframework: WARN

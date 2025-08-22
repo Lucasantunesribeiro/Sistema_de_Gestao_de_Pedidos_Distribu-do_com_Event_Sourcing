@@ -29,9 +29,9 @@ public class RabbitMQConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(RabbitMQConfig.class);
 
-    public static final String PAYMENT_EXCHANGE = "payment.exchange";
-    public static final String PAYMENT_PROCESS_QUEUE = "payment.process.queue";
-    public static final String PAYMENT_QUEUE = "payment.queue";
+    public static final String PAYMENT_EXCHANGE = "order.exchange";
+    public static final String PAYMENT_PROCESSING_QUEUE = "payment.processing.queue";
+    public static final String PAYMENT_RESULTS_QUEUE = "payment.results.queue";
     public static final String DLX_EXCHANGE = "payment.dlx";
     public static final String DLQ_QUEUE = "payment.dlq";
 
@@ -93,33 +93,40 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Queue paymentProcessQueue() {
-        return QueueBuilder.durable(PAYMENT_PROCESS_QUEUE)
+    public Queue paymentProcessingQueue() {
+        return QueueBuilder.durable(PAYMENT_PROCESSING_QUEUE)
                 .withArgument("x-dead-letter-exchange", DLX_EXCHANGE)
                 .withArgument("x-dead-letter-routing-key", "failed")
                 .build();
     }
 
     @Bean
-    public Queue paymentQueue() {
-        return QueueBuilder.durable(PAYMENT_QUEUE)
+    public Queue paymentResultsQueue() {
+        return QueueBuilder.durable(PAYMENT_RESULTS_QUEUE)
                 .withArgument("x-dead-letter-exchange", DLX_EXCHANGE)
                 .withArgument("x-dead-letter-routing-key", "failed")
                 .build();
     }
 
     @Bean
-    public Binding paymentProcessBinding() {
-        return BindingBuilder.bind(paymentProcessQueue())
+    public Binding paymentProcessingBinding() {
+        return BindingBuilder.bind(paymentProcessingQueue())
                 .to(paymentExchange())
-                .with("payment.process");
+                .with("payment.processing");
     }
 
     @Bean
-    public Binding paymentBinding() {
-        return BindingBuilder.bind(paymentQueue())
+    public Binding paymentProcessedBinding() {
+        return BindingBuilder.bind(paymentResultsQueue())
                 .to(paymentExchange())
                 .with("payment.processed");
+    }
+
+    @Bean
+    public Binding paymentFailedBinding() {
+        return BindingBuilder.bind(paymentResultsQueue())
+                .to(paymentExchange())
+                .with("payment.failed");
     }
 
     @Bean
