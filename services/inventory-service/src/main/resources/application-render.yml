@@ -1,26 +1,33 @@
-﻿server:
-  port: ${PORT:8080}
+server:
+  port: 8083
 
 spring:
   profiles:
     active: render
   datasource:
-    url: ${DATABASE_URL:jdbc:h2:mem:testdb}
-    driver-class-name: org.postgresql.Driver
+    url: ${DATABASE_URL:jdbc:h2:mem:inventorydb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
     hikari:
-      maximum-pool-size: 20
+      maximum-pool-size: 10
       
   jpa:
     hibernate:
       ddl-auto: update
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    database-platform: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
+    show-sql: false
 
 logging:
   level:
     com.ordersystem: INFO
+    root: WARN
     
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
