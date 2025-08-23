@@ -1,8 +1,18 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Script de inicialização para Sistema de Gestão de Pedidos Distribuído
+# Inicia todos os microsserviços usando supervisord
+# Produzido por Claude Code para deploy no Render
 
 echo "🚀 Starting Distributed Order Management System..."
 
-# Create log directories
+# Debug: Verificar arquivos e diretórios
+echo "📁 Current directory: $(pwd)"
+echo "📄 Available files:"
+ls -la /app/
+
+# Create log directories  
 mkdir -p /var/log/supervisor
 mkdir -p /var/log
 
@@ -16,24 +26,38 @@ export HIBERNATE_DIALECT=org.hibernate.dialect.H2Dialect
 export JWT_SECRET_KEY=renderSecretKeyForProduction2024
 export JAVA_OPTS="-Xmx150m -XX:+UseContainerSupport"
 
-# Wait for services to be ready
+# Função para aguardar serviços estarem prontos
 wait_for_service() {
     local port=$1
     local service_name=$2
-    echo "⏳ Waiting for $service_name on port $port..."
+    echo "⏳ Aguardando $service_name na porta $port..."
     
     for i in $(seq 1 60); do
-        if nc -z localhost $port; then
-            echo "✅ $service_name is ready on port $port"
+        if nc -z localhost "$port" 2>/dev/null; then
+            echo "✅ $service_name está pronto na porta $port"
             return 0
         fi
         sleep 2
     done
     
-    echo "❌ $service_name failed to start on port $port"
+    echo "❌ $service_name falhou ao iniciar na porta $port"
     return 1
 }
 
+# Verificar se arquivos JAR existem
+echo "🔍 Verificando arquivos JAR..."
+for jar in order-service.jar payment-service.jar inventory-service.jar query-service.jar; do
+    if [[ -f "/app/$jar" ]]; then
+        echo "✅ $jar encontrado"
+    else
+        echo "❌ $jar NÃO encontrado"
+        exit 1
+    fi
+done
+
 # Start all services with supervisor
-echo "🔄 Starting all services..."
-exec supervisord -c /etc/supervisor/conf.d/supervisord.conf
+echo "🔄 Iniciando todos os serviços com supervisord..."
+echo "📋 Configuração: /etc/supervisor/conf.d/supervisord.conf"
+
+# Usar exec para que supervisord seja PID 1
+exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf
