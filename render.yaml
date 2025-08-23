@@ -6,8 +6,6 @@ services:
     plan: free
     region: oregon
     envVars:
-      - key: PORT
-        value: 8080
       - key: SPRING_PROFILES_ACTIVE
         value: render
       - key: DATABASE_URL
@@ -15,12 +13,20 @@ services:
       - key: DATABASE_USERNAME
         value: sa
       - key: DATABASE_PASSWORD
-        value: password
-      - key: RABBITMQ_ENABLED
-        value: false
-      - key: REDIS_ENABLED
-        value: false
+        value: 
+      - key: DATABASE_DRIVER
+        value: org.h2.Driver
+      - key: HIBERNATE_DIALECT
+        value: org.hibernate.dialect.H2Dialect
+      - key: RABBITMQ_HOST
+        value: localhost
+      - key: RABBITMQ_PORT
+        value: 5672
+      - key: RABBITMQ_USERNAME
+        value: guest
+      - key: RABBITMQ_PASSWORD
+        value: guest
+      - key: JWT_SECRET_KEY
+        value: renderSecretKeyForProduction2024
       - key: JAVA_OPTS
         value: -Xmx400m -XX:+UseContainerSupport
-    buildCommand: echo "Building complete distributed system..."
-    startCommand: ./start-services.sh
