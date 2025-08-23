@@ -64,7 +64,7 @@ public class OrderQueryController {
         metrics.put("totalOrders", allOrders.size());
         
         double totalRevenue = allOrders.stream()
-            .mapToDouble(order -> order.getTotalAmount() != null ? order.getTotalAmount() : 0.0)
+            .mapToDouble(OrderReadModel::getTotalAmount)
             .sum();
         metrics.put("totalRevenue", totalRevenue);
         
