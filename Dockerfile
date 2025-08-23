@@ -41,11 +41,6 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY start-all-services.sh /app/start-all-services.sh
 RUN dos2unix /app/start-all-services.sh && chmod +x /app/start-all-services.sh
 
-# Verification steps (temporary debug - remove after validation)
-RUN ls -la /app && echo "Files in /app:" && \
-    file /app/start-all-services.sh && echo "Script file info:" && \
-    head -3 /app/start-all-services.sh && echo "Script first lines:"
-
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD nc -z localhost 8081 && nc -z localhost 8082 && nc -z localhost 8083 && nc -z localhost 8084 || exit 1
