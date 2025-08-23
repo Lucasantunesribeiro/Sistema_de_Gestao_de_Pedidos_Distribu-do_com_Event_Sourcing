@@ -22,8 +22,8 @@ RUN cd services/order-query-service && mvn clean package -DskipTests -q
 FROM openjdk:17-jdk-alpine
 WORKDIR /app
 
-# Install process manager
-RUN apk add --no-cache supervisor
+# Install process manager and utilities
+RUN apk add --no-cache supervisor netcat-openbsd
 
 # Copy all service JARs
 COPY --from=build /app/services/order-service/target/order-service-1.0.0.jar order-service.jar
