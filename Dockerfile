@@ -41,9 +41,9 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY start-all-services.sh /app/start-all-services.sh
 RUN dos2unix /app/start-all-services.sh && chmod +x /app/start-all-services.sh
 
-# Health check
+# Health check - apenas verificar porta principal do Render
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD nc -z localhost 8081 && nc -z localhost 8082 && nc -z localhost 8083 && nc -z localhost 8084 || exit 1
+  CMD nc -z localhost ${PORT:-8080} || exit 1
 
 # Expose all ports
 EXPOSE 8080 8081 8082 8083 8084
