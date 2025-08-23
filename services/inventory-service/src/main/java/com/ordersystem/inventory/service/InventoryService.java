@@ -245,7 +245,7 @@ public class InventoryService {
                 previousQuantity, 
                 item.getAvailableQuantity(), 
                 reason, 
-                InventoryStatus.IN_STOCK
+                InventoryStatus.AVAILABLE
             );
             
             logger.info("Restocked {} units of product {} - reason: {}", quantity, productId, reason);
@@ -299,7 +299,8 @@ public class InventoryService {
      * Create new inventory item
      */
     public InventoryItem createItem(InventoryItem item) {
-        return inventoryRepository.save(item);
+        inventoryRepository.save(item);
+        return item;
     }
     
     /**

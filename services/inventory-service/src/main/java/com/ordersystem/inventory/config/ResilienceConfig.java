@@ -31,7 +31,6 @@ public class ResilienceConfig {
         return RetryConfig.custom()
                 .maxAttempts(3)
                 .waitDuration(Duration.ofMillis(500))
-                .exponentialBackoffMultiplier(2.0)
                 .build();
     }
     

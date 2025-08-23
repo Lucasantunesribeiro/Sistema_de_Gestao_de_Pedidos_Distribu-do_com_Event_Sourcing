@@ -21,6 +21,9 @@ public class InventoryReservedEvent {
     @JsonProperty("timestamp")
     private String timestamp;
     
+    @JsonProperty("reservationId")
+    private String reservationId;
+    
     // Default constructor for JSON deserialization
     public InventoryReservedEvent() {}
     
@@ -30,6 +33,21 @@ public class InventoryReservedEvent {
         this.items = items;
         this.totalAmount = totalAmount;
         this.timestamp = java.time.Instant.now().toString();
+    }
+    
+    public InventoryReservedEvent(String orderId, String customerId, List<OrderItem> items, String reservationId, String timestamp) {
+        this.orderId = orderId;
+        this.customerId = customerId;
+        this.items = items;
+        this.reservationId = reservationId;
+        this.timestamp = timestamp;
+        this.totalAmount = calculateTotalAmount(items);
+    }
+    
+    private BigDecimal calculateTotalAmount(List<OrderItem> items) {
+        return items.stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
     
     // Getters and Setters
@@ -47,4 +65,7 @@ public class InventoryReservedEvent {
     
     public String getTimestamp() { return timestamp; }
     public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+    
+    public String getReservationId() { return reservationId; }
+    public void setReservationId(String reservationId) { this.reservationId = reservationId; }
 } 
