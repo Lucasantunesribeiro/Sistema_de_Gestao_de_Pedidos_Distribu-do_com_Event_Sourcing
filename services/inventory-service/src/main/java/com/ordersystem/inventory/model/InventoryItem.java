@@ -98,12 +98,20 @@ public class InventoryItem {
         this.availableStock = availableStock;
         this.updatedAt = LocalDateTime.now();
     }
+    
+    // Alias methods for compatibility with InventoryService
+    public int getAvailableQuantity() { return availableStock; }
+    public void setAvailableQuantity(int quantity) { setAvailableStock(quantity); }
 
     public int getReservedStock() { return reservedStock; }
     public void setReservedStock(int reservedStock) { 
         this.reservedStock = reservedStock;
         this.updatedAt = LocalDateTime.now();
     }
+    
+    // Alias methods for compatibility with InventoryService
+    public int getReservedQuantity() { return reservedStock; }
+    public void setReservedQuantity(int quantity) { setReservedStock(quantity); }
 
     public double getPrice() { return price; }
     public void setPrice(double price) { 

@@ -279,6 +279,93 @@ public class InventoryService {
                                  pendingReservations, expiredReservations);
     }
     
+    // Methods required by InventoryController
+    
+    /**
+     * Get all items (alias for getAllInventoryItems)
+     */
+    public List<InventoryItem> getAllItems() {
+        return (List<InventoryItem>) getAllInventoryItems();
+    }
+    
+    /**
+     * Get single item (alias for getInventoryItem)
+     */
+    public InventoryItem getItem(String productId) {
+        return getInventoryItem(productId);
+    }
+    
+    /**
+     * Create new inventory item
+     */
+    public InventoryItem createItem(InventoryItem item) {
+        return inventoryRepository.save(item);
+    }
+    
+    /**
+     * Update stock quantity
+     */
+    public InventoryItem updateStock(String productId, int quantity) {
+        InventoryItem item = inventoryRepository.findByProductId(productId);
+        if (item != null) {
+            allocationService.restock(productId, quantity, "Manual stock update");
+            return inventoryRepository.findByProductId(productId); // Return updated item
+        }
+        return null;
+    }
+    
+    /**
+     * Reserve stock for order
+     */
+    public boolean reserveStock(String productId, int quantity, String orderId) {
+        try {
+            OrderItem orderItem = new OrderItem(productId, "Product " + productId, quantity, java.math.BigDecimal.ZERO);
+            List<OrderItem> items = List.of(orderItem);
+            
+            StockAllocationService.AllocationResult result = allocationService.allocateStock(
+                items, orderId, StockAllocationService.AllocationStrategy.FIFO);
+            
+            if (result.isSuccess()) {
+                // Create simple reservation record
+                String reservationId = UUID.randomUUID().toString();
+                List<StockReservation.ReservedItem> reservedItems = List.of(
+                    new StockReservation.ReservedItem(productId, "Product " + productId, quantity)
+                );
+                
+                StockReservation reservation = new StockReservation(
+                    reservationId, orderId, "system", reservedItems, reservationTimeoutMinutes);
+                reservationRepository.save(reservation);
+                
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            logger.error("Failed to reserve stock for product {} and order {}", productId, orderId, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Release reserved stock
+     */
+    public void releaseStock(String productId, int quantity, String orderId) {
+        try {
+            OrderItem orderItem = new OrderItem(productId, "Product " + productId, quantity, java.math.BigDecimal.ZERO);
+            List<OrderItem> items = List.of(orderItem);
+            
+            allocationService.releaseStock(items, orderId, "Manual release");
+            
+            // Remove reservation if exists
+            StockReservation reservation = reservationRepository.findByOrderId(orderId);
+            if (reservation != null) {
+                reservation.release();
+                reservationRepository.save(reservation);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to release stock for product {} and order {}", productId, orderId, e);
+        }
+    }
+
     public static class InventoryStats {
         private final long totalProducts;
         private final long totalAvailableStock;
