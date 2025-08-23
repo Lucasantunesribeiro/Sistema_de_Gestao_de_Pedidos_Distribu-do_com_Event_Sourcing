@@ -58,17 +58,20 @@ public class PaymentCommandListener {
             String paymentMethod = determinePaymentMethod(command);
 
             // Process payment asynchronously
-            paymentService.processPayment(command.getOrderId(), command.getTotalAmount(), paymentMethod)
+            final String finalCorrelationId = correlationId;
+            final String orderId = command.getOrderId();
+            
+            paymentService.processPayment(orderId, command.getTotalAmount(), paymentMethod)
                     .thenAccept(payment -> {
-                        MDC.put("correlationId", correlationId);
+                        MDC.put("correlationId", finalCorrelationId);
                         logger.info("[{}] PaymentProcessingCommand completed successfully for order {}, payment: {}, status: {}", 
-                                   correlationId, command.getOrderId(), payment.getPaymentId(), payment.getStatus());
+                                   finalCorrelationId, orderId, payment.getPaymentId(), payment.getStatus());
                         MDC.clear();
                     })
                     .exceptionally(throwable -> {
-                        MDC.put("correlationId", correlationId);
+                        MDC.put("correlationId", finalCorrelationId);
                         logger.error("[{}] PaymentProcessingCommand failed for order {}: {}", 
-                                    correlationId, command.getOrderId(), throwable.getMessage(), throwable);
+                                    finalCorrelationId, orderId, throwable.getMessage(), throwable);
                         MDC.clear();
                         return null;
                     });
