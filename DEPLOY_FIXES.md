@@ -171,7 +171,56 @@ git commit -m "fix(deploy): convert to bash with error handling and JAR verifica
 
 git add supervisord.conf
 git commit -m "fix(deploy): remove duplicate api-gateway and improve service configs"
+
+# Correção final
+git add Dockerfile
+git commit -m "fix(deploy): remove debug steps that require 'file' command"
 ```
+
+## ⚠️ Problema Identificado no Deploy
+
+**Erro:** `file: not found` na etapa de debug do Dockerfile
+
+**Causa:** Comando `file` não disponível por padrão no Alpine Linux
+
+**Solução:** Removidas etapas de debug temporárias (commit `fce7ae3`)
+
+**Status:** ✅ Corrigido - logs mostram que script está sendo copiado corretamente:
+```
+-rwxr-xr-x 1 root root 1960 Aug 23 18:44 start-all-services.sh
+```
+
+## ⚠️ PROBLEMA CRÍTICO IDENTIFICADO: Port Binding Conflicts
+
+**Erro:** Serviços crashando com `exit status 1` + "Port scan timeout, no open ports detected"
+
+**Causa Raiz:** 
+1. Todos os services configurados com `${PORT:8080}` no application-render.yml
+2. Supervisord forçando portas específicas com `-Dserver.port=808X`
+3. **CONFLITO**: Spring não consegue bind na porta devido a configurações conflitantes
+4. **Render só detecta $PORT**, outros serviços ficam inacessíveis externamente
+
+**Solução Implementada (commits `71c3755` + `9b3d851`):**
+
+### Arquitetura Corrigida:
+- **Order Service**: `${PORT:8080}` (porta principal do Render) - GATEWAY
+- **Payment Service**: `8082` (porta fixa interna)
+- **Inventory Service**: `8083` (porta fixa interna)  
+- **Query Service**: `8084` (porta fixa interna)
+
+### Configurações Spring:
+- H2 databases separados (orderdb, paymentdb, inventorydb, querydb)
+- Management endpoints com health details habilitados
+- Configuração consistente de datasource e JPA
+- Removido BOM de todos application-render.yml
+
+### Supervisord:
+- Removido `-Dserver.port` forçado (conflitava)
+- Order Service recebe environment `PORT` do Render
+- Permite Spring Boot configurar portas naturalmente
+
+### Health Check:
+- Ajustado para verificar apenas `${PORT:-8080}` principal
 
 ## 🎯 Performance Monitoring
 

@@ -59,5 +59,25 @@ done
 echo "🔄 Iniciando todos os serviços com supervisord..."
 echo "📋 Configuração: /etc/supervisor/conf.d/supervisord.conf"
 
+# Debug: Mostrar variáveis de ambiente importantes
+echo "🔍 Environment Debug:"
+echo "PORT=${PORT:-'not set'}"
+echo "DATABASE_URL=${DATABASE_URL:-'not set'}"
+echo "JAVA_OPTS=${JAVA_OPTS:-'not set'}"
+
+# Test port availability
+if [[ -n "${PORT:-}" ]]; then
+    echo "🔍 Testando disponibilidade da porta $PORT..."
+    if nc -z localhost "$PORT" 2>/dev/null; then
+        echo "⚠️ AVISO: Porta $PORT já está em uso!"
+    else
+        echo "✅ Porta $PORT disponível"
+    fi
+else
+    echo "⚠️ AVISO: Variável PORT não está definida, usando fallback 8080"
+    export PORT=8080
+fi
+
 # Usar exec para que supervisord seja PID 1
+echo "🚀 Iniciando supervisord com loglevel=debug..."
 exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf

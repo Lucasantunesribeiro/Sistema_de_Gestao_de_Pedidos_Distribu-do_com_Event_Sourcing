@@ -37,9 +37,11 @@ COPY --from=build /app/services/order-query-service/target/order-query-service-1
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Copy and prepare startup script
+# Copy and prepare startup scripts
 COPY start-all-services.sh /app/start-all-services.sh
-RUN dos2unix /app/start-all-services.sh && chmod +x /app/start-all-services.sh
+COPY start-simple.sh /app/start-simple.sh
+RUN dos2unix /app/start-all-services.sh /app/start-simple.sh && \
+    chmod +x /app/start-all-services.sh /app/start-simple.sh
 
 # Health check - apenas verificar porta principal do Render
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
@@ -48,5 +50,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Expose all ports
 EXPOSE 8080 8081 8082 8083 8084
 
-# Start all services with exec form
-ENTRYPOINT ["/app/start-all-services.sh"]
+# Start with simplified approach for troubleshooting
+ENTRYPOINT ["/app/start-simple.sh"]
