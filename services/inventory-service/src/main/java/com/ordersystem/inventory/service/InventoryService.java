@@ -127,7 +127,7 @@ public class InventoryService {
         if (reservation != null && reservation.getStatus() == StockReservation.ReservationStatus.PENDING) {
             // Convert reserved items to OrderItems for allocation service
             List<OrderItem> items = reservation.getReservedItems().stream()
-                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity()))
+                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity(), java.math.BigDecimal.ZERO))
                 .collect(Collectors.toList());
             
             // Confirm allocation
@@ -155,7 +155,7 @@ public class InventoryService {
         if (reservation != null) {
             // Convert reserved items to OrderItems for allocation service
             List<OrderItem> items = reservation.getReservedItems().stream()
-                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity()))
+                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity(), java.math.BigDecimal.ZERO))
                 .collect(Collectors.toList());
             
             // Release allocation
@@ -213,7 +213,7 @@ public class InventoryService {
             
             // Convert reserved items to OrderItems for release
             List<OrderItem> items = reservation.getReservedItems().stream()
-                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity()))
+                .map(item -> new OrderItem(item.getProductId(), item.getProductName(), item.getQuantity(), java.math.BigDecimal.ZERO))
                 .collect(Collectors.toList());
             
             // Release the stock

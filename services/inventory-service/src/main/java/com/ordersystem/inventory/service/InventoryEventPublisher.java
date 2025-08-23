@@ -78,7 +78,7 @@ public class InventoryEventPublisher {
                                                  List<OrderItem> items, String reason) {
         try {
             InventoryReservationFailedEvent event = new InventoryReservationFailedEvent(
-                orderId, customerId, items, reason, Instant.now().toString()
+                orderId, customerId, items, reason
             );
             
             String eventJson = objectMapper.writeValueAsString(event);
