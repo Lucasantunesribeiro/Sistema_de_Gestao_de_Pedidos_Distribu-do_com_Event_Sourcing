@@ -1,9 +1,8 @@
 server:
   port: 8083
+  address: 0.0.0.0
 
 spring:
-  profiles:
-    active: render
   datasource:
     url: ${DATABASE_URL:jdbc:h2:mem:inventorydb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
     username: ${DATABASE_USERNAME:sa}

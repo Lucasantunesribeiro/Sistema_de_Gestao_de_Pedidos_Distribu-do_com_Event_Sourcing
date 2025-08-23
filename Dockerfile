@@ -12,11 +12,11 @@ COPY services/order-query-service/ services/order-query-service/
 # Build shared events first
 RUN cd shared-events && mvn clean install -DskipTests -q
 
-# Build all services
-RUN cd services/order-service && mvn clean package -DskipTests -q
-RUN cd services/payment-service && mvn clean package -DskipTests -q  
-RUN cd services/inventory-service && mvn clean package -DskipTests -q
-RUN cd services/order-query-service && mvn clean package -DskipTests -q
+# Build all services with forced clean to ensure config changes are picked up
+RUN cd services/order-service && mvn clean package -DskipTests -q -U
+RUN cd services/payment-service && mvn clean package -DskipTests -q -U
+RUN cd services/inventory-service && mvn clean package -DskipTests -q -U
+RUN cd services/order-query-service && mvn clean package -DskipTests -q -U
 
 # Production stage
 FROM openjdk:17-jdk-alpine
