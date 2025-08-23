@@ -33,7 +33,7 @@ class HomeController {
         Map<String, Object> response = new java.util.HashMap<>();
         response.put("message", "🎉 SISTEMA DE GESTÃO DE PEDIDOS DISTRIBUÍDO - COMPLETO E FUNCIONAL!");
         response.put("service", "Distributed Order Management System");
-        response.put("version", "3.0.0-COMPLETE-FUNCTIONAL");
+        response.put("version", "3.1.0-API-GATEWAY-ACTIVE");
         response.put("status", "UP ✅");
         response.put("architecture", "Event Sourcing + CQRS + Microservices + RabbitMQ + Security");
         
