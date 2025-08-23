@@ -1,0 +1,22 @@
+# Ignorar arquivos desnecessarios no build
+.git
+.gitignore
+README.md
+*.md
+.env*
+node_modules
+.idea
+.vscode
+*.log
+.DS_Store
+Thumbs.db
+
+# Manter apenas o essencial para build
+!shared-events/
+!services/
+!pom.xml
+!start-all-services.sh
+!supervisord.conf
+
+# Ignorar target apenas durante build, mas permitir copia no estágio final
+target
