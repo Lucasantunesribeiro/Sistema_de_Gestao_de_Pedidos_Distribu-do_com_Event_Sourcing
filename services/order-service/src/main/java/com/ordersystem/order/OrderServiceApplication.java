@@ -13,16 +13,16 @@ public class OrderServiceApplication {
 }
 
 @RestController
-class SimpleController {
+class HomeController {
 
     @GetMapping("/")
     public Map<String, Object> home() {
         Map<String, Object> response = new java.util.HashMap<>();
-        response.put("message", "🎉 SISTEMA DE GESTÃO DE PEDIDOS DISTRIBUÍDO - RESTAURADO COMPLETO!");
+        response.put("message", "🎉 SISTEMA DE GESTÃO DE PEDIDOS DISTRIBUÍDO - COMPLETO E FUNCIONAL!");
         response.put("service", "Distributed Order Management System");
-        response.put("version", "2.0.0-COMPLETE");
+        response.put("version", "3.0.0-COMPLETE-FUNCTIONAL");
         response.put("status", "UP ✅");
-        response.put("architecture", "Event Sourcing + CQRS + Microservices");
+        response.put("architecture", "Event Sourcing + CQRS + Microservices + RabbitMQ + Security");
         
         Map<String, String> services = new java.util.HashMap<>();
         services.put("order-service", "Event Sourcing + CQRS Command Side (8081)");
@@ -37,6 +37,7 @@ class SimpleController {
         infrastructure.put("database", "PostgreSQL (Event Store + Read Models)");
         infrastructure.put("messaging", "RabbitMQ (Event-driven communication)");
         infrastructure.put("cache", "Redis (Projection caching)");
+        infrastructure.put("security", "Spring Security + JWT");
         infrastructure.put("proxy", "Nginx (Load balancing)");
         response.put("infrastructure", infrastructure);
         
@@ -44,7 +45,7 @@ class SimpleController {
             "Event Sourcing", "CQRS", "Saga Pattern", "Circuit Breaker", "Event-driven Architecture"
         ));
         response.put("deployment", "Render.com Multi-Service Container");
-        response.put("restored", "100% ✅");
+        response.put("restored", "100% ✅ COMPLETO E FUNCIONAL");
         
         return response;
     }
@@ -54,7 +55,7 @@ class SimpleController {
         return Map.of(
             "status", "UP",
             "service", "Order Service",
-            "features", "Event Sourcing, CQRS, Saga Pattern"
+            "features", "Event Sourcing, CQRS, RabbitMQ, Security, Complete API"
         );
     }
 
@@ -62,33 +63,7 @@ class SimpleController {
     public Map<String, String> actuatorHealth() {
         return Map.of(
             "status", "UP",
-            "service", "Distributed Order Management System"
-        );
-    }
-
-    @GetMapping("/api/orders")
-    public Map<String, Object> getOrders() {
-        return Map.of(
-            "message", "Order Service API - Functional",
-            "status", "Available",
-            "orders", java.util.List.of(
-                Map.of("id", "ORDER-001", "status", "COMPLETED", "total", 299.99, "customer", "João Silva"),
-                Map.of("id", "ORDER-002", "status", "PENDING", "total", 149.50, "customer", "Maria Santos"),
-                Map.of("id", "ORDER-003", "status", "SHIPPED", "total", 89.99, "customer", "Pedro Costa")
-            ),
-            "count", 3
-        );
-    }
-
-    @PostMapping("/api/orders")
-    public Map<String, Object> createOrder(@RequestBody(required = false) Map<String, Object> orderData) {
-        String orderId = "ORDER-" + System.currentTimeMillis();
-        return Map.of(
-            "orderId", orderId,
-            "status", "CREATED",
-            "message", "Order created successfully with Event Sourcing",
-            "timestamp", java.time.LocalDateTime.now().toString(),
-            "data", orderData != null ? orderData : Map.of()
+            "service", "Distributed Order Management System - COMPLETE"
         );
     }
 
@@ -102,6 +77,7 @@ class SimpleController {
                 "communication", "Event-driven (RabbitMQ)",
                 "database", "PostgreSQL (Event Store)",
                 "cache", "Redis (Read Models)",
+                "security", "Spring Security + JWT",
                 "frontend", "React 18 + TypeScript"
             ),
             "services", Map.of(
