@@ -37,16 +37,21 @@ export function Dashboard() {
     refetchInterval: 30000,
   })
 
-  const orders = ordersResponse || []
+  const orders = Array.isArray(ordersResponse) ? ordersResponse : []
   const isLoading = systemLoading || healthLoading || ordersLoading
 
   // Calculate metrics from orders data
-  const metrics = orders ? {
+  const metrics = orders.length > 0 ? {
     totalOrders: orders.length,
     totalRevenue: orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0),
     conversionRate: orders.length > 0 ? (orders.filter(o => o.status === 'COMPLETED').length / orders.length) * 100 : 0,
     pendingOrders: orders.filter(o => o.status === 'PENDING').length
-  } : null
+  } : {
+    totalOrders: 0,
+    totalRevenue: 0,
+    conversionRate: 0,
+    pendingOrders: 0
+  }
 
   const recentOrders = orders ? orders.slice(0, 5) : []
 
