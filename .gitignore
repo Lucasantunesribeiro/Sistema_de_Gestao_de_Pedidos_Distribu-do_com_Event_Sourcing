@@ -130,3 +130,4 @@ shared-events-output/
 
 # Service minimal directories
 services/*-minimal/
+.vercel
