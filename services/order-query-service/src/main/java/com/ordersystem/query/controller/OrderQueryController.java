@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 
 @RestController
@@ -52,5 +54,33 @@ public class OrderQueryController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Order Query Service is healthy");
+    }
+    
+    @GetMapping("/dashboard/metrics")
+    public ResponseEntity<Map<String, Object>> getDashboardMetrics() {
+        List<OrderReadModel> allOrders = orderQueryService.getAllOrders();
+        
+        Map<String, Object> metrics = new HashMap<>();
+        metrics.put("totalOrders", allOrders.size());
+        
+        double totalRevenue = allOrders.stream()
+            .mapToDouble(order -> order.getTotalAmount() != null ? order.getTotalAmount() : 0.0)
+            .sum();
+        metrics.put("totalRevenue", totalRevenue);
+        
+        long completedOrders = allOrders.stream()
+            .filter(order -> "COMPLETED".equals(order.getStatus()))
+            .count();
+        metrics.put("completedOrders", completedOrders);
+        
+        long pendingOrders = allOrders.stream()
+            .filter(order -> "PENDING".equals(order.getStatus()) || "PROCESSING".equals(order.getStatus()))
+            .count();
+        metrics.put("pendingOrders", pendingOrders);
+        
+        double averageOrderValue = allOrders.isEmpty() ? 0.0 : totalRevenue / allOrders.size();
+        metrics.put("averageOrderValue", Math.round(averageOrderValue * 100.0) / 100.0);
+        
+        return ResponseEntity.ok(metrics);
     }
 }

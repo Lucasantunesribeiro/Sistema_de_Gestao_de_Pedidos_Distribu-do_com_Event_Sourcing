@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @RestController
-@RequestMapping("/payments")
+@RequestMapping("/api/payments")
 @Validated
 @Tag(name = "Payments", description = "API para gerenciamento de pagamentos")
 public class PaymentController {

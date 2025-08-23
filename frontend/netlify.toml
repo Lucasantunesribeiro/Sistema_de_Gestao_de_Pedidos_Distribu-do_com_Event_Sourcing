@@ -1,0 +1,58 @@
+[build]
+  # Diretório base onde está o frontend
+  base = "frontend"
+  
+  # Comando para build do frontend
+  command = "npm ci && npm run build"
+  
+  # Diretório de output da build
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_CONFIG_PRODUCTION = "false"
+
+# Configurações de SPA para React Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers de segurança
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://gestao-de-pedidos.onrender.com; frame-ancestors 'none';"
+
+# Cache estático para assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Environment Variables
+[context.production.environment]
+  VITE_API_URL = "https://gestao-de-pedidos.onrender.com"
+  VITE_ENV = "production"
+
+[context.deploy-preview.environment]
+  VITE_API_URL = "https://gestao-de-pedidos.onrender.com"
+  VITE_ENV = "preview"
+
+[context.branch-deploy.environment]
+  VITE_API_URL = "https://gestao-de-pedidos.onrender.com"
+  VITE_ENV = "development"

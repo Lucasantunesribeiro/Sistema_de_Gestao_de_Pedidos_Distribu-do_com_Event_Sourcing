@@ -1,7 +1,8 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import api from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import apiClient from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -15,11 +16,29 @@ import {
 } from 'lucide-react'
 
 export function Dashboard() {
-  const { data: orders, isLoading } = useQuery({
-    queryKey: ['recent-orders'],
-    queryFn: () => api.getOrders().then(res => res.data),
-    refetchInterval: 30000, // Refresh every 30 seconds
+  // Fetch system info from your deployed backend
+  const { data: systemInfo, isLoading: systemLoading } = useQuery({
+    queryKey: ['system-info'],
+    queryFn: () => apiClient.getSystemInfo(),
+    refetchInterval: 30000,
   })
+
+  // Fetch health status
+  const { data: healthCheck, isLoading: healthLoading } = useQuery({
+    queryKey: ['health-check'],
+    queryFn: () => apiClient.getHealthCheck(),
+    refetchInterval: 10000,
+  })
+
+  // Fetch orders from your backend
+  const { data: ordersResponse, isLoading: ordersLoading } = useQuery({
+    queryKey: ['recent-orders'],
+    queryFn: () => apiClient.getOrders(),
+    refetchInterval: 30000,
+  })
+
+  const orders = ordersResponse || []
+  const isLoading = systemLoading || healthLoading || ordersLoading
 
   // Calculate metrics from orders data
   const metrics = orders ? {
