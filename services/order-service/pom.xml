@@ -66,12 +66,12 @@
             <artifactId>HikariCP</artifactId>
         </dependency>
 
-        <!-- Shared Events Library -->
-        <dependency>
+        <!-- Shared Events Library - Removed for deployment simplification -->
+        <!-- <dependency>
             <groupId>com.ordersystem</groupId>
             <artifactId>shared-events</artifactId>
             <version>1.0.0</version>
-        </dependency>
+        </dependency> -->
 
         <!-- JWT Dependencies -->
         <dependency>
