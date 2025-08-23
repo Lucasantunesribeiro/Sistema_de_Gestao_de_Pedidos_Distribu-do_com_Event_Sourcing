@@ -22,8 +22,11 @@ RUN cd services/order-query-service && mvn clean package -DskipTests -q
 FROM openjdk:17-jdk-alpine
 WORKDIR /app
 
-# Install process manager and utilities
-RUN apk add --no-cache supervisor netcat-openbsd
+# Install process manager, utilities and debugging tools
+RUN apk add --no-cache supervisor netcat-openbsd dos2unix bash
+
+# Create log directories
+RUN mkdir -p /var/log/supervisor /var/log
 
 # Copy all service JARs
 COPY --from=build /app/services/order-service/target/order-service-1.0.0.jar order-service.jar
@@ -31,15 +34,24 @@ COPY --from=build /app/services/payment-service/target/payment-service-1.0.0.jar
 COPY --from=build /app/services/inventory-service/target/inventory-service-1.0.0.jar inventory-service.jar
 COPY --from=build /app/services/order-query-service/target/order-query-service-1.0.0.jar query-service.jar
 
-# Create supervisor configuration
+# Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Create startup script
+# Copy and prepare startup script
 COPY start-all-services.sh /app/start-all-services.sh
-RUN chmod +x /app/start-all-services.sh
+RUN dos2unix /app/start-all-services.sh && chmod +x /app/start-all-services.sh
+
+# Verification steps (temporary debug - remove after validation)
+RUN ls -la /app && echo "Files in /app:" && \
+    file /app/start-all-services.sh && echo "Script file info:" && \
+    head -3 /app/start-all-services.sh && echo "Script first lines:"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD nc -z localhost 8081 && nc -z localhost 8082 && nc -z localhost 8083 && nc -z localhost 8084 || exit 1
 
 # Expose all ports
 EXPOSE 8080 8081 8082 8083 8084
 
-# Start all services
-CMD ["/app/start-all-services.sh"]
+# Start all services with exec form
+ENTRYPOINT ["/app/start-all-services.sh"]
