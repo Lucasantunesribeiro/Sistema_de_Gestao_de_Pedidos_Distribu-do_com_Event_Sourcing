@@ -2,8 +2,9 @@
 
 echo "🚀 Starting Distributed Order Management System..."
 
-# Create log directory
+# Create log directories
 mkdir -p /var/log/supervisor
+mkdir -p /var/log
 
 # Set environment variables for all services
 export SPRING_PROFILES_ACTIVE=render
