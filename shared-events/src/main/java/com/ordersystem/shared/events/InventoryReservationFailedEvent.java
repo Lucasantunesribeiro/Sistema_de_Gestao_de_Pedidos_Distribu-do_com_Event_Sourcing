@@ -36,6 +36,21 @@ public class InventoryReservationFailedEvent {
         this.timestamp = java.time.Instant.now().toString();
     }
     
+    public InventoryReservationFailedEvent(String orderId, String customerId, List<OrderItem> items, String reason) {
+        this.orderId = orderId;
+        this.customerId = customerId;
+        this.items = items;
+        this.reason = reason;
+        this.timestamp = java.time.Instant.now().toString();
+        this.totalAmount = calculateTotalAmount(items);
+    }
+    
+    private BigDecimal calculateTotalAmount(List<OrderItem> items) {
+        return items.stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    
     // Getters and Setters
     public String getOrderId() { return orderId; }
     public void setOrderId(String orderId) { this.orderId = orderId; }

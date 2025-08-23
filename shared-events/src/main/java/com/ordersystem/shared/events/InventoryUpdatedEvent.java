@@ -40,6 +40,17 @@ public class InventoryUpdatedEvent extends BaseEvent {
         this.changeReason = changeReason;
         this.updatedAt = LocalDateTime.now();
     }
+    
+    public InventoryUpdatedEvent(String productId, int previousQuantity, int newQuantity, 
+                               String changeReason, InventoryStatus status, String timestamp) {
+        super(null, null, "INVENTORY_UPDATED");
+        this.productId = productId;
+        this.productName = "Product " + productId;
+        this.previousQuantity = previousQuantity;
+        this.newQuantity = newQuantity;
+        this.changeReason = changeReason;
+        this.updatedAt = LocalDateTime.now();
+    }
 
     // Getters
     public String getProductId() { return productId; }

@@ -76,6 +76,10 @@ public class InventoryItem {
         reservedStock -= quantity;
         updatedAt = LocalDateTime.now();
     }
+    
+    public void confirm(int quantity) {
+        confirmReservation(quantity);
+    }
 
     public void addStock(int quantity) {
         availableStock += quantity;
