@@ -48,8 +48,8 @@ class InventoryServiceTest {
 
     @BeforeEach
     void setUp() {
-        testProduct = new InventoryItem("product-1", "Test Product", 10, 0);
-        testOrderItem = new OrderItem("product-1", "Test Product", 5);
+        testProduct = new InventoryItem("product-1", "Test Product", 10, 10.00, "A1");
+        testOrderItem = new OrderItem("product-1", "Test Product", 5, java.math.BigDecimal.valueOf(10.00));
         
         List<OrderItem> items = Arrays.asList(testOrderItem);
         testCommand = new InventoryReservationCommand("order-123", "customer-456", items);
