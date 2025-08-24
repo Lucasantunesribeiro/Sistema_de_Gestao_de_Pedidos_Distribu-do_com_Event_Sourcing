@@ -17,7 +17,7 @@ export function Layout() {
       <div className="lg:pl-64">
         <Header onMenuClick={toggleSidebar} />
         
-        <main className="p-6 pt-20 min-h-screen">
+        <main className="mt-16 px-6 py-4 min-h-screen">
           <Outlet />
         </main>
       </div>
