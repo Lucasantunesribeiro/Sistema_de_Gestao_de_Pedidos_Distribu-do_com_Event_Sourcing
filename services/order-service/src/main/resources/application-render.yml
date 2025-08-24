@@ -18,6 +18,18 @@ spring:
       ddl-auto: update
     database-platform: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
     show-sql: false
+  
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    connection-timeout: 1000ms
+    template:
+      retry:
+        enabled: true
+        initial-interval: 1000ms
+        max-attempts: 3
 
 logging:
   level:
