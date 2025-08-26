@@ -31,8 +31,8 @@ public class RedisEventPublisher {
             eventData.put("payload", event);
             eventData.put("timestamp", System.currentTimeMillis());
             
-            String messageId = streamOps.add(stream, eventData);
-            logger.info("Event published to stream {}: {} with ID {}", stream, eventType, messageId);
+            var messageId = streamOps.add(stream, eventData);
+            logger.info("Event published to stream {}: {} with ID {}", stream, eventType, messageId.getValue());
         } catch (Exception e) {
             logger.error("Failed to publish event to stream {}: {}", stream, eventType, e);
             throw new RuntimeException("Failed to publish event", e);

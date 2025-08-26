@@ -2,7 +2,7 @@ package com.ordersystem.shared.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.redis.connection.stream.ObjectRecord;
+import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -45,27 +45,36 @@ public abstract class RedisEventListener {
     
     private void pollStream(String stream) {
         try {
-            List<ObjectRecord<String, Object>> records = redisTemplate.opsForStream()
-                .read(StreamOffset.fromStart(stream))
+            // Read from the end of stream to get only new messages
+            List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
+                .read(StreamOffset.latest(stream))
                 .stream()
                 .limit(10)
                 .toList();
                 
-            for (ObjectRecord<String, Object> record : records) {
-                Map<String, Object> value = (Map<String, Object>) record.getValue();
-                String eventType = (String) value.get("eventType");
-                Object payload = value.get("payload");
-                
+            for (MapRecord<String, Object, Object> record : records) {
                 try {
-                    handleEvent(eventType, payload);
-                    // Acknowledge message processing
-                    redisTemplate.opsForStream().delete(stream, record.getId());
+                    Map<Object, Object> value = record.getValue();
+                    String eventType = (String) value.get("eventType");
+                    Object payload = value.get("payload");
+                    
+                    if (eventType != null && payload != null) {
+                        handleEvent(eventType, payload);
+                        logger.debug("Successfully processed event {} from stream {}", eventType, stream);
+                    } else {
+                        logger.warn("Received incomplete event from stream {}: eventType={}, payload={}", 
+                                  stream, eventType, payload);
+                    }
                 } catch (Exception e) {
-                    logger.error("Failed to process event {} from stream {}: {}", eventType, stream, e.getMessage());
+                    logger.error("Failed to process event from stream {}: {}", stream, e.getMessage(), e);
                 }
             }
         } catch (Exception e) {
-            logger.error("Failed to poll stream {}: {}", stream, e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("NOGROUP")) {
+                logger.debug("Stream {} does not exist yet, skipping polling", stream);
+            } else {
+                logger.error("Failed to poll stream {}: {}", stream, e.getMessage());
+            }
         }
     }
 }
