@@ -1,0 +1,59 @@
+package com.ordersystem.query.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+/**
+ * Simplified Security Configuration for Render Deploy
+ * Profile-based security: dev/test = permitAll, production = secure with health checks
+ */
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    private final Environment env;
+
+    public SecurityConfig(Environment env) {
+        this.env = env;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // Check if we're running in dev/test mode
+        boolean isDev = env.acceptsProfiles(Profiles.of("dev", "test", "local"));
+        
+        if (isDev) {
+            // Development mode: allow all requests
+            http
+                .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            return http.build();
+        }
+
+        // Production mode: secure but allow health checks
+        http
+            .csrf(csrf -> csrf.disable())
+            .authorizeHttpRequests(auth -> auth
+                // Public endpoints - no authentication required
+                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers("/api/health").permitAll()
+                .requestMatchers("/health").permitAll()
+                // H2 Console for development
+                .requestMatchers("/h2-console/**").permitAll()
+                // All other requests require authentication
+                .anyRequest().authenticated()
+            )
+            .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()))
+            .httpBasic(Customizer.withDefaults()); // Enable basic auth for protected endpoints
+
+        return http.build();
+    }
+}
