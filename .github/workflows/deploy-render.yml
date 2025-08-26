@@ -12,10 +12,21 @@ env:
   MAVEN_OPTS: '-Xmx1024m -Dmaven.repo.local=.m2/repository'
 
 jobs:
-  # Unit Tests - Fast fail without external dependencies
+  # Unit Tests - Fast fail with Redis service
   unit-tests:
     name: 'Unit Tests (Fail Fast)'
     runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     
     steps:
     - name: Checkout code
@@ -34,21 +45,16 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
 
-    - name: Build and install shared-events
-      run: |
-        cd shared-events
-        mvn clean install -q -DskipTests
+    - name: Build all modules first
+      run: mvn -B -DskipTests=true package
 
     - name: Run unit tests - Order Query Service
       run: |
         cd services/order-query-service
         mvn -Dtest=CacheInvalidationServiceTest test -q
-      
-    - name: Compile and validate other services
-      run: |
-        cd services/order-service && mvn clean compile -q
-        cd ../payment-service && mvn clean compile -q  
-        cd ../inventory-service && mvn clean compile -q
+      env:
+        SPRING_REDIS_HOST: 127.0.0.1
+        SPRING_REDIS_PORT: 6379
 
   # Integration Tests - With external dependencies  
   integration-tests:
