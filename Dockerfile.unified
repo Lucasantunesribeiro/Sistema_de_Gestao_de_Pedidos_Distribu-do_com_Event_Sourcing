@@ -15,8 +15,8 @@ RUN mvn clean package -DskipTests -q
 # Stage 3: Build React frontend
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
+COPY frontend/package.json ./
+RUN npm install
 COPY frontend/ .
 RUN npm run build
 
