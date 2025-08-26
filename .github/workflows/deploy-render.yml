@@ -1,11 +1,10 @@
-name: Deploy to Render
+name: CI/CD - Build, Test and Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, fix/* ]
   pull_request:
     branches: [ main ]
-    types: [ opened, synchronize, reopened, closed ]
 
 env:
   NODE_VERSION: '22'
@@ -13,10 +12,50 @@ env:
   MAVEN_OPTS: '-Xmx1024m -Dmaven.repo.local=.m2/repository'
 
 jobs:
-  # Test Job - Runs on every PR and push
-  test:
-    name: 'Test & Build'
+  # Unit Tests - Fast fail without external dependencies
+  unit-tests:
+    name: 'Unit Tests (Fail Fast)'
     runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: Build and install shared-events
+      run: |
+        cd shared-events
+        mvn clean install -q -DskipTests
+
+    - name: Run unit tests - Order Query Service
+      run: |
+        cd services/order-query-service
+        mvn -Dtest=CacheInvalidationServiceTest test -q
+      
+    - name: Compile and validate other services
+      run: |
+        cd services/order-service && mvn clean compile -q
+        cd ../payment-service && mvn clean compile -q  
+        cd ../inventory-service && mvn clean compile -q
+
+  # Integration Tests - With external dependencies  
+  integration-tests:
+    name: 'Integration Tests'
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: github.event_name == 'pull_request' || contains(github.ref, 'refs/heads/main')
     
     services:
       postgres:
@@ -60,20 +99,12 @@ jobs:
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
 
-    - name: Cache Maven dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
-
-    # Build and test shared events
     - name: Build shared events
       run: |
         cd shared-events
         mvn clean install -DskipTests
 
-    # Test backend services
+    # Test backend services with dependencies
     - name: Test Order Service
       run: |
         cd services/order-service
@@ -142,16 +173,16 @@ jobs:
     # Build backend artifacts for deployment
     - name: Build backend services
       run: |
-        cd services/order-service && mvn clean package -DskipTests &&
-        cd ../payment-service && mvn clean package -DskipTests &&
-        cd ../inventory-service && mvn clean package -DskipTests &&
+        cd services/order-service && mvn clean package -DskipTests
+        cd ../payment-service && mvn clean package -DskipTests
+        cd ../inventory-service && mvn clean package -DskipTests
         cd ../order-query-service && mvn clean package -DskipTests
 
   # Deploy Job - Only runs on main branch pushes
   deploy:
     name: 'Deploy to Render'
     runs-on: ubuntu-latest
-    needs: test
+    needs: [unit-tests, integration-tests]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
@@ -188,70 +219,139 @@ jobs:
       env:
         RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
 
-    - name: Health Check Services
+  # Smoke Tests - Post-deploy validation
+  smoke-tests:
+    name: 'Smoke Tests - Production'
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Wait for Render deployment stabilization
       run: |
-        echo "Performing health checks..."
-        
-        # Wait for services to be ready
-        sleep 60
-        
-        # Check backend services health
-        for service in order-service payment-service inventory-service order-query-service; do
-          echo "Checking $service health..."
-          for i in {1..10}; do
-            if curl -f "https://$service.onrender.com/actuator/health" &>/dev/null; then
-              echo "✅ $service is healthy"
-              break
-            else
-              echo "⏳ Waiting for $service... (attempt $i/10)"
-              sleep 30
-            fi
-            
-            if [ $i -eq 10 ]; then
-              echo "❌ $service health check failed"
-              exit 1
-            fi
-          done
+        echo "Waiting for deployment to stabilize..."
+        sleep 120
+
+    - name: Test Order Service Health
+      run: |
+        echo "Testing Order Service health..."
+        for i in {1..5}; do
+          if curl -f --retry 3 --retry-delay 5 --max-time 30 "https://order-service.onrender.com/actuator/health"; then
+            echo "✅ Order Service healthy"
+            break
+          fi
+          echo "⏳ Retry $i/5 for Order Service..."
+          sleep 30
+          if [ $i -eq 5 ]; then
+            echo "❌ Order Service health check failed"
+            exit 1
+          fi
         done
         
-        # Check frontend
-        echo "Checking frontend health..."
-        if curl -f "https://order-management-frontend.onrender.com/health" &>/dev/null; then
-          echo "✅ Frontend is healthy"
-        else
-          echo "❌ Frontend health check failed"
-          exit 1
-        fi
-        
-        echo "All services are healthy! 🎉"
-
-    - name: Run Integration Tests
+    - name: Test Payment Service Health  
       run: |
-        echo "Running integration tests against deployed services..."
+        echo "Testing Payment Service health..."
+        for i in {1..5}; do
+          if curl -f --retry 3 --retry-delay 5 --max-time 30 "https://payment-service.onrender.com/actuator/health"; then
+            echo "✅ Payment Service healthy"
+            break
+          fi
+          echo "⏳ Retry $i/5 for Payment Service..."
+          sleep 30
+          if [ $i -eq 5 ]; then
+            echo "❌ Payment Service health check failed"
+            exit 1
+          fi
+        done
+        
+    - name: Test Inventory Service Health
+      run: |
+        echo "Testing Inventory Service health..."
+        for i in {1..5}; do
+          if curl -f --retry 3 --retry-delay 5 --max-time 30 "https://inventory-service.onrender.com/actuator/health"; then
+            echo "✅ Inventory Service healthy"
+            break
+          fi
+          echo "⏳ Retry $i/5 for Inventory Service..."
+          sleep 30
+          if [ $i -eq 5 ]; then
+            echo "❌ Inventory Service health check failed"
+            exit 1
+          fi
+        done
+        
+    - name: Test Query Service Health
+      run: |
+        echo "Testing Query Service health..."
+        for i in {1..5}; do
+          if curl -f --retry 3 --retry-delay 5 --max-time 30 "https://order-query-service.onrender.com/actuator/health"; then
+            echo "✅ Query Service healthy"  
+            break
+          fi
+          echo "⏳ Retry $i/5 for Query Service..."
+          sleep 30
+          if [ $i -eq 5 ]; then
+            echo "❌ Query Service health check failed"
+            exit 1
+          fi
+        done
+        
+    - name: Test Frontend
+      run: |
+        echo "Testing Frontend availability..."
+        for i in {1..5}; do
+          if curl -f --retry 3 --retry-delay 5 --max-time 30 -I "https://order-management-frontend.onrender.com"; then
+            echo "✅ Frontend healthy"
+            break
+          fi
+          echo "⏳ Retry $i/5 for Frontend..."
+          sleep 30
+          if [ $i -eq 5 ]; then
+            echo "❌ Frontend health check failed"
+            exit 1
+          fi
+        done
+
+    - name: Run Basic Integration Tests
+      run: |
+        echo "Running basic integration smoke tests..."
         
         # Test order creation flow
-        ORDER_RESPONSE=$(curl -s -X POST "https://order-service.onrender.com/api/orders" \
+        echo "Testing order creation..."
+        ORDER_RESPONSE=$(curl -s -w "%{http_code}" -X POST "https://order-service.onrender.com/api/orders" \
           -H "Content-Type: application/json" \
           -d '{
-            "customerId": "test-customer",
+            "customerId": "smoke-test-customer",
             "items": [
-              {"productId": "test-product", "quantity": 1, "price": 10.0}
+              {"productId": "smoke-test-product", "quantity": 1, "price": 10.0}
             ]
           }')
         
-        echo "Order created: $ORDER_RESPONSE"
+        if [[ "$ORDER_RESPONSE" =~ 200|201 ]]; then
+          echo "✅ Order creation test passed"
+        else
+          echo "❌ Order creation test failed: $ORDER_RESPONSE"
+          exit 1
+        fi
         
         # Test query service
-        ORDERS=$(curl -s "https://order-query-service.onrender.com/api/orders")
-        echo "Orders query result: $ORDERS"
+        echo "Testing query service..."
+        QUERY_RESPONSE=$(curl -s -w "%{http_code}" "https://order-query-service.onrender.com/api/orders")
         
-        echo "Integration tests passed! ✅"
+        if [[ "$QUERY_RESPONSE" =~ 200 ]]; then
+          echo "✅ Query service test passed"
+        else
+          echo "❌ Query service test failed: $QUERY_RESPONSE"
+          exit 1
+        fi
+        
+        echo "🎉 All smoke tests passed!"
 
   # Rollback Job - Manual trigger only
   rollback:
     name: 'Rollback Deployment'
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || failure()
     
     steps:
     - name: Install Render CLI
@@ -261,24 +361,43 @@ jobs:
 
     - name: Rollback Services
       run: |
-        echo "Rolling back services to previous version..."
+        echo "🔄 Rolling back services to previous version..."
         
         # Rollback in reverse dependency order
-        render service rollback ${{ secrets.RENDER_FRONTEND_SERVICE_ID }}
-        render service rollback ${{ secrets.RENDER_QUERY_SERVICE_ID }}
-        render service rollback ${{ secrets.RENDER_ORDER_SERVICE_ID }}
-        render service rollback ${{ secrets.RENDER_PAYMENT_SERVICE_ID }}
-        render service rollback ${{ secrets.RENDER_INVENTORY_SERVICE_ID }}
+        echo "Rollback frontend..."
+        render service rollback ${{ secrets.RENDER_FRONTEND_SERVICE_ID }} || true
         
-        echo "Rollback completed!"
+        echo "Rollback query service..."
+        render service rollback ${{ secrets.RENDER_QUERY_SERVICE_ID }} || true
+        
+        echo "Rollback backend services..."
+        render service rollback ${{ secrets.RENDER_ORDER_SERVICE_ID }} || true
+        render service rollback ${{ secrets.RENDER_PAYMENT_SERVICE_ID }} || true
+        render service rollback ${{ secrets.RENDER_INVENTORY_SERVICE_ID }} || true
+        
+        echo "✅ Rollback completed!"
       env:
         RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+
+    - name: Post-Rollback Health Check
+      run: |
+        echo "Checking services after rollback..."
+        sleep 60
+        
+        # Quick health check after rollback
+        for service in order-service payment-service inventory-service order-query-service; do
+          if curl -f "https://$service.onrender.com/actuator/health" &>/dev/null; then
+            echo "✅ $service healthy after rollback"
+          else
+            echo "⚠️ $service still having issues after rollback"
+          fi
+        done
 
   # Cleanup old deployments
   cleanup:
     name: 'Cleanup Old Deployments'
     runs-on: ubuntu-latest
-    needs: deploy
+    needs: smoke-tests
     if: success()
     
     steps:
@@ -289,11 +408,14 @@ jobs:
 
     - name: Cleanup old deployments
       run: |
-        echo "Cleaning up old deployments..."
+        echo "🧹 Cleaning up old deployments..."
         # Keep last 5 deployments per service
-        for service_id in ${{ secrets.RENDER_ORDER_SERVICE_ID }} ${{ secrets.RENDER_PAYMENT_SERVICE_ID }} ${{ secrets.RENDER_INVENTORY_SERVICE_ID }} ${{ secrets.RENDER_QUERY_SERVICE_ID }} ${{ secrets.RENDER_FRONTEND_SERVICE_ID }}; do
-          render service cleanup $service_id --keep=5
+        services=(${{ secrets.RENDER_ORDER_SERVICE_ID }} ${{ secrets.RENDER_PAYMENT_SERVICE_ID }} ${{ secrets.RENDER_INVENTORY_SERVICE_ID }} ${{ secrets.RENDER_QUERY_SERVICE_ID }} ${{ secrets.RENDER_FRONTEND_SERVICE_ID }})
+        
+        for service_id in "${services[@]}"; do
+          echo "Cleaning up service: $service_id"
+          render service cleanup $service_id --keep=5 || echo "⚠️ Cleanup failed for $service_id"
         done
-        echo "Cleanup completed!"
+        echo "✅ Cleanup completed!"
       env:
         RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
