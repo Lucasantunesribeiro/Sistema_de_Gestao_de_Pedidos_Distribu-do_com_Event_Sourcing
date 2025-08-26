@@ -1,34 +1,42 @@
 package com.ordersystem.query.config;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import java.time.Duration;
+
+import javax.sql.DataSource;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.retry.annotation.EnableRetry;
 
-import javax.sql.DataSource;
-import java.time.Duration;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * Database configuration with HikariCP connection pooling and resilience settings
+ * Database configuration with HikariCP connection pooling and resilience
+ * settings
  * Optimized for read-heavy workloads in the query service
  */
 @Configuration
 @EnableRetry
 @ConfigurationProperties(prefix = "app.database")
+@Profile("!local")
 public class DatabaseConfig {
 
-    @Value("${DATABASE_URL:jdbc:postgresql://localhost:5433/order_query_db}")
+    @Value("${spring.datasource.url:jdbc:postgresql://localhost:5433/order_query_db}")
     private String databaseUrl;
 
-    @Value("${DATABASE_USERNAME:postgres}")
+    @Value("${spring.datasource.username:postgres}")
     private String username;
 
-    @Value("${DATABASE_PASSWORD:password}")
+    @Value("${spring.datasource.password:password}")
     private String password;
+
+    @Value("${spring.datasource.driver-class-name:org.postgresql.Driver}")
+    private String driverClassName;
 
     // Connection pool settings optimized for read operations
     private int maximumPoolSize = 15;
@@ -49,13 +57,13 @@ public class DatabaseConfig {
     @Primary
     public DataSource dataSource() {
         HikariConfig config = new HikariConfig();
-        
+
         // Basic connection settings
         config.setJdbcUrl(databaseUrl);
         config.setUsername(username);
         config.setPassword(password);
-        config.setDriverClassName("org.postgresql.Driver");
-        
+        config.setDriverClassName(driverClassName);
+
         // Connection pool settings
         config.setMaximumPoolSize(maximumPoolSize);
         config.setMinimumIdle(minimumIdle);
@@ -64,11 +72,11 @@ public class DatabaseConfig {
         config.setMaxLifetime(maxLifetime.toMillis());
         config.setLeakDetectionThreshold(leakDetectionThreshold.toMillis());
         config.setValidationTimeout(validationTimeout.toMillis());
-        
+
         // Connection validation
         config.setConnectionTestQuery("SELECT 1");
         config.setConnectionInitSql("SELECT 1");
-        
+
         // Performance optimizations for read-heavy workloads
         config.addDataSourceProperty("cachePrepStmts", "true");
         config.addDataSourceProperty("prepStmtCacheSize", "500");
@@ -81,13 +89,13 @@ public class DatabaseConfig {
         config.addDataSourceProperty("elideSetAutoCommits", "true");
         config.addDataSourceProperty("maintainTimeStats", "false");
         config.addDataSourceProperty("defaultFetchSize", "100");
-        
+
         // Connection pool name for monitoring
         config.setPoolName("QueryServiceHikariCP");
-        
+
         // Register JMX beans for monitoring
         config.setRegisterMbeans(true);
-        
+
         return new HikariDataSource(config);
     }
 

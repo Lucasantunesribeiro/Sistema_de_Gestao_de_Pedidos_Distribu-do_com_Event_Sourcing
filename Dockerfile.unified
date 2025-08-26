@@ -1,0 +1,81 @@
+# Multi-stage Dockerfile for unified deployment
+# Stage 1: Build all Java services
+FROM maven:3.8.6-openjdk-17 AS java-builder
+
+WORKDIR /app
+
+# Copy parent pom and shared dependencies first for better caching
+COPY pom.xml .
+COPY services/order-service/pom.xml services/order-service/
+COPY services/payment-service/pom.xml services/payment-service/
+COPY services/inventory-service/pom.xml services/inventory-service/
+COPY services/query-service/pom.xml services/query-service/
+
+# Download dependencies
+RUN mvn dependency:go-offline -B
+
+# Copy source code
+COPY services/ services/
+
+# Build all services
+RUN mvn clean package -DskipTests -B
+
+# Stage 2: Build React frontend
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+# Copy package files
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy frontend source
+COPY frontend/ .
+
+# Build frontend
+RUN npm run build
+
+# Stage 3: Runtime environment with all services
+FROM openjdk:17-jdk-slim
+
+# Install necessary packages
+RUN apt-get update && apt-get install -y \
+    nginx \
+    supervisor \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create application directories
+RUN mkdir -p /app/services /app/frontend /app/logs /var/log/supervisor
+
+# Copy built JAR files
+COPY --from=java-builder /app/services/order-service/target/*.jar /app/services/order-service.jar
+COPY --from=java-builder /app/services/payment-service/target/*.jar /app/services/payment-service.jar
+COPY --from=java-builder /app/services/inventory-service/target/*.jar /app/services/inventory-service.jar
+COPY --from=java-builder /app/services/query-service/target/*.jar /app/services/query-service.jar
+
+# Copy built frontend
+COPY --from=frontend-builder /app/frontend/build /app/frontend
+
+# Copy configuration files
+COPY deployment/nginx.conf /etc/nginx/nginx.conf
+COPY deployment/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY deployment/start-services.sh /app/start-services.sh
+
+# Make scripts executable
+RUN chmod +x /app/start-services.sh
+
+# Create nginx directories
+RUN mkdir -p /var/log/nginx /var/lib/nginx/body /var/lib/nginx/fastcgi /var/lib/nginx/proxy /var/lib/nginx/scgi /var/lib/nginx/uwsgi
+
+# Expose ports
+EXPOSE 80 8081 8082 8083 8084
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost/health || exit 1
+
+# Start supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

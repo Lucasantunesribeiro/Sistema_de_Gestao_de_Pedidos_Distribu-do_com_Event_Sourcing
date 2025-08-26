@@ -4,77 +4,36 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
   
-  # Database Configuration (Read-optimized)
+  # Database Configuration (H2 for local development)
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/order_query_db}
-    username: ${DATABASE_USERNAME:postgres}
-    password: ${DATABASE_PASSWORD:password}
-    driver-class-name: org.postgresql.Driver
+    url: ${DATABASE_URL:jdbc:h2:mem:testdb}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: org.h2.Driver
     hikari:
-      # Otimizações para queries de alta performance (200ms → 50ms)
       connection-timeout: 10000
-      maximum-pool-size: 25
-      minimum-idle: 12
+      maximum-pool-size: 10
+      minimum-idle: 5
       idle-timeout: 600000
       max-lifetime: 1800000
       leak-detection-threshold: 60000
-      pool-name: QueryServiceHikariCP
-      register-mbeans: true
-      # Configurações específicas para read workload
-      validation-timeout: 3000
-      initialization-fail-timeout: 8000
-      connection-test-query: SELECT 1
-      auto-commit: false
-      # Read-optimized settings
-      read-only: false
-      transaction-isolation: TRANSACTION_READ_COMMITTED
+      pool-name: QueryServiceH2HikariCP
 
-  # JPA Configuration (Read-optimized)
+  # JPA Configuration
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        dialect: org.hibernate.dialect.H2Dialect
         format_sql: false
         show_sql: false
-        connection:
-          provider_disables_autocommit: true
-        jdbc:
-          batch_size: 50
-          fetch_size: 100
-        cache:
-          use_second_level_cache: true
-          use_query_cache: true
-        query:
-          plan_cache_max_size: 2048
 
-  # Redis Cache Configuration (Performance Target: 200ms → 50ms)
-  redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
-    database: ${REDIS_DATABASE:0}
-    timeout: 2000ms
-    connect-timeout: 1000ms
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 0
-        max-wait: -1ms
-        time-between-eviction-runs: 30s
-    ssl:
-      enabled: false
-  
-  # Cache Configuration
-  cache:
-    type: redis
-    redis:
-      cache-null-values: false
-      time-to-live: 300000  # 5 minutes default TTL
-      use-key-prefix: true
-      key-prefix: "order-query::"
+  # H2 Console (for local development)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
 
   # RabbitMQ Configuration
   rabbitmq:
@@ -86,102 +45,48 @@ spring:
     requested-heartbeat: 60
     publisher-confirm-type: correlated
     publisher-returns: true
-    listener:
-      simple:
-        retry:
-          enabled: true
-          initial-interval: 1000
-          max-attempts: 3
-          multiplier: 2
-        prefetch: 20
-        concurrency: 2
-        max-concurrency: 8
 
 # Server Configuration
 server:
   port: 8084
   servlet:
     context-path: /api/orders
-  tomcat:
-    threads:
-      max: 200
-      min-spare: 10
-    connection-timeout: 20000
-    max-connections: 8192
 
 # Management and Monitoring
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics
       base-path: /actuator
   endpoint:
     health:
       show-details: always
-      show-components: always
-  health:
-    defaults:
-      enabled: true
-    db:
-      enabled: true
-    rabbit:
-      enabled: true
-    redis:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
-    # Connection Pool Monitoring específico para queries
-    hikaricp:
-      enabled: true
-    # Cache metrics monitoring
-    cache:
-      instrument: true
-    tags:
-      service: order-query-service
-      environment: ${SPRING_PROFILES_ACTIVE:local}
-      workload: read-heavy
 
-# Logging Configuration - Enterprise Security
+# Enhanced Logging Configuration
 logging:
   level:
     com.ordersystem.query: INFO
-    com.ordersystem.query.security: INFO
-    org.springframework.security: WARN
-    org.springframework.amqp: WARN
+    com.ordersystem.query.listener: DEBUG
+    com.ordersystem.query.service: DEBUG
+    com.ordersystem.query.config: INFO
+    org.springframework.amqp: INFO
+    org.springframework.amqp.rabbit.connection: INFO
+    org.springframework.amqp.rabbit.core: INFO
+    org.springframework.amqp.rabbit.listener: INFO
     org.hibernate.SQL: WARN
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
-    AUDIT: INFO
+    org.springframework.transaction: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] [%X{orderId:-}] [%X{eventType:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] [%X{orderId:-}] [%X{eventType:-}] %logger{36} - %msg%n"
   file:
-    name: logs/order-query-service.log
-    max-size: 100MB
+    name: logs/query-service.log
+    max-size: 10MB
     max-history: 30
-  loggers:
-    AUDIT:
-      name: logs/audit.log
-      max-size: 100MB
-      max-history: 90  # Keep audit logs for 90 days
 
 # Application Specific Configuration
 app:
-  database:
-    # Configurações otimizadas para read queries
-    maximum-pool-size: 25
-    minimum-idle: 12
-    connection-timeout: 10s
-    idle-timeout: 10m
-    max-lifetime: 30m
-    leak-detection-threshold: 60s
-    # Query-specific optimizations
-    query-timeout: 30s
-    read-only-ratio: 0.8
-    connection-validation-interval: 30s
-  
   rabbitmq:
     connection-timeout: 30s
     requested-heartbeat: 60s
@@ -192,73 +97,38 @@ app:
     initial-interval: 1s
     multiplier: 2.0
     max-interval: 10s
-  
-  resilience:
-    max-retries: 3
-    initial-delay: 1s
-    max-delay: 30s
-    backoff-multiplier: 2.0
-    failure-threshold: 5
-    circuit-breaker-timeout: 1m
-    database-connection-timeout: 20s
-    rabbitmq-connection-timeout: 30s
-    health-check-interval: 30s
-    health-check-failure-threshold: 3
-    query-timeout: 30s
-    max-query-retries: 2
 
-# Resilience4j Configuration - Optimized for 99.9% Availability
+# Resilience4j Configuration (Simplified)
 resilience4j:
   circuitbreaker:
     instances:
       payment-service:
-        sliding-window-size: 20
-        failure-rate-threshold: 30          # 30% de falhas abre circuit
-        wait-duration-in-open-state: 10s    # Aguarda 10s antes de tentar half-open
-        permitted-number-of-calls-in-half-open-state: 5
-        minimum-number-of-calls: 10         # Mínimo para calcular rate
-        slow-call-duration-threshold: 3s    # Calls > 3s são consideradas slow
-        slow-call-rate-threshold: 50        # 50% slow calls abre circuit
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        minimum-number-of-calls: 5
         automatic-transition-from-open-to-half-open-enabled: true
         register-health-indicator: true
         record-exceptions:
           - java.net.ConnectException
           - java.net.SocketTimeoutException
-          - org.springframework.web.client.HttpServerErrorException
         ignore-exceptions:
-          - com.ordersystem.query.config.CircuitBreakerOptimizedConfig$PaymentDeclinedException
+          - java.lang.IllegalArgumentException
           
       inventory-service:
-        sliding-window-size: 15
-        failure-rate-threshold: 40          # Inventory pode ter mais tolerância
-        wait-duration-in-open-state: 5s     # Recovery mais rápido
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
         permitted-number-of-calls-in-half-open-state: 3
-        minimum-number-of-calls: 8
-        slow-call-duration-threshold: 1s    # Inventory deve ser mais rápido
-        slow-call-rate-threshold: 60        # 60% slow calls abre circuit
+        minimum-number-of-calls: 5
         automatic-transition-from-open-to-half-open-enabled: true
         register-health-indicator: true
         record-exceptions:
           - java.net.ConnectException
           - java.net.SocketTimeoutException
-          - org.springframework.web.client.HttpServerErrorException
         ignore-exceptions:
-          - com.ordersystem.query.config.CircuitBreakerOptimizedConfig$StockNotFoundException
-          
-      database:
-        sliding-window-size: 30
-        failure-rate-threshold: 20          # Database menos tolerante
-        wait-duration-in-open-state: 30s    # Recovery mais conservador
-        permitted-number-of-calls-in-half-open-state: 10
-        minimum-number-of-calls: 15
-        slow-call-duration-threshold: 2s
-        slow-call-rate-threshold: 40
-        automatic-transition-from-open-to-half-open-enabled: true
-        register-health-indicator: true
-        record-exceptions:
-          - java.net.ConnectException
-          - java.net.SocketTimeoutException
-          - org.springframework.dao.DataAccessException
+          - java.lang.IllegalArgumentException
           
   retry:
     instances:
@@ -270,7 +140,7 @@ resilience4j:
           - java.net.SocketTimeoutException
           - java.net.ConnectException
         ignore-exceptions:
-          - com.ordersystem.query.config.CircuitBreakerOptimizedConfig$PaymentDeclinedException
+          - java.lang.IllegalArgumentException
           
       inventory-service:
         max-attempts: 2
@@ -280,139 +150,40 @@ resilience4j:
           - java.net.SocketTimeoutException
           - java.net.ConnectException
         ignore-exceptions:
-          - com.ordersystem.query.config.CircuitBreakerOptimizedConfig$StockNotFoundException
-          
-      database:
-        max-attempts: 3
-        wait-duration: 2s
-        exponential-backoff-multiplier: 2
-        retry-exceptions:
-          - org.springframework.dao.TransientDataAccessException
-          - java.net.SocketTimeoutException
-          
-  timelimiter:
-    instances:
-      payment-service:
-        timeout-duration: 5s
-        cancel-running-future: true
-        
-      inventory-service:
-        timeout-duration: 3s
-        cancel-running-future: true
-        
-      database:
-        timeout-duration: 10s
-        cancel-running-future: true
-        
-  bulkhead:
-    instances:
-      payment-service:
-        max-concurrent-calls: 10
-        max-wait-duration: 1s
-        
-      inventory-service:
-        max-concurrent-calls: 15
-        max-wait-duration: 500ms
-        
-      database:
-        max-concurrent-calls: 20
-        max-wait-duration: 2s
-
-# Query Service Specific Configuration
-query:
-  cache:
-    enabled: true
-    ttl: 5m
-    max-size: 1000
-    hit-ratio-target: 0.80  # 80% target hit ratio
-    metrics-enabled: true
-  pagination:
-    default-size: 20
-    max-size: 100
-
-# Cache specific configuration for different data types
-cache:
-  redis:
-    # Orders cache - frequently accessed order lists (5 minutes)
-    orders:
-      ttl: 300
-      max-entries: 1000
-    # Customer orders cache - customer-specific queries (5 minutes)  
-    customer-orders:
-      ttl: 300
-      max-entries: 2000
-    # Single order cache - individual order lookups (5 minutes)
-    single-order:
-      ttl: 300
-      max-entries: 5000
-    # Status orders cache - status-based queries (5 minutes)
-    status-orders:
-      ttl: 300
-      max-entries: 500
-    # Order stats cache - aggregated statistics (1 hour)
-    order-stats:
-      ttl: 3600
-      max-entries: 100
+          - java.lang.IllegalArgumentException
 
 ---
-# Docker Profile
+# Local Profile (H2 Database)
 spring:
   config:
     activate:
-      on-profile: docker
+      on-profile: local
   datasource:
-    url: jdbc:postgresql://query-db:5432/order_query_db
-  redis:
-    host: redis
-    port: 6379
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
 
 logging:
   level:
     com.ordersystem.query: DEBUG
-
----
-# Railway Profile
-spring:
-  config:
-    activate:
-      on-profile: railway
-  datasource:
-    hikari:
-      # Otimizações Railway para read workload produção
-      maximum-pool-size: 35
-      minimum-idle: 18
-      connection-timeout: 8000
-      validation-timeout: 2000
-  redis:
-    host: ${REDIS_URL:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
-    ssl:
-      enabled: ${REDIS_SSL:false}
-    timeout: 1000ms
-    lettuce:
-      pool:
-        max-active: 12
-        max-idle: 10
-        min-idle: 2
-  
-# Security Configuration for Railway
-jwt:
-  secret: ${JWT_SECRET_KEY:defaultSecretForLocalDev}
-  access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:900000}  # 15 minutes
-  refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:604800000}  # 7 days
-
-# Rate Limiting Configuration
-rate-limiting:
-  enabled: true
-  per-user-limit: ${RATE_LIMIT_PER_USER:100}
-  per-ip-limit: ${RATE_LIMIT_PER_IP:50}
-  window-size-minutes: ${RATE_LIMIT_WINDOW:1}
-
-logging:
-  level:
-    com.ordersystem.query: INFO
-    com.ordersystem.query.security: INFO
-    org.springframework.web: WARN
-    org.springframework.cache: WARN
-    org.springframework.security: WARN
+    com.ordersystem.query.listener: DEBUG
+    com.ordersystem.query.service: DEBUG
+    com.ordersystem.query.config: DEBUG
+    org.springframework.amqp: DEBUG
+    org.springframework.amqp.rabbit.connection: DEBUG
+    org.springframework.amqp.rabbit.core: DEBUG
+    org.springframework.amqp.rabbit.listener: DEBUG
+    org.springframework.transaction: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] [%X{orderId:-}] [%X{eventType:-}] %logger{36} - %msg%n"

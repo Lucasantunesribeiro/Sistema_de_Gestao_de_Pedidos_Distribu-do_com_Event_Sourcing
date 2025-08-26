@@ -1,0 +1,98 @@
+spring:
+  # H2 Database Configuration for Local Development
+  datasource:
+    url: jdbc:h2:mem:querydb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    hikari:
+      connection-timeout: 10000
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: QueryServiceH2HikariCP
+      register-mbeans: true
+      validation-timeout: 3000
+      connection-test-query: SELECT 1
+      auto-commit: false
+
+  # JPA Configuration for H2
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: false
+        show_sql: false
+        jdbc:
+          batch_size: 50
+          fetch_size: 100
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+
+  # H2 Console (for debugging)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # Disable cache for local development
+  cache:
+    type: none
+
+  # Disable Redis for local development
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 2
+        max-idle: 2
+        min-idle: 0
+
+  # Disable RabbitMQ for local development
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+# Logging for local development
+logging:
+  level:
+    com.ordersystem.query: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# Disable some features for local development
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
+
+# Disable resilience patterns for local development
+resilience4j:
+  circuitbreaker:
+    enabled: false
+  retry:
+    enabled: false
+  timelimiter:
+    enabled: false
+  bulkhead:
+    enabled: false

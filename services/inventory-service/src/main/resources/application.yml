@@ -1,19 +1,27 @@
+server:
+  port: 8083
+
 spring:
   application:
     name: inventory-service
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
-
-  # RabbitMQ Configuration
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/orderdb}
+    username: ${SPRING_DATASOURCE_USERNAME:orderuser}
+    password: ${SPRING_DATASOURCE_PASSWORD:orderpass}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
-    connection-timeout: 30000
-    requested-heartbeat: 60
-    publisher-confirm-type: correlated
-    publisher-returns: true
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: 5672
+    username: ${SPRING_RABBITMQ_USERNAME:orderuser}
+    password: ${SPRING_RABBITMQ_PASSWORD:orderpass}
     listener:
       simple:
         retry:
@@ -21,130 +29,26 @@ spring:
           initial-interval: 1000
           max-attempts: 3
           multiplier: 2
-        prefetch: 5
-        concurrency: 1
-        max-concurrency: 3
+        acknowledge-mode: auto
+        prefetch: 1
 
-# Server Configuration
-server:
-  port: 8083
-  servlet:
-    context-path: /api/inventory
-  tomcat:
-    threads:
-      max: 100
-      min-spare: 10
-    connection-timeout: 20000
-    max-connections: 4096
-
-# Management and Monitoring
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-      base-path: /actuator
-  endpoint:
-    health:
-      show-details: always
-      show-components: always
-  health:
-    defaults:
-      enabled: true
-    rabbit:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
-
-# Logging Configuration
 logging:
   level:
-    com.ordersystem.inventory: INFO
-    org.springframework.amqp: WARN
+    com.ordersystem.inventory: DEBUG
+    org.springframework.amqp: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
   file:
     name: logs/inventory-service.log
-    max-size: 10MB
-    max-history: 30
 
-# Application Specific Configuration
-app:
-  rabbitmq:
-    connection-timeout: 30s
-    requested-heartbeat: 60s
-    channel-cache-size: 25
-    publisher-confirms: true
-    publisher-returns: true
-    max-retry-attempts: 3
-    initial-interval: 1s
-    multiplier: 2.0
-    max-interval: 10s
-  
-  resilience:
-    max-retries: 3
-    initial-delay: 1s
-    max-delay: 30s
-    backoff-multiplier: 2.0
-    failure-threshold: 5
-    circuit-breaker-timeout: 1m
-    rabbitmq-connection-timeout: 30s
-    health-check-interval: 30s
-    health-check-failure-threshold: 3
-
-# Inventory Service Specific Configuration
-inventory:
-  reservation:
-    timeout:
-      minutes: 15
-  stock:
-    low-threshold: 5
-    reorder-threshold: 10
-    allocation-strategy: FIFO
-  cleanup:
-    expired-reservations:
-      interval: 60000  # 1 minute in milliseconds
-  notifications:
-    low-stock:
-      enabled: true
-      threshold: 5
-
-# RabbitMQ Exchange and Routing Configuration
-rabbitmq:
-  exchange:
-    inventory: inventory.exchange
-  routing:
-    inventory:
-      reserved: inventory.reserved
-      failed: inventory.failed
-      updated: inventory.updated
-  queues:
-    inventory-reservation: inventory.reservation.queue
-    inventory-confirmation: inventory.confirmation.queue
-    inventory-release: inventory.release.queue
-
----
-# Docker Profile
-spring:
-  config:
-    activate:
-      on-profile: docker
-
-logging:
-  level:
-    com.ordersystem.inventory: DEBUG
-
----
-# Railway Profile
-spring:
-  config:
-    activate:
-      on-profile: railway
-
-logging:
-  level:
-    com.ordersystem.inventory: INFO
-    org.springframework.web: WARN
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
