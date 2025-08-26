@@ -1,19 +1,19 @@
 # Multi-stage Dockerfile for unified frontend + backend deployment
 # Stage 1: Build shared events
-FROM maven:3.9-openjdk-21 AS shared-builder
+FROM maven:3.9.8-eclipse-temurin-17 AS shared-builder
 WORKDIR /app
 COPY shared-events/ shared-events/
 RUN cd shared-events && mvn clean install -DskipTests -q
 
 # Stage 2: Build all Java services  
-FROM maven:3.9-openjdk-21 AS java-builder
+FROM maven:3.9.8-eclipse-temurin-17 AS java-builder
 WORKDIR /app
 COPY --from=shared-builder /root/.m2/repository /root/.m2/repository
 COPY services/ services/
 RUN mvn clean package -DskipTests -q
 
 # Stage 3: Build React frontend
-FROM node:22-alpine AS frontend-builder
+FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
@@ -21,8 +21,8 @@ COPY frontend/ .
 RUN npm run build
 
 # Stage 4: Runtime environment with Nginx + Java services
-FROM openjdk:21-jdk-slim
-RUN apt-get update && apt-get install -y nginx supervisor curl && rm -rf /var/lib/apt/lists/*
+FROM eclipse-temurin:17-jdk-alpine
+RUN apk add --no-cache nginx supervisor curl
 
 # Create directories
 RUN mkdir -p /app/services /app/frontend /var/log/supervisor
