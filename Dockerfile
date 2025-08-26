@@ -2,16 +2,33 @@
 # Stage 1: Build shared events
 FROM maven:3.9.8-eclipse-temurin-17 AS shared-builder
 WORKDIR /app
-COPY shared-events/ shared-events/
-RUN cd shared-events && mvn clean install -DskipTests -q
+COPY pom.xml ./
+COPY shared-events/pom.xml shared-events/
+COPY shared-events/src/ shared-events/src/
+RUN cd shared-events && mvn clean install -DskipTests -B
 
 # Stage 2: Build all Java services  
 FROM maven:3.9.8-eclipse-temurin-17 AS java-builder
 WORKDIR /app
+
+# Copy Maven repository from shared-builder
 COPY --from=shared-builder /root/.m2/repository /root/.m2/repository
-COPY pom.xml .
+
+# Copy Maven configuration files for cache optimization
+COPY pom.xml ./
+COPY services/order-service/pom.xml services/order-service/
+COPY services/payment-service/pom.xml services/payment-service/
+COPY services/inventory-service/pom.xml services/inventory-service/
+COPY services/order-query-service/pom.xml services/order-query-service/
+
+# Download dependencies for cache layer
+RUN mvn -B -f pom.xml -DskipTests dependency:resolve
+
+# Copy source code
 COPY services/ services/
-RUN mvn clean package -DskipTests -q
+
+# Build all services
+RUN mvn -B -f pom.xml clean package -DskipTests
 
 # Stage 3: Build React frontend
 FROM node:18-alpine AS frontend-builder
@@ -38,7 +55,7 @@ COPY --from=java-builder /app/services/order-query-service/target/*.jar /app/ser
 COPY --from=frontend-builder /app/frontend/build /app/frontend
 
 # Create Nginx configuration inline
-RUN echo 'worker_processes auto;\npid /run/nginx.pid;\nevents {\n    worker_connections 1024;\n}\nhttp {\n    include /etc/nginx/mime.types;\n    default_type application/octet-stream;\n    server {\n        listen 80;\n        root /app/frontend;\n        index index.html;\n        location / {\n            try_files $uri $uri/ /index.html;\n        }\n        location /api/ {\n            proxy_pass http://localhost:8081;\n            proxy_set_header Host $host;\n            proxy_set_header X-Real-IP $remote_addr;\n        }\n        location /actuator/ {\n            proxy_pass http://localhost:8081;\n        }\n        location /health {\n            return 200 "{\\"status\\": \\"UP\\", \\"services\\": [\\"order-service\\", \\"payment-service\\", \\"inventory-service\\", \\"query-service\\"], \\"frontend\\": \\"React 18 + TypeScript\\", \\"message\\": \\"Sistema funcionando!\\"}";\n            add_header Content-Type application/json;\n        }\n    }\n}' > /etc/nginx/nginx.conf
+RUN echo 'worker_processes auto;\npid /run/nginx.pid;\nevents {\n    worker_connections 1024;\n}\nhttp {\n    include /etc/nginx/mime.types;\n    default_type application/octet-stream;\n    server {\n        listen 80;\n        root /app/frontend;\n        index index.html;\n        location / {\n            try_files $uri $uri/ /index.html;\n        }\n        location /api/ {\n            proxy_pass http://localhost:8081;\n            proxy_set_header Host $host;\n            proxy_set_header X-Real-IP $remote_addr;\n        }\n        location /actuator/ {\n            proxy_pass http://localhost:8081;\n        }\n        location /health {\n            return 200 "{\"status\": \"UP\", \"services\": [\"order-service\", \"payment-service\", \"inventory-service\", \"query-service\"], \"frontend\": \"React 18 + TypeScript\", \"message\": \"Sistema funcionando!\"}";\n            add_header Content-Type application/json;\n        }\n    }\n}' > /etc/nginx/nginx.conf
 
 # Create supervisor configuration inline
 RUN echo '[supervisord]\nnodaemon=true\nlogfile=/var/log/supervisor/supervisord.log\npidfile=/var/run/supervisord.pid\n[program:nginx]\ncommand=/usr/sbin/nginx -g "daemon off;"\nautostart=true\nautorestart=true\n[program:order-service]\ncommand=java -jar /app/services/order-service.jar --server.port=8081\nautostart=true\nautorestart=true\n[program:payment-service]\ncommand=java -jar /app/services/payment-service.jar --server.port=8082\nautostart=true\nautorestart=true\n[program:inventory-service]\ncommand=java -jar /app/services/inventory-service.jar --server.port=8083\nautostart=true\nautorestart=true\n[program:query-service]\ncommand=java -jar /app/services/query-service.jar --server.port=8084\nautostart=true\nautorestart=true' > /etc/supervisor/conf.d/supervisord.conf
