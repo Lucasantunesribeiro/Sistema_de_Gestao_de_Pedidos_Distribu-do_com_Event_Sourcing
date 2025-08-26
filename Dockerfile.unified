@@ -9,6 +9,7 @@ RUN cd shared-events && mvn clean install -DskipTests -q
 FROM maven:3.9.8-eclipse-temurin-17 AS java-builder
 WORKDIR /app
 COPY --from=shared-builder /root/.m2/repository /root/.m2/repository
+COPY pom.xml .
 COPY services/ services/
 RUN mvn clean package -DskipTests -q
 
