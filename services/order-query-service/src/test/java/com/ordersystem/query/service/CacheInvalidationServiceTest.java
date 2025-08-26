@@ -17,6 +17,7 @@ import java.util.Set;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 @ActiveProfiles("test")
@@ -44,11 +45,11 @@ class CacheInvalidationServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(cacheManager.getCache("orders")).thenReturn(ordersCache);
-        when(cacheManager.getCache("customer-orders")).thenReturn(customerOrdersCache);
-        when(cacheManager.getCache("single-order")).thenReturn(singleOrderCache);
-        when(cacheManager.getCache("status-orders")).thenReturn(statusOrdersCache);
-        when(cacheManager.getCache("order-stats")).thenReturn(orderStatsCache);
+        lenient().when(cacheManager.getCache("orders")).thenReturn(ordersCache);
+        lenient().when(cacheManager.getCache("customer-orders")).thenReturn(customerOrdersCache);
+        lenient().when(cacheManager.getCache("single-order")).thenReturn(singleOrderCache);
+        lenient().when(cacheManager.getCache("status-orders")).thenReturn(statusOrdersCache);
+        lenient().when(cacheManager.getCache("order-stats")).thenReturn(orderStatsCache);
 
         cacheInvalidationService = new CacheInvalidationService(cacheManager);
     }
