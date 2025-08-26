@@ -22,50 +22,58 @@ public class SecurityConfig {
 
     @Autowired
     private CorsConfigurationSource corsConfigurationSource;
-    
+
     @Autowired
     private RateLimitingFilter rateLimitingFilter;
-    
+
     @Autowired
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // Disable CSRF for stateless JWT authentication
-            .csrf(csrf -> csrf.disable())
-            
-            // Enable CORS with enterprise configuration
-            .cors(cors -> cors.configurationSource(corsConfigurationSource))
-            
-            // Stateless session management
-            .sessionManagement(session -> 
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            
-            // Configure authorization rules
-            .authorizeHttpRequests(authz -> authz
-                // Public endpoints
-                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/orders/**").permitAll()
-                .requestMatchers("/api/dashboard/**").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
-                
-                // Allow all for now - can be restricted later
-                .anyRequest().permitAll()
-            )
-            
-            // Custom JWT authentication entry point
-            .exceptionHandling(ex -> 
-                ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
-            
-            // Security headers
-            .headers(headers -> headers
-                .frameOptions(frameOptions -> frameOptions.deny())
-                .contentTypeOptions(contentTypeOptions -> {})
-                .httpStrictTransportSecurity(hstsConfig -> hstsConfig
-                    .maxAgeInSeconds(31536000))
-            );
+                // Disable CSRF for stateless JWT authentication
+                .csrf(csrf -> csrf.disable())
+
+                // Enable CORS with enterprise configuration
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+
+                // Stateless session management
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // Configure authorization rules
+                .authorizeHttpRequests(authz -> authz
+                        // Public endpoints - using AntPathRequestMatcher for clarity
+                        .requestMatchers(
+                                org.springframework.security.web.util.matcher.AntPathRequestMatcher
+                                        .antMatcher("/actuator/health"),
+                                org.springframework.security.web.util.matcher.AntPathRequestMatcher
+                                        .antMatcher("/actuator/info"),
+                                org.springframework.security.web.util.matcher.AntPathRequestMatcher
+                                        .antMatcher("/api/auth/**"),
+                                org.springframework.security.web.util.matcher.AntPathRequestMatcher
+                                        .antMatcher("/api/orders/**"),
+                                org.springframework.security.web.util.matcher.AntPathRequestMatcher
+                                        .antMatcher("/api/dashboard/**"),
+                                org.springframework.security.web.util.matcher.AntPathRequestMatcher
+                                        .antMatcher("/actuator/**"),
+                                org.springframework.security.web.util.matcher.AntPathRequestMatcher
+                                        .antMatcher("/h2-console/**"))
+                        .permitAll()
+
+                        // Allow all for now - can be restricted later
+                        .anyRequest().permitAll())
+
+                // Custom JWT authentication entry point
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+
+                // Security headers
+                .headers(headers -> headers
+                        .frameOptions(frameOptions -> frameOptions.sameOrigin())
+                        .contentTypeOptions(contentTypeOptions -> {
+                        })
+                        .httpStrictTransportSecurity(hstsConfig -> hstsConfig
+                                .maxAgeInSeconds(31536000)));
 
         // Add rate limiting filter before authentication
         http.addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);

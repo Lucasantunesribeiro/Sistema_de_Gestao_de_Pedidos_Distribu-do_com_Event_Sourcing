@@ -1,0 +1,299 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened, closed ]
+
+env:
+  NODE_VERSION: '22'
+  JAVA_VERSION: '21'
+  MAVEN_OPTS: '-Xmx1024m -Dmaven.repo.local=.m2/repository'
+
+jobs:
+  # Test Job - Runs on every PR and push
+  test:
+    name: 'Test & Build'
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Set up Node.js ${{ env.NODE_VERSION }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    # Build and test shared events
+    - name: Build shared events
+      run: |
+        cd shared-events
+        mvn clean install -DskipTests
+
+    # Test backend services
+    - name: Test Order Service
+      run: |
+        cd services/order-service
+        mvn test
+      env:
+        DATABASE_URL: jdbc:postgresql://localhost:5432/test_db
+        DATABASE_USERNAME: postgres
+        DATABASE_PASSWORD: postgres
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        MESSAGING_TYPE: redis
+
+    - name: Test Payment Service
+      run: |
+        cd services/payment-service
+        mvn test
+      env:
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        MESSAGING_TYPE: redis
+
+    - name: Test Inventory Service
+      run: |
+        cd services/inventory-service
+        mvn test
+      env:
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        MESSAGING_TYPE: redis
+
+    - name: Test Query Service
+      run: |
+        cd services/order-query-service
+        mvn test
+      env:
+        DATABASE_URL: jdbc:postgresql://localhost:5432/test_db
+        DATABASE_USERNAME: postgres
+        DATABASE_PASSWORD: postgres
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        MESSAGING_TYPE: redis
+
+    # Frontend tests and build
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Run frontend tests
+      run: |
+        cd frontend
+        npm run test
+
+    - name: Type check frontend
+      run: |
+        cd frontend
+        npm run type-check
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+      env:
+        VITE_API_URL: https://order-service.onrender.com
+
+    # Build backend artifacts for deployment
+    - name: Build backend services
+      run: |
+        cd services/order-service && mvn clean package -DskipTests &&
+        cd ../payment-service && mvn clean package -DskipTests &&
+        cd ../inventory-service && mvn clean package -DskipTests &&
+        cd ../order-query-service && mvn clean package -DskipTests
+
+  # Deploy Job - Only runs on main branch pushes
+  deploy:
+    name: 'Deploy to Render'
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Render CLI
+      run: |
+        curl -fsSL https://cli.render.com/install | bash
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Deploy to Render
+      run: |
+        echo "Starting deployment to Render..."
+        
+        # Deploy services in dependency order
+        echo "Deploying database and Redis..."
+        render deploy --service-id=${{ secrets.RENDER_POSTGRES_SERVICE_ID }} --wait
+        render deploy --service-id=${{ secrets.RENDER_REDIS_SERVICE_ID }} --wait
+        
+        echo "Deploying backend services..."
+        render deploy --service-id=${{ secrets.RENDER_ORDER_SERVICE_ID }} --wait &
+        render deploy --service-id=${{ secrets.RENDER_PAYMENT_SERVICE_ID }} --wait &
+        render deploy --service-id=${{ secrets.RENDER_INVENTORY_SERVICE_ID }} --wait &
+        wait
+        
+        echo "Deploying query service..."
+        render deploy --service-id=${{ secrets.RENDER_QUERY_SERVICE_ID }} --wait
+        
+        echo "Deploying frontend..."
+        render deploy --service-id=${{ secrets.RENDER_FRONTEND_SERVICE_ID }} --wait
+        
+        echo "Deployment completed successfully!"
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+
+    - name: Health Check Services
+      run: |
+        echo "Performing health checks..."
+        
+        # Wait for services to be ready
+        sleep 60
+        
+        # Check backend services health
+        for service in order-service payment-service inventory-service order-query-service; do
+          echo "Checking $service health..."
+          for i in {1..10}; do
+            if curl -f "https://$service.onrender.com/actuator/health" &>/dev/null; then
+              echo "✅ $service is healthy"
+              break
+            else
+              echo "⏳ Waiting for $service... (attempt $i/10)"
+              sleep 30
+            fi
+            
+            if [ $i -eq 10 ]; then
+              echo "❌ $service health check failed"
+              exit 1
+            fi
+          done
+        done
+        
+        # Check frontend
+        echo "Checking frontend health..."
+        if curl -f "https://order-management-frontend.onrender.com/health" &>/dev/null; then
+          echo "✅ Frontend is healthy"
+        else
+          echo "❌ Frontend health check failed"
+          exit 1
+        fi
+        
+        echo "All services are healthy! 🎉"
+
+    - name: Run Integration Tests
+      run: |
+        echo "Running integration tests against deployed services..."
+        
+        # Test order creation flow
+        ORDER_RESPONSE=$(curl -s -X POST "https://order-service.onrender.com/api/orders" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "customerId": "test-customer",
+            "items": [
+              {"productId": "test-product", "quantity": 1, "price": 10.0}
+            ]
+          }')
+        
+        echo "Order created: $ORDER_RESPONSE"
+        
+        # Test query service
+        ORDERS=$(curl -s "https://order-query-service.onrender.com/api/orders")
+        echo "Orders query result: $ORDERS"
+        
+        echo "Integration tests passed! ✅"
+
+  # Rollback Job - Manual trigger only
+  rollback:
+    name: 'Rollback Deployment'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Install Render CLI
+      run: |
+        curl -fsSL https://cli.render.com/install | bash
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Rollback Services
+      run: |
+        echo "Rolling back services to previous version..."
+        
+        # Rollback in reverse dependency order
+        render service rollback ${{ secrets.RENDER_FRONTEND_SERVICE_ID }}
+        render service rollback ${{ secrets.RENDER_QUERY_SERVICE_ID }}
+        render service rollback ${{ secrets.RENDER_ORDER_SERVICE_ID }}
+        render service rollback ${{ secrets.RENDER_PAYMENT_SERVICE_ID }}
+        render service rollback ${{ secrets.RENDER_INVENTORY_SERVICE_ID }}
+        
+        echo "Rollback completed!"
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+
+  # Cleanup old deployments
+  cleanup:
+    name: 'Cleanup Old Deployments'
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+    
+    steps:
+    - name: Install Render CLI
+      run: |
+        curl -fsSL https://cli.render.com/install | bash
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Cleanup old deployments
+      run: |
+        echo "Cleaning up old deployments..."
+        # Keep last 5 deployments per service
+        for service_id in ${{ secrets.RENDER_ORDER_SERVICE_ID }} ${{ secrets.RENDER_PAYMENT_SERVICE_ID }} ${{ secrets.RENDER_INVENTORY_SERVICE_ID }} ${{ secrets.RENDER_QUERY_SERVICE_ID }} ${{ secrets.RENDER_FRONTEND_SERVICE_ID }}; do
+          render service cleanup $service_id --keep=5
+        done
+        echo "Cleanup completed!"
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
