@@ -2,16 +2,33 @@
 # Stage 1: Build shared events
 FROM maven:3.9.8-eclipse-temurin-17 AS shared-builder
 WORKDIR /app
-COPY shared-events/ shared-events/
-RUN cd shared-events && mvn clean install -DskipTests -q
+COPY pom.xml ./
+COPY shared-events/pom.xml shared-events/
+COPY shared-events/src/ shared-events/src/
+RUN cd shared-events && mvn clean install -DskipTests -B
 
 # Stage 2: Build all Java services  
 FROM maven:3.9.8-eclipse-temurin-17 AS java-builder
 WORKDIR /app
+
+# Copy Maven repository from shared-builder
 COPY --from=shared-builder /root/.m2/repository /root/.m2/repository
-COPY pom.xml .
+
+# Copy Maven configuration files for cache optimization
+COPY pom.xml ./
+COPY services/order-service/pom.xml services/order-service/
+COPY services/payment-service/pom.xml services/payment-service/
+COPY services/inventory-service/pom.xml services/inventory-service/
+COPY services/order-query-service/pom.xml services/order-query-service/
+
+# Download dependencies for cache layer
+RUN mvn -B -f pom.xml -DskipTests dependency:resolve
+
+# Copy source code
 COPY services/ services/
-RUN mvn clean package -DskipTests -q
+
+# Build all services
+RUN mvn -B -f pom.xml clean package -DskipTests
 
 # Stage 3: Build React frontend
 FROM node:18-alpine AS frontend-builder
