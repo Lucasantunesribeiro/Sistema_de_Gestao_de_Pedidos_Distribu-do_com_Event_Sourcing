@@ -13,35 +13,34 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-  
-  ponent
+@Component
+@Order(1)
+public class CorrelationIdFilter implements Filter {
 
-  ic class 
-  
-       final String CORRELATION_ID_HEADER = 
+    private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
+    private static final String CORRELATION_ID_MDC_KEY = "correlationId";
 
-    
-    
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
 
-    tion,
-      
-      st httpRequest = (HttpServletRequest) request;
-        httpResponse = (HttpServletResponse) response
-      
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
 
-      Id = httpRequest.getHeader(CORRELATION_ID_HEADE
-      == null || correlationId.trim().isEmpty()) {
+        String correlationId = httpRequest.getHeader(CORRELATION_ID_HEADER);
+        if (correlationId == null || correlationId.trim().isEmpty()) {
+            correlationId = UUID.randomUUID().toString();
+        }
 
-      
+        MDC.put(CORRELATION_ID_MDC_KEY, correlationId);
+        httpResponse.setHeader(CORRELATION_ID_HEADER, correlationId);
 
-    ATION_ID_MD
-      ader(CORRELATION_ID_HEADER, correla
-    
-    er(request, response);
-
-    y {
-      ORRELATION_ID_MDC_KEY);
-    
-  
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            MDC.remove(CORRELATION_ID_MDC_KEY);
+        }
+    }
 }
