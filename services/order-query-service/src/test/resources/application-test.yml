@@ -1,0 +1,32 @@
+spring:
+  redis:
+    host: ${SPRING_REDIS_HOST:127.0.0.1}
+    port: ${SPRING_REDIS_PORT:6379}
+    timeout: 10000
+    connect-timeout: 10000
+    lettuce:
+      pool:
+        max-active: 25
+        max-wait: 10000
+        min-idle: 0
+        max-idle: 8
+  
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    
+  h2:
+    console:
+      enabled: true
+      
+logging:
+  level:
+    com.ordersystem: WARN
+    org.springframework.cache: WARN

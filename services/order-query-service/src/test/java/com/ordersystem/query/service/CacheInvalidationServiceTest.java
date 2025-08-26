@@ -1,7 +1,9 @@
 package com.ordersystem.query.service;
 
+import com.ordersystem.query.util.RedisWaiter;
 import com.ordersystem.shared.events.OrderStatusUpdatedEvent;
 import com.ordersystem.shared.events.PaymentProcessedEvent;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,13 @@ import static org.mockito.Mockito.lenient;
 @ExtendWith(MockitoExtension.class)
 @ActiveProfiles("test")
 class CacheInvalidationServiceTest {
+
+    @BeforeAll
+    static void setupRedis() {
+        String host = System.getenv().getOrDefault("SPRING_REDIS_HOST", "127.0.0.1");
+        int port = Integer.parseInt(System.getenv().getOrDefault("SPRING_REDIS_PORT", "6379"));
+        RedisWaiter.waitUntilAvailable(host, port, 10000);
+    }
 
     @Mock
     private CacheManager cacheManager;
