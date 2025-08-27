@@ -63,8 +63,8 @@ RUN chmod 644 /etc/supervisor/supervisord.conf
 RUN grep -q '^\[supervisord\]' /etc/supervisor/supervisord.conf || (echo "ERROR: supervisord.conf missing [supervisord]" && cat /etc/supervisor/supervisord.conf && false)
 
 # Create startup script to process nginx template
-RUN echo '#!/bin/sh\nexport PORT=${PORT:-80}\nenvsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\nexec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf' > /start.sh
-RUN chmod +x /start.sh
+RUN printf '#!/bin/sh\nexport PORT=${PORT:-80}\nenvsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\nexec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf\n' > /start.sh && \
+    chmod +x /start.sh
 
 EXPOSE ${PORT:-80}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s CMD curl -f http://localhost:${PORT:-80}/health || exit 1
