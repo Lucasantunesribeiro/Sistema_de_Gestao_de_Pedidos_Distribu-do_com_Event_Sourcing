@@ -40,30 +40,32 @@ RUN npm run build
 
 # Stage 4: Runtime environment with Nginx + Java services
 FROM eclipse-temurin:17-jdk-alpine
-RUN apk add --no-cache nginx supervisor curl
+RUN apk add --no-cache nginx supervisor curl gettext
 
 # Create directories
 RUN mkdir -p /app/services /app/frontend /var/log/supervisor /etc/supervisor/conf.d
 
-# Copy built JAR files
-COPY --from=java-builder /app/services/order-service/target/*.jar /app/services/order-service.jar
-COPY --from=java-builder /app/services/payment-service/target/*.jar /app/services/payment-service.jar  
-COPY --from=java-builder /app/services/inventory-service/target/*.jar /app/services/inventory-service.jar
-COPY --from=java-builder /app/services/order-query-service/target/*.jar /app/services/query-service.jar
+# Copy built JAR files with exact names
+COPY --from=java-builder /app/services/order-service/target/order-service-1.0.0.jar /app/services/order-service.jar
+COPY --from=java-builder /app/services/payment-service/target/payment-service-1.0.0.jar /app/services/payment-service.jar  
+COPY --from=java-builder /app/services/inventory-service/target/inventory-service-1.0.0.jar /app/services/inventory-service.jar
+COPY --from=java-builder /app/services/order-query-service/target/order-query-service-1.0.0.jar /app/services/query-service.jar
 
 # Copy built frontend
 COPY --from=frontend-builder /app/frontend/dist /app/frontend
 
-# Create Nginx configuration inline
-RUN echo 'worker_processes auto;\npid /run/nginx.pid;\nevents {\n    worker_connections 1024;\n}\nhttp {\n    include /etc/nginx/mime.types;\n    default_type application/octet-stream;\n    server {\n        listen 80;\n        root /app/frontend;\n        index index.html;\n        location / {\n            try_files $uri $uri/ /index.html;\n        }\n        location /api/ {\n            proxy_pass http://localhost:8081;\n            proxy_set_header Host $host;\n            proxy_set_header X-Real-IP $remote_addr;\n        }\n        location /actuator/ {\n            proxy_pass http://localhost:8081;\n        }\n        location /health {\n            return 200 "{\"status\": \"UP\", \"services\": [\"order-service\", \"payment-service\", \"inventory-service\", \"query-service\"], \"frontend\": \"React 18 + TypeScript\", \"message\": \"Sistema funcionando!\"}";\n            add_header Content-Type application/json;\n        }\n    }\n}' > /etc/nginx/nginx.conf
-
-# Copy canonical supervisor configuration
+# Copy nginx template and supervisor config
+COPY deploy/nginx/nginx.conf.template /etc/nginx/nginx.conf.template
 COPY deploy/supervisord/supervisord.conf /etc/supervisor/supervisord.conf
 RUN chmod 644 /etc/supervisor/supervisord.conf
 
 # Validate supervisord.conf contains required [supervisord] section
 RUN grep -q '^\[supervisord\]' /etc/supervisor/supervisord.conf || (echo "ERROR: supervisord.conf missing [supervisord]" && cat /etc/supervisor/supervisord.conf && false)
 
-EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s CMD curl -f http://localhost/health || exit 1
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+# Create startup script to process nginx template
+RUN echo '#!/bin/sh\nexport PORT=${PORT:-80}\nenvsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\nexec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf' > /start.sh
+RUN chmod +x /start.sh
+
+EXPOSE ${PORT:-80}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s CMD curl -f http://localhost:${PORT:-80}/health || exit 1
+CMD ["/start.sh"]
