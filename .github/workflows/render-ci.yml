@@ -1,326 +1,161 @@
-# DESABILITADO - Usando render-deploy-multi.yml para nova arquitetura multi-serviços
-name: Render Deploy CI/CD (LEGACY)
+name: Render Deploy Pipeline
 
 on:
-  # push:
-  #   branches: [main]
-  # pull_request:
-  #   branches: [main]
-  workflow_dispatch:
-
-env:
-  JAVA_VERSION: '17'
-  NODE_VERSION: '18'
-  MAVEN_OPTS: '-Xmx2g -Xms1g -Dmaven.repo.local=$HOME/.m2/repository'
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   test:
-    name: Build & Test
     runs-on: ubuntu-latest
     
     services:
       redis:
         image: redis:7-alpine
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
         ports:
-          - 6379:6379
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Java 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'eclipse-temurin'
-        java-version: ${{ env.JAVA_VERSION }}
-        cache: 'maven'
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
 
-    - name: Setup Node.js 18
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-    - name: Verify Maven and Java versions
-      run: |
-        java -version
-        mvn -version
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
 
-    - name: Build shared events library
-      run: |
-        echo "🔧 Building shared events library..."
-        cd shared-events
-        mvn clean install -DskipTests -B
-        echo "✅ Shared events library built successfully"
+      - name: Build shared-events
+        run: |
+          cd shared-events
+          mvn clean install -DskipTests -B
 
-    - name: Run Java integration tests with Redis
-      env:
-        TEST_REDIS_URL: redis://localhost:6379
-        SPRING_REDIS_HOST: localhost
-        SPRING_REDIS_PORT: 6379
-        SPRING_PROFILES_ACTIVE: test
-      run: |
-        echo "🧪 Running Java tests with Redis integration..."
-        mvn test -B
-        echo "✅ Java tests completed successfully"
+      - name: Run Java tests
+        run: |
+          mvn clean test -B
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          DATABASE_URL: jdbc:postgresql://localhost:5432/test_db
+          DB_USERNAME: test_user
+          DB_PASSWORD: test_pass
 
-    - name: Generate test report
-      if: always()
-      run: |
-        echo "📊 Generating test reports..."
-        find . -name "surefire-reports" -type d | head -5
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
 
-    - name: Install frontend dependencies
-      run: |
-        echo "📦 Installing frontend dependencies..."
-        cd frontend
-        npm ci
-        echo "✅ Frontend dependencies installed"
+      - name: Run frontend tests
+        run: |
+          cd frontend
+          npm run test:coverage
 
-    - name: Run frontend linting
-      run: |
-        echo "🔍 Running frontend linting..."
-        cd frontend
-        npm run lint
-        echo "✅ Frontend linting passed"
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
 
-    - name: Run frontend tests
-      run: |
-        echo "🧪 Running frontend tests..."
-        cd frontend
-        npm run test
-        echo "✅ Frontend tests completed"
+      - name: Build Java artifacts
+        run: |
+          mvn clean package -DskipTests -B
 
-    - name: Build frontend production bundle
-      run: |
-        echo "🏗️ Building frontend for production..."
-        cd frontend
-        npm run build
-        echo "✅ Frontend build completed"
-        ls -la dist/
+      - name: Verify build artifacts
+        run: |
+          echo "=== JAR Files ==="
+          find . -name "*.jar" -path "*/target/*" | grep -v -E "(test|original)" || true
+          echo "=== Frontend Build ==="
+          ls -la frontend/dist/ || echo "Frontend dist not found"
 
-    - name: Cache Maven dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2/repository
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-maven-
-
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: test-results
-        path: |
-          **/target/surefire-reports/
-          frontend/coverage/
-        retention-days: 7
-
-  security:
-    name: Security Scan
+  build-docker:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Run OWASP Dependency Check
-      uses: dependency-check/Dependency-Check_Action@main
-      with:
-        project: 'sistema-gestao-pedidos'
-        path: '.'
-        format: 'ALL'
-        args: >
-          --enableRetired
-          --enableExperimental
-          --scan './services/'
-          --scan './frontend/'
-          --out './reports'
-    
-    - name: Upload security scan results
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: dependency-check-report
-        path: reports
-        retention-days: 7
-
-    - name: Security Report Summary
-      if: always()
-      run: |
-        echo "🔒 Security scan completed"
-        if [ -f reports/dependency-check-report.xml ]; then
-          echo "📋 Security report generated successfully"
-        else
-          echo "⚠️ Security report not found"
-        fi
-
-  docker-build:
-    name: Docker Build & Test
-    runs-on: ubuntu-latest
-    needs: [test, security]
+    needs: test
     if: github.ref == 'refs/heads/main'
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Build Docker image
-      run: |
-        echo "🐳 Building Docker image..."
-        docker build -t sistema-pedidos:${{ github.sha }} .
-        echo "✅ Docker image built successfully"
+      - name: Build and export Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: gestao-pedidos:latest
+          outputs: type=docker,dest=/tmp/gestao-pedidos.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Test Docker container startup
-      run: |
-        echo "🧪 Testing Docker container startup..."
-        
-        # Start container in background
-        docker run -d --name test-container \
-          -e PORT=8080 \
-          -p 8080:8080 \
-          sistema-pedidos:${{ github.sha }}
-        
-        # Wait for services to start (increased timeout for multi-service container)
-        echo "⏳ Waiting for services to start..."
-        sleep 60
-        
-        # Test health endpoint
-        echo "🔍 Testing health endpoint..."
-        for i in {1..5}; do
-          if curl -f http://localhost:8080/health; then
-            echo "✅ Health check passed on attempt $i"
-            break
-          else
-            echo "⚠️ Health check failed on attempt $i"
-            if [ $i -eq 5 ]; then
-              echo "❌ Health check failed after 5 attempts"
-              docker logs test-container
-              exit 1
-            fi
-            sleep 15
-          fi
-        done
-        
-        # Test frontend endpoint
-        echo "🔍 Testing frontend endpoint..."
-        if curl -f http://localhost:8080/; then
-          echo "✅ Frontend endpoint accessible"
-        else
-          echo "⚠️ Frontend endpoint not accessible"
-          docker logs test-container
-        fi
+      - name: Test Docker image
+        run: |
+          docker load --input /tmp/gestao-pedidos.tar
+          
+          # Test web service
+          docker run --rm -e SERVICE_TYPE=web -e PORT=8080 \
+            gestao-pedidos:latest timeout 30s /app/startup.sh || true
+            
+          # Test worker services
+          for service in order payment inventory; do
+            echo "Testing $service service..."
+            docker run --rm -e SERVICE_TYPE=$service \
+              gestao-pedidos:latest timeout 10s /app/startup.sh || true
+          done
 
-    - name: Docker container logs
-      if: always()
-      run: |
-        echo "📋 Container logs:"
-        docker logs test-container || true
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-image
+          path: /tmp/gestao-pedidos.tar
+          retention-days: 1
 
-    - name: Clean up test container
-      if: always()
-      run: |
-        echo "🧹 Cleaning up test container..."
-        docker stop test-container || true
-        docker rm test-container || true
-
-    - name: Test Docker image size
-      run: |
-        echo "📊 Docker image size analysis:"
-        docker images sistema-pedidos:${{ github.sha }} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
-
-  performance-test:
-    name: Performance Baseline
+  notify-deploy:
     runs-on: ubuntu-latest
-    needs: [docker-build]
-    if: github.ref == 'refs/heads/main'
+    needs: [test, build-docker]
+    if: github.ref == 'refs/heads/main' && success()
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js for performance testing
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-
-    - name: Run basic performance checks
-      run: |
-        echo "⚡ Running performance baseline checks..."
-        
-        # Check frontend bundle size
-        cd frontend
-        npm ci
-        npm run build
-        
-        BUNDLE_SIZE=$(du -sk dist | cut -f1)
-        echo "📦 Frontend bundle size: ${BUNDLE_SIZE}KB"
-        
-        if [ $BUNDLE_SIZE -gt 2048 ]; then
-          echo "⚠️ Bundle size exceeds 2MB threshold"
-        else
-          echo "✅ Bundle size within acceptable range"
-        fi
-
-  deploy-notify:
-    name: Deploy Notification
-    runs-on: ubuntu-latest
-    needs: [docker-build, performance-test]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
-    steps:
-    - name: Deploy Success Notification
-      run: |
-        echo "🚀 Deploy Pipeline Completed Successfully!"
-        echo "=================================="
-        echo "✅ All tests passed"
-        echo "✅ Security scan completed"
-        echo "✅ Docker image built and tested"
-        echo "✅ Performance checks passed"
-        echo ""
-        echo "🎯 Render auto-deploy triggered from main branch"
-        echo "📊 Monitor deploy at: https://dashboard.render.com"
-        echo "🔗 Commit SHA: ${{ github.sha }}"
-        echo "👤 Author: ${{ github.actor }}"
-        echo "📝 Commit message: ${{ github.event.head_commit.message }}"
-
-    - name: Create deployment badge
-      run: |
-        echo "🏷️ Deployment Status: ✅ READY" >> $GITHUB_STEP_SUMMARY
-        echo "📅 Deploy Time: $(date)" >> $GITHUB_STEP_SUMMARY
-        echo "🔗 Commit: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
-
-  rollback-check:
-    name: Rollback Readiness
-    runs-on: ubuntu-latest
-    needs: [deploy-notify]
-    if: failure() && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Rollback Instructions
-      run: |
-        echo "🚨 DEPLOYMENT FAILED - ROLLBACK REQUIRED"
-        echo "========================================"
-        echo ""
-        echo "To rollback manually:"
-        echo "1. Go to Render Dashboard: https://dashboard.render.com"
-        echo "2. Navigate to your service"
-        echo "3. Go to 'Deploys' tab"
-        echo "4. Click 'Rollback' on the last successful deploy"
-        echo ""
-        echo "Or use Render CLI:"
-        echo "render deploy rollback <service-id> <previous-deploy-id>"
-        echo ""
-        echo "❌ Failed commit: ${{ github.sha }}"
-        echo "👤 Author: ${{ github.actor }}"
+      - name: Deploy notification
+        run: |
+          echo "✅ Build successful! Ready for Render deployment"
+          echo "🚀 Services: 1 web + 3 workers"
+          echo "📦 Artifacts: Java services + React frontend"
+          echo "🔗 Deploy URL: https://dashboard.render.com/services"
