@@ -15,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -453,6 +455,48 @@ public class OrderQueryController {
                     "success", false,
                     "error", e.getMessage(),
                     "message", "CQRS demonstration failed",
+                    "correlationId", correlationId);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> createOrder(@RequestBody Map<String, Object> orderRequest) {
+        String correlationId = UUID.randomUUID().toString();
+        MDC.put("correlationId", correlationId);
+
+        logger.info("🛍️ Query service received createOrder request (demo mode), correlationId={}", correlationId);
+
+        try {
+            // Simulate order creation (in real system, this would go to order-service)
+            String orderId = UUID.randomUUID().toString();
+            String customerName = (String) orderRequest.get("customerName");
+            Double totalAmount = ((Number) orderRequest.get("totalAmount")).doubleValue();
+            
+            logger.info("✅ Demo order created: orderId={}, customer={}, total={}, correlationId={}", 
+                    orderId, customerName, totalAmount, correlationId);
+
+            Map<String, Object> response = Map.of(
+                    "success", true,
+                    "message", "Order created successfully (demo mode)",
+                    "orderId", orderId,
+                    "customerName", customerName,
+                    "totalAmount", totalAmount,
+                    "status", "CREATED",
+                    "correlationId", correlationId);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        } catch (Exception e) {
+            logger.error("❌ Failed to create demo order: error={}, correlationId={}",
+                    e.getMessage(), correlationId, e);
+
+            Map<String, Object> errorResponse = Map.of(
+                    "success", false,
+                    "error", e.getMessage(),
+                    "message", "Failed to create order (demo mode)",
                     "correlationId", correlationId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         } finally {
