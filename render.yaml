@@ -21,9 +21,11 @@ services:
     env: docker
     plan: starter
     region: oregon
-    dockerfilePath: ./Dockerfile.unified
+    dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildCommand: ""  # Docker handles the build
+    startCommand: ""  # Docker handles the start
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -47,6 +49,4 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: render
       - key: JAVA_OPTS
-        value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
-      - key: PORT
-        value: "80"
+        value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dspring.jpa.hibernate.ddl-auto=update"
