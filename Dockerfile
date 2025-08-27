@@ -3,8 +3,7 @@
 FROM maven:3.9.8-eclipse-temurin-17 AS shared-builder
 WORKDIR /app
 COPY pom.xml ./
-COPY shared-events/pom.xml shared-events/
-COPY shared-events/src/ shared-events/src/
+COPY shared-events/ shared-events/
 RUN cd shared-events && mvn clean install -DskipTests -B
 
 # Stage 2: Build all Java services  
@@ -16,6 +15,7 @@ COPY --from=shared-builder /root/.m2/repository /root/.m2/repository
 
 # Copy Maven configuration files for cache optimization
 COPY pom.xml ./
+COPY shared-events/ shared-events/
 COPY services/order-service/pom.xml services/order-service/
 COPY services/payment-service/pom.xml services/payment-service/
 COPY services/inventory-service/pom.xml services/inventory-service/
