@@ -52,7 +52,7 @@ COPY --from=java-builder /app/services/inventory-service/target/*.jar /app/servi
 COPY --from=java-builder /app/services/order-query-service/target/*.jar /app/services/query-service.jar
 
 # Copy built frontend
-COPY --from=frontend-builder /app/frontend/build /app/frontend
+COPY --from=frontend-builder /app/frontend/dist /app/frontend
 
 # Create Nginx configuration inline
 RUN echo 'worker_processes auto;\npid /run/nginx.pid;\nevents {\n    worker_connections 1024;\n}\nhttp {\n    include /etc/nginx/mime.types;\n    default_type application/octet-stream;\n    server {\n        listen 80;\n        root /app/frontend;\n        index index.html;\n        location / {\n            try_files $uri $uri/ /index.html;\n        }\n        location /api/ {\n            proxy_pass http://localhost:8081;\n            proxy_set_header Host $host;\n            proxy_set_header X-Real-IP $remote_addr;\n        }\n        location /actuator/ {\n            proxy_pass http://localhost:8081;\n        }\n        location /health {\n            return 200 "{\\"status\\": \\"UP\\", \\"services\\": [\\"order-service\\", \\"payment-service\\", \\"inventory-service\\", \\"query-service\\"], \\"frontend\\": \\"React 18 + TypeScript\\", \\"message\\": \\"Sistema funcionando!\\"}";\n            add_header Content-Type application/json;\n        }\n    }\n}' > /etc/nginx/nginx.conf
