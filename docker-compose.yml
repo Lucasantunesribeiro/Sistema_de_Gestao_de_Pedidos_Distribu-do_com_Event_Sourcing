@@ -364,6 +364,219 @@ services:
         max-file: "3"
     profiles: ["dev", "prod-simulated"]
 
+  # ====================================================================
+  # UNIFIED DEPLOYMENT SERVICES - Using new multi-service Dockerfile
+  # ====================================================================
+  
+  # Web Service: nginx + query-service + frontend
+  web-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: web-service
+    environment:
+      SERVICE_TYPE: web
+      PORT: 80
+      # Database for query-service
+      DATABASE_URL: jdbc:postgresql://query-db:5432/order_query_db
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: password
+      # Messaging for query-service
+      MESSAGING_TYPE: ${MESSAGING_TYPE:-rabbitmq}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Spring profiles
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-docker}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:+UseG1GC"
+    ports:
+      - "8080:80"
+    networks:
+      - order-network
+    depends_on:
+      query-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 896M
+          cpus: '1.0'
+        reservations:
+          memory: 640M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles: ["unified", "prod-unified"]
+
+  # Order Service Isolado
+  order-service-unified:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order-service-unified
+    environment:
+      SERVICE_TYPE: order
+      # Database
+      DATABASE_URL: jdbc:postgresql://order-db:5432/order_db
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: password
+      # Messaging
+      MESSAGING_TYPE: ${MESSAGING_TYPE:-rabbitmq}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Spring
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-docker}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+    ports:
+      - "8091:8081"
+    networks:
+      - order-network
+    depends_on:
+      order-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 384M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles: ["unified", "prod-unified"]
+
+  # Payment Service Isolado
+  payment-service-unified:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payment-service-unified
+    environment:
+      SERVICE_TYPE: payment
+      # Messaging
+      MESSAGING_TYPE: ${MESSAGING_TYPE:-rabbitmq}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Spring
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-docker}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+    ports:
+      - "8092:8082"
+    networks:
+      - order-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles: ["unified", "prod-unified"]
+
+  # Inventory Service Isolado
+  inventory-service-unified:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventory-service-unified
+    environment:
+      SERVICE_TYPE: inventory
+      # Messaging
+      MESSAGING_TYPE: ${MESSAGING_TYPE:-rabbitmq}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Spring
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-docker}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+    ports:
+      - "8093:8083"
+    networks:
+      - order-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles: ["unified", "prod-unified"]
+
+  # ====================================================================
+  # LEGACY SERVICES - Original separate Dockerfiles (dev profile only)
+  # ====================================================================
+
   # Frontend
   frontend:
     build:
