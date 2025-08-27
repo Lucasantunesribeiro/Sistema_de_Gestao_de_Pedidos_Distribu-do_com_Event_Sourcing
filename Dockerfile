@@ -43,7 +43,7 @@ FROM eclipse-temurin:17-jdk-alpine
 RUN apk add --no-cache nginx supervisor curl
 
 # Create directories
-RUN mkdir -p /app/services /app/frontend /var/log/supervisor
+RUN mkdir -p /app/services /app/frontend /var/log/supervisor /etc/supervisor/conf.d
 
 # Copy built JAR files
 COPY --from=java-builder /app/services/order-service/target/*.jar /app/services/order-service.jar
