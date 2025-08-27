@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
-    "spring.redis.host=localhost",
-    "spring.redis.port=6379",
+    "spring.redis.host=${SPRING_REDIS_HOST:127.0.0.1}",
+    "spring.redis.port=${SPRING_REDIS_PORT:6379}",
     "spring.redis.timeout=2000ms",
     "spring.redis.lettuce.pool.max-active=8",
     "spring.redis.lettuce.pool.max-idle=8",

@@ -1,4 +1,6 @@
-# Multi-stage Dockerfile for unified frontend + backend deployment
+# Multi-stage Dockerfile para sistema distribuído de gestão de pedidos
+# Otimizado para deploy no Render com SERVICE_TYPE variável
+
 # Stage 1: Build shared events
 FROM maven:3.9.8-eclipse-temurin-17 AS shared-builder
 WORKDIR /app
@@ -6,14 +8,14 @@ COPY pom.xml ./
 COPY shared-events/ shared-events/
 RUN cd shared-events && mvn clean install -DskipTests -B
 
-# Stage 2: Build all Java services  
+# Stage 2: Build all Java services
 FROM maven:3.9.8-eclipse-temurin-17 AS java-builder
 WORKDIR /app
 
 # Copy Maven repository from shared-builder
 COPY --from=shared-builder /root/.m2/repository /root/.m2/repository
 
-# Copy Maven configuration files for cache optimization
+# Copy Maven files for dependency caching
 COPY pom.xml ./
 COPY shared-events/ shared-events/
 COPY services/order-service/pom.xml services/order-service/
@@ -21,90 +23,85 @@ COPY services/payment-service/pom.xml services/payment-service/
 COPY services/inventory-service/pom.xml services/inventory-service/
 COPY services/order-query-service/pom.xml services/order-query-service/
 
-# Download dependencies for cache layer
+# Download dependencies
 RUN mvn -B -f pom.xml -DskipTests dependency:resolve
 
-# Copy source code
+# Copy source code and build
 COPY services/ services/
-
-# Build all services
 RUN mvn -B -f pom.xml clean package -DskipTests
 
-# Stage 3: Build React frontend
-FROM node:18-alpine AS frontend-builder
-WORKDIR /app/frontend
-COPY frontend/package.json ./
-RUN npm install
-COPY frontend/ .
-RUN npm run build
-
-# Stage 4: Runtime environment with Nginx + Java services
+# Stage 3: Runtime environment
 FROM eclipse-temurin:17-jdk-alpine
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /app
+
+# Install runtime dependencies
 RUN apk add --no-cache nginx supervisor curl gettext
 
-# Create directories
-RUN mkdir -p /app/services /app/frontend /var/log/supervisor /etc/supervisor/conf.d
+# Create required directories
+RUN mkdir -p /app/services /app/frontend /var/log/supervisor /etc/supervisor
 
 # Copy built JAR files with exact names
 COPY --from=java-builder /app/services/order-service/target/order-service-1.0.0.jar /app/services/order-service.jar
-COPY --from=java-builder /app/services/payment-service/target/payment-service-1.0.0.jar /app/services/payment-service.jar  
+COPY --from=java-builder /app/services/payment-service/target/payment-service-1.0.0.jar /app/services/payment-service.jar
 COPY --from=java-builder /app/services/inventory-service/target/inventory-service-1.0.0.jar /app/services/inventory-service.jar
 COPY --from=java-builder /app/services/order-query-service/target/order-query-service-1.0.0.jar /app/services/query-service.jar
 
-# Copy built frontend
-COPY --from=frontend-builder /app/frontend/dist /app/frontend
+# Copy frontend build (static files)
+COPY frontend/dist /app/frontend
 
-# Copy nginx template and all supervisor configs
+# Copy nginx template and supervisor configs
 COPY deploy/nginx/nginx.conf.template /etc/nginx/nginx.conf.template
-COPY deploy/supervisord/ /etc/supervisor/configs/
-RUN chmod 644 /etc/supervisor/configs/*.conf
+COPY deploy/supervisord/web.conf /etc/supervisor/web.conf
+COPY deploy/supervisord/order.conf /etc/supervisor/order.conf
+COPY deploy/supervisord/payment.conf /etc/supervisor/payment.conf
+COPY deploy/supervisord/inventory.conf /etc/supervisor/inventory.conf
 
-# Create startup script with service type selection
+# Set permissions
+RUN chmod 644 /etc/supervisor/*.conf && chmod 755 /app/services/*.jar
+
+# Create startup script
 RUN printf '#!/bin/sh\n\
-export PORT=${PORT:-80}\n\
-export SERVICE_TYPE=${SERVICE_TYPE:-web}\n\
+set -e\n\
+log() { echo "[$(date)] SERVICE_TYPE=$SERVICE_TYPE: $1"; }\n\
 \n\
-echo "=== Configurando deploy para SERVICE_TYPE=$SERVICE_TYPE ==="\n\
-\n\
-# Select appropriate supervisord config based on SERVICE_TYPE\n\
+# Validate SERVICE_TYPE\n\
 case "$SERVICE_TYPE" in\n\
-  web)\n\
-    SUPERVISOR_CONF="/etc/supervisor/configs/web.conf"\n\
-    echo "Web service: nginx + query-service na porta $PORT"\n\
-    # Process nginx template only for web service\n\
-    envsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\n\
-    ;;\n\
-  order)\n\
-    SUPERVISOR_CONF="/etc/supervisor/configs/order.conf"\n\
-    echo "Order service isolado na porta 8081"\n\
-    ;;\n\
-  payment)\n\
-    SUPERVISOR_CONF="/etc/supervisor/configs/payment.conf"\n\
-    echo "Payment service isolado na porta 8082"\n\
-    ;;\n\
-  inventory)\n\
-    SUPERVISOR_CONF="/etc/supervisor/configs/inventory.conf"\n\
-    echo "Inventory service isolado na porta 8083"\n\
-    ;;\n\
-  *)\n\
-    echo "ERROR: Invalid SERVICE_TYPE=$SERVICE_TYPE. Valid values: web, order, payment, inventory"\n\
-    exit 1\n\
-    ;;\n\
+    "web")\n\
+        log "Starting web service (nginx + query-service)"\n\
+        export PORT=${PORT:-8080}\n\
+        envsubst "\\$PORT" < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\n\
+        nginx -t || { log "Invalid nginx.conf"; exit 1; }\n\
+        CONFIG="/etc/supervisor/web.conf"\n\
+        ;;\n\
+    "order")\n\
+        log "Starting order service"\n\
+        CONFIG="/etc/supervisor/order.conf"\n\
+        ;;\n\
+    "payment")\n\
+        log "Starting payment service"\n\
+        CONFIG="/etc/supervisor/payment.conf"\n\
+        ;;\n\
+    "inventory")\n\
+        log "Starting inventory service"\n\
+        CONFIG="/etc/supervisor/inventory.conf"\n\
+        ;;\n\
+    *)\n\
+        log "ERROR: Invalid SERVICE_TYPE. Use: web, order, payment, inventory"\n\
+        exit 1\n\
+        ;;\n\
 esac\n\
 \n\
-# Validate selected config contains required [supervisord] section\n\
-if ! grep -q "^\[supervisord\]" "$SUPERVISOR_CONF"; then\n\
-  echo "ERROR: $SUPERVISOR_CONF missing [supervisord] section"\n\
-  cat "$SUPERVISOR_CONF"\n\
-  exit 1\n\
-fi\n\
-\n\
-echo "Iniciando supervisord com config: $SUPERVISOR_CONF"\n\
-exec /usr/bin/supervisord -c "$SUPERVISOR_CONF"\n\
-' > /start.sh && chmod +x /start.sh
+log "Using config: $CONFIG"\n\
+exec /usr/bin/supervisord -c "$CONFIG"\n\
+' > /app/startup.sh && chmod +x /app/startup.sh
 
-# Expose ports based on service type (handled by runtime ENV)
-EXPOSE 80 8081 8082 8083 8084
+# Expose port (will be set dynamically by Render)
+EXPOSE ${PORT:-8080}
 
-# Health check varies by service type (handled by startup script)  
-CMD ["/start.sh"]
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
+  CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
+
+# Start with our intelligent startup script
+CMD ["/app/startup.sh"]

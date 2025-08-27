@@ -37,6 +37,16 @@ jobs:
         ports:
           - 5672:5672
           - 15672:15672
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
 
     steps:
     - uses: actions/checkout@v3
@@ -87,10 +97,10 @@ jobs:
         cd services/inventory-service
         mvn clean test
       env:
-        RABBITMQ_HOST: localhost
-        RABBITMQ_PORT: 5672
-        RABBITMQ_USERNAME: guest
-        RABBITMQ_PASSWORD: guest
+        SPRING_RABBITMQ_HOST: localhost
+        SPRING_RABBITMQ_PORT: 5672
+        SPRING_RABBITMQ_USERNAME: guest
+        SPRING_RABBITMQ_PASSWORD: guest
         
     - name: Test Order Query Service
       run: |
@@ -104,6 +114,8 @@ jobs:
         RABBITMQ_PORT: 5672
         RABBITMQ_USERNAME: guest
         RABBITMQ_PASSWORD: guest
+        SPRING_REDIS_HOST: localhost
+        SPRING_REDIS_PORT: 6379
 
   build:
     needs: test
