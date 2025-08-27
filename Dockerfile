@@ -47,7 +47,7 @@ COPY --from=java-builder /app/services/payment-service/target/payment-service-1.
 COPY --from=java-builder /app/services/inventory-service/target/inventory-service-1.0.0.jar /app/services/inventory-service.jar
 COPY --from=java-builder /app/services/order-query-service/target/order-query-service-1.0.0.jar /app/services/query-service.jar
 
-# Copy frontend build (static files)
+# Copy frontend static files (pre-built)
 COPY frontend/dist /app/frontend
 
 # Copy nginx template and supervisor configs

@@ -1,46 +1,21 @@
 package com.ordersystem.query.config;
 
-import java.io.IOException;
-import java.util.UUID;
+ponent
 
-import org.slf4j.MDC;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
+ic class
 
-import jakarta.servlet.Filter;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+final String CORRELATION_ID_HEADER=
 
-@Component
-@Order(1)
-public class CorrelationIdFilter implements Filter {
+tion,
 
-    private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
-    private static final String CORRELATION_ID_MDC_KEY = "correlationId";
+st httpRequest=(HttpServletRequest)request;httpResponse=(HttpServletResponse)response
 
-    @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-            throws IOException, ServletException {
+Id=httpRequest.getHeader(CORRELATION_ID_HEADE==null||correlationId.trim().isEmpty()){
 
-        HttpServletRequest httpRequest = (HttpServletRequest) request;
-        HttpServletResponse httpResponse = (HttpServletResponse) response;
+ATION_ID_MD ader(CORRELATION_ID_HEADER,correla
 
-        String correlationId = httpRequest.getHeader(CORRELATION_ID_HEADER);
-        if (correlationId == null || correlationId.trim().isEmpty()) {
-            correlationId = UUID.randomUUID().toString();
-        }
+er(request,response);
 
-        MDC.put(CORRELATION_ID_MDC_KEY, correlationId);
-        httpResponse.setHeader(CORRELATION_ID_HEADER, correlationId);
+y{ORRELATION_ID_MDC_KEY);
 
-        try {
-            chain.doFilter(request, response);
-        } finally {
-            MDC.remove(CORRELATION_ID_MDC_KEY);
-        }
-    }
 }
