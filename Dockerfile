@@ -65,13 +65,15 @@ RUN printf '#!/bin/sh\n\
 set -e\n\
 log() { echo "[$(date)] SERVICE_TYPE=$SERVICE_TYPE: $1"; }\n\
 \n\
-# Validate SERVICE_TYPE\n\
 case "$SERVICE_TYPE" in\n\
     "web")\n\
         log "Starting web service (nginx + query-service)"\n\
         export PORT=${PORT:-8080}\n\
-        envsubst "\\$PORT" < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\n\
-        nginx -t || { log "Invalid nginx.conf"; exit 1; }\n\
+        log "Processing nginx template with PORT=$PORT"\n\
+        envsubst "\\$PORT" < /etc/nginx/nginx.conf.template > /tmp/nginx.conf.new\n\
+        mv /tmp/nginx.conf.new /etc/nginx/nginx.conf\n\
+        log "Testing nginx configuration"\n\
+        nginx -t || { log "Invalid nginx.conf generated"; cat /etc/nginx/nginx.conf; exit 1; }\n\
         CONFIG="/etc/supervisor/web.conf"\n\
         ;;\n\
     "order")\n\
@@ -87,12 +89,12 @@ case "$SERVICE_TYPE" in\n\
         CONFIG="/etc/supervisor/inventory.conf"\n\
         ;;\n\
     *)\n\
-        log "ERROR: Invalid SERVICE_TYPE. Use: web, order, payment, inventory"\n\
+        log "ERROR: Invalid SERVICE_TYPE. Valid: web, order, payment, inventory"\n\
         exit 1\n\
         ;;\n\
 esac\n\
 \n\
-log "Using config: $CONFIG"\n\
+log "Starting supervisord with config: $CONFIG"\n\
 exec /usr/bin/supervisord -c "$CONFIG"\n\
 ' > /app/startup.sh && chmod +x /app/startup.sh
 
