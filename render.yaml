@@ -8,37 +8,29 @@ services:
     databaseUser: order_system_user
     ipAllowList: []
 
-  # Redis Instance
+  # Redis Instance  
   - type: redis
     name: order-redis-cache
     plan: starter
     region: oregon
     ipAllowList: []
 
-  # Unified Application (Frontend + Backend)
+  # Web Service (nginx + frontend + query-service)
   - type: web
-    name: gestao-de-pedidos
+    name: gestao-de-pedidos-web
     env: docker
     plan: starter
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
-    buildCommand: ""  # Docker handles the build
-    startCommand: ""  # Docker handles the start
     envVars:
+      - key: SERVICE_TYPE
+        value: web
       - key: DATABASE_URL
         fromDatabase:
           name: order-postgres-db
           property: connectionString
-      - key: DATABASE_USERNAME
-        fromDatabase:
-          name: order-postgres-db
-          property: user
-      - key: DATABASE_PASSWORD
-        fromDatabase:
-          name: order-postgres-db
-          property: password
       - key: REDIS_URL
         fromService:
           type: redis
@@ -49,4 +41,85 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: render
       - key: JAVA_OPTS
-        value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dspring.jpa.hibernate.ddl-auto=update"
+        value: "-Xmx128m -XX:+UseContainerSupport"
+
+  # Order Service Worker
+  - type: worker
+    name: gestao-de-pedidos-order
+    env: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SERVICE_TYPE
+        value: order
+      - key: DATABASE_URL
+        fromDatabase:
+          name: order-postgres-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: order-redis-cache
+          property: connectionString
+      - key: MESSAGING_TYPE
+        value: redis
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_OPTS
+        value: "-Xmx96m -XX:+UseContainerSupport"
+
+  # Payment Service Worker
+  - type: worker
+    name: gestao-de-pedidos-payment
+    env: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SERVICE_TYPE
+        value: payment
+      - key: DATABASE_URL
+        fromDatabase:
+          name: order-postgres-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: order-redis-cache
+          property: connectionString
+      - key: MESSAGING_TYPE
+        value: redis
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_OPTS
+        value: "-Xmx96m -XX:+UseContainerSupport"
+
+  # Inventory Service Worker
+  - type: worker
+    name: gestao-de-pedidos-inventory
+    env: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SERVICE_TYPE
+        value: inventory
+      - key: DATABASE_URL
+        fromDatabase:
+          name: order-postgres-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: order-redis-cache
+          property: connectionString
+      - key: MESSAGING_TYPE
+        value: redis
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_OPTS
+        value: "-Xmx96m -XX:+UseContainerSupport"
