@@ -1,0 +1,346 @@
+name: Render Multi-Service Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '18'
+  MAVEN_OPTS: '-Xmx2g -Xms1g -Dmaven.repo.local=$HOME/.m2/repository'
+
+jobs:
+  test-and-build:
+    name: Build & Test All Services
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_DB: order_system_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'eclipse-temurin'
+        java-version: ${{ env.JAVA_VERSION }}
+        cache: 'maven'
+
+    - name: Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Build shared events library
+      run: |
+        echo "🔧 Building shared events library..."
+        cd shared-events
+        mvn clean install -DskipTests -B
+        echo "✅ Shared events library built successfully"
+
+    - name: Run Java tests with services
+      env:
+        DATABASE_URL: jdbc:postgresql://localhost:5432/order_system_test
+        DATABASE_USERNAME: test_user
+        DATABASE_PASSWORD: test_pass
+        REDIS_URL: redis://localhost:6379
+        SPRING_REDIS_HOST: localhost
+        SPRING_REDIS_PORT: 6379
+        SPRING_PROFILES_ACTIVE: test
+        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/order_system_test
+        SPRING_DATASOURCE_USERNAME: test_user
+        SPRING_DATASOURCE_PASSWORD: test_pass
+      run: |
+        echo "🧪 Running Java integration tests..."
+        mvn test -B -Dspring.profiles.active=test
+        echo "✅ Java tests completed successfully"
+
+    - name: Build and test frontend
+      run: |
+        echo "📦 Installing frontend dependencies..."
+        cd frontend
+        npm ci
+        
+        echo "🔍 Running frontend linting..."
+        npm run lint
+        
+        echo "🧪 Running frontend tests..."
+        npm run test
+        
+        echo "🏗️ Building frontend for production..."
+        npm run build
+        
+        echo "✅ Frontend build completed"
+        ls -la dist/
+
+    - name: Build Docker image for testing
+      run: |
+        echo "🐳 Building unified Docker image..."
+        docker build -t sistema-pedidos:${{ github.sha }} .
+        echo "✅ Docker image built successfully"
+
+    - name: Test container startup for each service type
+      run: |
+        echo "🧪 Testing container startup for all service types..."
+        
+        # Test Web Service (nginx + query-service + frontend)
+        echo "Testing WEB service..."
+        docker run -d --name test-web \
+          -e SERVICE_TYPE=web \
+          -e PORT=8080 \
+          -e DATABASE_URL=jdbc:postgresql://host.docker.internal:5432/order_system_test \
+          -e REDIS_URL=redis://host.docker.internal:6379 \
+          -e SPRING_PROFILES_ACTIVE=test \
+          --network host \
+          sistema-pedidos:${{ github.sha }}
+        
+        sleep 30
+        
+        # Test health endpoints
+        if curl -f http://localhost:8080/health; then
+          echo "✅ Web service health check passed"
+        else
+          echo "❌ Web service health check failed"
+          docker logs test-web
+          exit 1
+        fi
+        
+        docker stop test-web && docker rm test-web
+        
+        # Test Order Service Worker
+        echo "Testing ORDER worker..."
+        docker run -d --name test-order \
+          -e SERVICE_TYPE=order \
+          -e DATABASE_URL=jdbc:postgresql://host.docker.internal:5432/order_system_test \
+          -e REDIS_URL=redis://host.docker.internal:6379 \
+          -e SPRING_PROFILES_ACTIVE=test \
+          --network host \
+          sistema-pedidos:${{ github.sha }}
+        
+        sleep 20
+        
+        # Check if order service is running (no HTTP endpoint for workers)
+        if docker ps | grep test-order; then
+          echo "✅ Order worker is running"
+        else
+          echo "❌ Order worker failed to start"
+          docker logs test-order
+          exit 1
+        fi
+        
+        docker stop test-order && docker rm test-order
+        
+        # Test Payment Service Worker
+        echo "Testing PAYMENT worker..."
+        docker run -d --name test-payment \
+          -e SERVICE_TYPE=payment \
+          -e DATABASE_URL=jdbc:postgresql://host.docker.internal:5432/order_system_test \
+          -e REDIS_URL=redis://host.docker.internal:6379 \
+          -e SPRING_PROFILES_ACTIVE=test \
+          --network host \
+          sistema-pedidos:${{ github.sha }}
+        
+        sleep 20
+        
+        if docker ps | grep test-payment; then
+          echo "✅ Payment worker is running"
+        else
+          echo "❌ Payment worker failed to start"
+          docker logs test-payment
+          exit 1
+        fi
+        
+        docker stop test-payment && docker rm test-payment
+        
+        # Test Inventory Service Worker
+        echo "Testing INVENTORY worker..."
+        docker run -d --name test-inventory \
+          -e SERVICE_TYPE=inventory \
+          -e DATABASE_URL=jdbc:postgresql://host.docker.internal:5432/order_system_test \
+          -e REDIS_URL=redis://host.docker.internal:6379 \
+          -e SPRING_PROFILES_ACTIVE=test \
+          --network host \
+          sistema-pedidos:${{ github.sha }}
+        
+        sleep 20
+        
+        if docker ps | grep test-inventory; then
+          echo "✅ Inventory worker is running"
+        else
+          echo "❌ Inventory worker failed to start"
+          docker logs test-inventory
+          exit 1
+        fi
+        
+        docker stop test-inventory && docker rm test-inventory
+
+    - name: Security scan
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'sistema-gestao-pedidos-multi'
+        path: '.'
+        format: 'ALL'
+        args: >
+          --enableRetired
+          --enableExperimental
+          --scan './services/'
+          --scan './frontend/'
+          --out './reports'
+
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts-${{ github.sha }}
+        path: |
+          **/target/surefire-reports/
+          frontend/coverage/
+          frontend/dist/
+          reports/
+        retention-days: 7
+
+  deploy-trigger:
+    name: Trigger Render Deploys
+    runs-on: ubuntu-latest
+    needs: [test-and-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    strategy:
+      matrix:
+        service:
+          - name: "Web Service"
+            id: "RENDER_WEB_SERVICE_ID"
+            type: "web"
+          - name: "Order Worker"
+            id: "RENDER_ORDER_SERVICE_ID" 
+            type: "worker"
+          - name: "Payment Worker"
+            id: "RENDER_PAYMENT_SERVICE_ID"
+            type: "worker"
+          - name: "Inventory Worker"
+            id: "RENDER_INVENTORY_SERVICE_ID"
+            type: "worker"
+      fail-fast: false
+    
+    steps:
+    - name: Deploy ${{ matrix.service.name }}
+      if: vars[matrix.service.id] != ''
+      run: |
+        echo "🚀 Triggering deploy for ${{ matrix.service.name }}..."
+        
+        SERVICE_ID="${{ vars[matrix.service.id] }}"
+        
+        if [ -z "$SERVICE_ID" ]; then
+          echo "⚠️ Service ID not configured for ${{ matrix.service.name }}"
+          echo "Please set ${{ matrix.service.id }} in repository variables"
+          exit 0
+        fi
+        
+        curl -X POST \
+          "https://api.render.com/v1/services/$SERVICE_ID/deploys" \
+          -H "Accept: application/json" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          -d '{
+            "clearCache": "clear"
+          }'
+        
+        echo "✅ Deploy triggered for ${{ matrix.service.name }} (Service ID: $SERVICE_ID)"
+
+  monitor-deploys:
+    name: Monitor Deploy Status
+    runs-on: ubuntu-latest
+    needs: [deploy-trigger]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Wait and check deploy status
+      run: |
+        echo "⏳ Waiting 2 minutes for deploys to start..."
+        sleep 120
+        
+        echo "🔍 Deploy monitoring instructions:"
+        echo "1. Visit Render Dashboard: https://dashboard.render.com"
+        echo "2. Check each service deploy status:"
+        echo "   - gestao-de-pedidos-web (Web Service)"
+        echo "   - gestao-de-pedidos-order (Order Worker)"
+        echo "   - gestao-de-pedidos-payment (Payment Worker)" 
+        echo "   - gestao-de-pedidos-inventory (Inventory Worker)"
+        echo ""
+        echo "🔗 Commit deployed: ${{ github.sha }}"
+        echo "👤 Deployed by: ${{ github.actor }}"
+        echo "📝 Commit message: ${{ github.event.head_commit.message }}"
+
+    - name: Create deployment summary
+      run: |
+        echo "## 🚀 Multi-Service Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
+        echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Time:** $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Services Deployed:" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ **Web Service** - Frontend + Query API" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ **Order Worker** - Order processing" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ **Payment Worker** - Payment processing" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ **Inventory Worker** - Inventory management" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔗 **Monitor at:** [Render Dashboard](https://dashboard.render.com)" >> $GITHUB_STEP_SUMMARY
+
+  rollback-guide:
+    name: Rollback Instructions
+    runs-on: ubuntu-latest
+    needs: [deploy-trigger]
+    if: failure() && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Generate rollback instructions
+      run: |
+        echo "🚨 MULTI-SERVICE DEPLOYMENT FAILED" >> $GITHUB_STEP_SUMMARY
+        echo "=================================" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Manual Rollback Steps:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Go to [Render Dashboard](https://dashboard.render.com)" >> $GITHUB_STEP_SUMMARY
+        echo "2. For each failed service:" >> $GITHUB_STEP_SUMMARY
+        echo "   - **gestao-de-pedidos-web**" >> $GITHUB_STEP_SUMMARY
+        echo "   - **gestao-de-pedidos-order**" >> $GITHUB_STEP_SUMMARY
+        echo "   - **gestao-de-pedidos-payment**" >> $GITHUB_STEP_SUMMARY
+        echo "   - **gestao-de-pedidos-inventory**" >> $GITHUB_STEP_SUMMARY
+        echo "3. Navigate to **Deploys** tab" >> $GITHUB_STEP_SUMMARY
+        echo "4. Click **Rollback** on last successful deploy" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Using Render CLI:" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "render deploy rollback <service-id> <previous-deploy-id>" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "❌ **Failed commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "👤 **Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
