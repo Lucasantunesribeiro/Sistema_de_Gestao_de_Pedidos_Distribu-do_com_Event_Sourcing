@@ -10,43 +10,206 @@ const indexHtml = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestão de Pedidos</title>
+    <title>Sistema de Gestão de Pedidos - Event Sourcing</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        .header { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-bottom: 20px; }
-        .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-        .status.up { background: #dcfce7; color: #166534; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #1a202c;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .header { 
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(10px);
+            border-radius: 16px; 
+            padding: 32px; 
+            margin-bottom: 32px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            border: 1px solid rgba(255,255,255,0.2);
+            text-align: center;
+        }
+        .header h1 { 
+            font-size: 2.5rem; 
+            font-weight: 800; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        .header p { 
+            color: #64748b; 
+            font-size: 1.1rem; 
+            font-weight: 500;
+        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .card { 
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(10px);
+            border-radius: 16px; 
+            padding: 24px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1); 
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:hover { 
+            transform: translateY(-4px); 
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15); 
+        }
+        .card h2, .card h3 { 
+            font-weight: 700; 
+            margin-bottom: 16px; 
+            font-size: 1.4rem;
+            color: #2d3748;
+        }
+        .status { 
+            display: inline-flex; 
+            align-items: center;
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-size: 13px; 
+            font-weight: 600; 
+            gap: 6px;
+        }
+        .status.up { background: #d1fae5; color: #065f46; }
         .status.loading { background: #fef3c7; color: #d97706; }
-        .btn { background: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; margin: 5px; }
-        .btn:hover { background: #2563eb; }
-        .btn.success { background: #059669; }
-        .btn.danger { background: #dc2626; }
-        .btn.secondary { background: #6b7280; }
-        .result { margin-top: 10px; padding: 10px; border-radius: 4px; font-size: 14px; }
-        .result.success { background: #dcfce7; color: #166534; }
-        .result.error { background: #fef2f2; color: #dc2626; }
-        .result.info { background: #dbeafe; color: #1d4ed8; }
-        input, select { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #d1d5db; border-radius: 4px; }
-        .orders-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .orders-table th, .orders-table td { padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-        .orders-table th { background: #f9fafb; font-weight: 600; }
-        .footer { text-align: center; color: #64748b; margin-top: 40px; }
-        .stats { display: flex; justify-content: space-between; margin: 10px 0; }
-        .stat-item { text-align: center; }
-        .stat-number { font-size: 24px; font-weight: bold; color: #3b82f6; }
-        .loading { color: #6b7280; }
+        .status.error { background: #fee2e2; color: #dc2626; }
+        .btn { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            margin: 6px; 
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); 
+        }
+        .btn.success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .btn.success:hover { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
+        .btn.danger { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+        .btn.danger:hover { box-shadow: 0 4px 12px rgba(248, 113, 113, 0.4); }
+        .btn.secondary { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
+        .btn.secondary:hover { box-shadow: 0 4px 12px rgba(148, 163, 184, 0.4); }
+        .result { 
+            margin-top: 16px; 
+            padding: 14px; 
+            border-radius: 10px; 
+            font-size: 14px;
+            border-left: 4px solid;
+        }
+        .result.success { background: #ecfdf5; color: #065f46; border-color: #10b981; }
+        .result.error { background: #fef2f2; color: #dc2626; border-color: #f87171; }
+        .result.info { background: #eff6ff; color: #1e40af; border-color: #3b82f6; }
+        input, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 8px 0; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 8px; 
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+        input:focus, select:focus { 
+            outline: none; 
+            border-color: #667eea; 
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); 
+        }
+        .orders-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 16px; 
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .orders-table th, .orders-table td { 
+            padding: 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #f1f5f9; 
+        }
+        .orders-table th { 
+            background: #f8fafc; 
+            font-weight: 700; 
+            color: #475569;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .orders-table tbody tr:hover { 
+            background: #f8fafc; 
+        }
+        .footer { 
+            text-align: center; 
+            color: rgba(255,255,255,0.8); 
+            margin-top: 48px; 
+            font-weight: 500;
+        }
+        .footer p { margin: 6px 0; }
+        .stats { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
+            gap: 16px; 
+            margin: 20px 0; 
+        }
+        .stat-item { 
+            text-align: center; 
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        .stat-number { 
+            font-size: 2rem; 
+            font-weight: 800; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-label { 
+            font-size: 12px; 
+            color: #64748b; 
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 4px;
+        }
+        .loading { 
+            color: #64748b; 
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .loading { animation: pulse 1.5s ease-in-out infinite; }
+        
+        .system-badge { 
+            display: inline-block; 
+            background: rgba(102, 126, 234, 0.1); 
+            color: #667eea; 
+            padding: 4px 10px; 
+            border-radius: 12px; 
+            font-size: 11px; 
+            font-weight: 600; 
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🛒 Sistema de Gestão de Pedidos</h1>
-            <p>Sistema distribuído com Event Sourcing - Deploy no Render</p>
+            <p>Arquitetura Distribuída com Event Sourcing <span class="system-badge">v2.0</span></p>
         </div>
         
         <div class="grid">
@@ -78,15 +241,15 @@ const indexHtml = `<!DOCTYPE html>
                 <div class="stats">
                     <div class="stat-item">
                         <div id="total-orders" class="stat-number">0</div>
-                        <div>Total</div>
+                        <div class="stat-label">Total</div>
                     </div>
                     <div class="stat-item">
                         <div id="pending-orders" class="stat-number">0</div>
-                        <div>Pendentes</div>
+                        <div class="stat-label">Pendentes</div>
                     </div>
                     <div class="stat-item">
                         <div id="completed-orders" class="stat-number">0</div>
-                        <div>Concluídos</div>
+                        <div class="stat-label">Concluídos</div>
                     </div>
                 </div>
                 <button class="btn" onclick="loadOrders()">🔄 Carregar Pedidos</button>
@@ -105,9 +268,9 @@ const indexHtml = `<!DOCTYPE html>
         </div>
 
         <div class="footer">
-            <p>Sistema de Gestão de Pedidos v2.0.0 | Arquitetura Distribuída</p>
-            <p>Microsserviços: Order, Payment, Inventory, Query Services</p>
-            <p>🚀 Funcionando no Render com Event Sourcing</p>
+            <p><strong>Sistema de Gestão de Pedidos v2.0.0</strong> | Arquitetura Distribuída</p>
+            <p>Microsserviços: Order Service • Payment Service • Inventory Service • Query Service</p>
+            <p>🚀 <strong>Deploy em Produção</strong> no Render.com com Event Sourcing & Redis</p>
         </div>
     </div>
 
