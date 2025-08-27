@@ -30,12 +30,15 @@ RUN mvn -B -f pom.xml -DskipTests dependency:resolve
 COPY services/ services/
 RUN mvn -B -f pom.xml clean package -DskipTests
 
-# Stage 3: Frontend (using pre-built static files)
-FROM alpine:latest AS frontend-builder
+# Stage 3: Build frontend (fallback strategy)
+FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 
-# Copy pre-built frontend
-COPY frontend/dist/ ./
+# Copy frontend files
+COPY frontend/ ./
+
+# Try simple build first, fallback to full build if needed
+RUN node build-simple.js || (npm install && npm run build)
 
 # Stage 4: Runtime environment
 FROM eclipse-temurin:17-jdk-alpine
@@ -55,7 +58,7 @@ COPY --from=java-builder /app/services/inventory-service/target/inventory-servic
 COPY --from=java-builder /app/services/order-query-service/target/order-query-service-1.0.0.jar /app/services/query-service.jar
 
 # Copy frontend build output
-COPY --from=frontend-builder /app/frontend /app/frontend
+COPY --from=frontend-builder /app/frontend/dist /app/frontend
 
 # Copy nginx template and supervisor configs
 COPY deploy/nginx/nginx.conf.template /etc/nginx/nginx.conf.template
