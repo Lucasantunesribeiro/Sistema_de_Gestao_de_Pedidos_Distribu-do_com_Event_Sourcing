@@ -75,6 +75,26 @@ RUN printf '#!/bin/sh\n\
 set -e\n\
 log() { echo "[$(date)] SERVICE_TYPE=$SERVICE_TYPE: $1"; }\n\
 \n\
+# Debug environment\n\
+log "=== STARTUP DEBUG ==="\n\
+log "SERVICE_TYPE: ${SERVICE_TYPE:-NOT_SET}"\n\
+log "PORT: ${PORT:-NOT_SET}"\n\
+log "RENDER_SERVICE_TYPE: ${RENDER_SERVICE_TYPE:-NOT_SET}"\n\
+log "All env vars:"\n\
+env | grep -E "(SERVICE|PORT|RENDER)" | sort || echo "No matching env vars"\n\
+log "=================="\n\
+\n\
+# Default SERVICE_TYPE if not set (fallback to web)\n\
+if [ -z "$SERVICE_TYPE" ]; then\n\
+    if [ ! -z "$RENDER_SERVICE_TYPE" ]; then\n\
+        SERVICE_TYPE="$RENDER_SERVICE_TYPE"\n\
+        log "Using RENDER_SERVICE_TYPE: $SERVICE_TYPE"\n\
+    else\n\
+        SERVICE_TYPE="web"\n\
+        log "Defaulting to SERVICE_TYPE: web"\n\
+    fi\n\
+fi\n\
+\n\
 case "$SERVICE_TYPE" in\n\
     "web")\n\
         log "Starting web service (nginx + query-service)"\n\
@@ -99,7 +119,9 @@ case "$SERVICE_TYPE" in\n\
         CONFIG="/etc/supervisor/conf.d/inventory.conf"\n\
         ;;\n\
     *)\n\
-        log "ERROR: Invalid SERVICE_TYPE. Valid: web, order, payment, inventory"\n\
+        log "ERROR: Invalid SERVICE_TYPE: [$SERVICE_TYPE]. Valid: web, order, payment, inventory"\n\
+        log "Available config files:"\n\
+        ls -la /etc/supervisor/conf.d/\n\
         exit 1\n\
         ;;\n\
 esac\n\
