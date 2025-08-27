@@ -1,39 +1,57 @@
-# Sistema de Gestão de Pedidos Distribuído
+# 🛒 Sistema de Gestão de Pedidos Distribuído
 
-Um sistema completo de gestão de pedidos implementado com arquitetura de microsserviços, demonstrando padrões avançados como Event Sourcing, CQRS e comunicação orientada a eventos.
+[![Deploy Status](https://img.shields.io/badge/Deploy-Production-success)](https://gestao-de-pedidos.onrender.com)
+[![Architecture](https://img.shields.io/badge/Architecture-Microservices-blue)](https://github.com)
+[![Event Sourcing](https://img.shields.io/badge/Pattern-Event%20Sourcing-orange)](https://github.com)
 
-## 🚀 Características
+> Sistema distribuído de gestão de pedidos implementado com arquitetura de microsserviços, Event Sourcing e deploy automatizado no Render.com
+
+## 🚀 Demo em Produção
+
+**URL de Produção**: [https://gestao-de-pedidos.onrender.com](https://gestao-de-pedidos.onrender.com)
+
+## ✨ Características
 
 - **Arquitetura de Microsserviços**: 4 serviços independentes com responsabilidades bem definidas
-- **Event Sourcing**: Armazenamento completo do histórico de eventos
-- **CQRS**: Separação entre comandos e consultas para otimização
-- **Frontend Moderno**: Interface React 18 + TypeScript + shadcn/ui
-- **Comunicação Assíncrona**: RabbitMQ para mensageria entre serviços
-- **Resiliência**: Circuit breakers, retry e timeout patterns
-- **Observabilidade**: Health checks, métricas e logs estruturados
+- **Event Sourcing**: Armazenamento completo do histórico de eventos com Redis Streams
+- **Deploy Automatizado**: CI/CD completo no Render.com com GitHub Actions
+- **Interface Moderna**: Dashboard responsivo com design glassmorphism
+- **Alta Disponibilidade**: Nginx com fallbacks e health checks automatizados
+- **Otimização de Memória**: JVM tuning para deploy em containers de 512MB
 
 ## 🏗️ Arquitetura
 
-### Serviços Backend
+### Microsserviços
 
-- **Order Service** (8081): Gerenciamento de pedidos com Event Sourcing
-- **Payment Service** (8082): Processamento de pagamentos
-- **Inventory Service** (8083): Controle de estoque
-- **Order Query Service** (8084): Consultas otimizadas e dashboard
+- **Order Service** (Port 8081): Gerenciamento de pedidos
+- **Payment Service** (Port 8082): Processamento de pagamentos  
+- **Inventory Service** (Port 8083): Controle de estoque
+- **Query Service** (Port 8084): Agregação de dados e consultas
 
-### Frontend
+### Stack Tecnológica
 
-- **React Application** (3000): Interface de usuário moderna e responsiva
-- **shadcn/ui**: Componentes de UI consistentes e acessíveis
-- **TanStack Query**: Gerenciamento de estado do servidor
-- **React Router**: Navegação client-side
+- **Backend**: Java 21 + Spring Boot 3.4
+- **Event Sourcing**: Redis Streams
+- **Frontend**: HTML5 + CSS3 + Vanilla JavaScript
+- **Proxy**: Nginx com balanceamento
+- **Deploy**: Render.com com CI/CD
+- **Containerização**: Docker multi-stage
 
-### Infraestrutura
+### Render.com Services
 
-- **PostgreSQL**: Bancos de dados para event store e read models
-- **RabbitMQ**: Message broker para comunicação entre serviços
-- **Redis**: Cache para otimização de consultas
-- **Nginx**: Reverse proxy e load balancer
+1. **Web Service** (gestao-de-pedidos)
+   - Frontend + Nginx + Query Service
+   - Endpoint público com health checks
+   - Memória: 512MB
+
+2. **Background Workers**
+   - Order Service (background)
+   - Payment Service (background) 
+   - Inventory Service (background)
+
+3. **Redis Service**
+   - Event streaming
+   - Cache distribuído
 
 ## 🛠️ Tecnologias
 
