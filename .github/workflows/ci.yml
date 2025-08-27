@@ -151,25 +151,25 @@ jobs:
         mvn clean package -DskipTests
         
     - name: Upload Order Service Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: order-service-jar
         path: services/order-service/target/*.jar
         
     - name: Upload Payment Service Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: payment-service-jar
         path: services/payment-service/target/*.jar
         
     - name: Upload Inventory Service Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: inventory-service-jar
         path: services/inventory-service/target/*.jar
         
     - name: Upload Order Query Service Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: order-query-service-jar
         path: services/order-query-service/target/*.jar
