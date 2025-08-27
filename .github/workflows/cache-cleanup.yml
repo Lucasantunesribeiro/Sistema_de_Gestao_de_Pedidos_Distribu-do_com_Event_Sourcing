@@ -1,0 +1,36 @@
+name: Cache Cleanup
+
+# Runs weekly to clean up old caches and optimize CI performance
+on:
+  schedule:
+    - cron: '0 2 * * 1' # Every Monday at 2 AM UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  cleanup:
+    name: Clean Caches
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Cleanup old caches
+      run: |
+        echo "🧹 Cleaning up old GitHub Actions caches..."
+        
+        # Get list of caches
+        gh api repos/${{ github.repository }}/actions/caches \
+          --jq '.actions_caches[] | select(.created_at < (now - 604800)) | .id' \
+          | head -20 \
+          | xargs -I {} gh api --method DELETE repos/${{ github.repository }}/actions/caches/{}
+        
+        echo "✅ Cache cleanup completed"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Cache Statistics
+      run: |
+        echo "📊 Current cache statistics:"
+        gh api repos/${{ github.repository }}/actions/caches \
+          --jq '.actions_caches | length' \
+          | xargs -I {} echo "Total caches: {}"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
