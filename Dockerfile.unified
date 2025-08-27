@@ -34,7 +34,7 @@ RUN mvn -B -f pom.xml clean package -DskipTests
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install
 COPY frontend/ .
 RUN npm run build
 
