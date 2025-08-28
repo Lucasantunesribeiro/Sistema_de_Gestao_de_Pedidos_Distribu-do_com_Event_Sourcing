@@ -26,7 +26,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="orderflow-ui-theme">
         <Router>
-          <div className="min-h-screen bg-background font-inter antialiased">
+          <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 font-inter antialiased">
             <Routes>
               <Route path="/" element={<Layout />}>
                 <Route index element={<Dashboard />} />
