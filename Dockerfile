@@ -1,36 +1,17 @@
-# Multi-stage Dockerfile para sistema distribuído de gestão de pedidos
-# Otimizado para deploy no Render com SERVICE_TYPE variável
+# Dockerfile simplificado para gestão de pedidos
+# Otimizado para deploy no Render
 
-# Stage 1: Build shared events
-FROM maven:3.9.8-eclipse-temurin-17 AS shared-builder
-WORKDIR /app
-COPY pom.xml ./
-COPY shared-events/ shared-events/
-RUN cd shared-events && mvn clean install -DskipTests -B
-
-# Stage 2: Build all Java services
+# Stage 1: Build Java services
 FROM maven:3.9.8-eclipse-temurin-17 AS java-builder
 WORKDIR /app
 
-# Copy Maven repository from shared-builder
-COPY --from=shared-builder /root/.m2/repository /root/.m2/repository
+# Copy all source files
+COPY . .
 
-# Copy Maven files for dependency caching
-COPY pom.xml ./
-COPY shared-events/ shared-events/
-COPY services/order-service/pom.xml services/order-service/
-COPY services/payment-service/pom.xml services/payment-service/
-COPY services/inventory-service/pom.xml services/inventory-service/
-COPY services/order-query-service/pom.xml services/order-query-service/
+# Build everything in one step
+RUN mvn clean package -DskipTests -B
 
-# Download dependencies
-RUN mvn -B -f pom.xml -DskipTests dependency:resolve
-
-# Copy source code and build
-COPY services/ services/
-RUN mvn -B -f pom.xml clean package -DskipTests
-
-# Stage 3: Build frontend (fallback strategy)
+# Stage 2: Build frontend (fallback strategy)
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 
@@ -40,7 +21,7 @@ COPY frontend/ ./
 # Try simple build first, fallback to full build if needed
 RUN node build-simple.js || (npm install && npm run build)
 
-# Stage 4: Runtime environment
+# Stage 3: Runtime environment
 FROM eclipse-temurin:17-jdk-alpine
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
