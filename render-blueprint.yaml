@@ -1,0 +1,145 @@
+# Render Blueprint - Sistema de Gestão de Pedidos
+# Deploy completo com PostgreSQL, Redis e microserviços
+# Use este arquivo no Render Dashboard: "New" -> "Blueprint"
+
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: order-postgres-db
+    plan: free
+    region: oregon
+    databaseName: order_system_db
+    databaseUser: order_system_user
+    ipAllowList: []
+
+  # Redis Cache  
+  - type: redis
+    name: order-redis-cache
+    plan: free
+    region: oregon
+    ipAllowList: []
+
+  # Web Service (Frontend + Query Service)
+  - type: web
+    name: gestao-pedidos-web
+    env: docker
+    plan: free
+    region: oregon
+    repo: https://github.com/Lucasantunesribeiro/Sistema_de_Gestao_de_Pedidos_Distribu-do_com_Event_Sourcing.git
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: SERVICE_TYPE
+        value: web
+      - key: DATABASE_URL
+        fromDatabase:
+          name: order-postgres-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: order-redis-cache
+          property: connectionString
+      - key: MESSAGING_TYPE
+        value: redis
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_OPTS
+        value: "-Xmx128m -XX:+UseContainerSupport"
+      - key: PORT
+        value: "10000"
+
+  # Order Service (Worker)
+  - type: worker
+    name: gestao-pedidos-order
+    env: docker
+    plan: free
+    region: oregon
+    repo: https://github.com/Lucasantunesribeiro/Sistema_de_Gestao_de_Pedidos_Distribu-do_com_Event_Sourcing.git
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SERVICE_TYPE
+        value: order
+      - key: DATABASE_URL
+        fromDatabase:
+          name: order-postgres-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: order-redis-cache
+          property: connectionString
+      - key: MESSAGING_TYPE
+        value: redis
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_OPTS
+        value: "-Xmx96m -XX:+UseContainerSupport"
+      - key: SERVER_PORT
+        value: "8081"
+
+  # Payment Service (Worker)
+  - type: worker
+    name: gestao-pedidos-payment
+    env: docker
+    plan: free
+    region: oregon
+    repo: https://github.com/Lucasantunesribeiro/Sistema_de_Gestao_de_Pedidos_Distribu-do_com_Event_Sourcing.git
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SERVICE_TYPE
+        value: payment
+      - key: DATABASE_URL
+        fromDatabase:
+          name: order-postgres-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: order-redis-cache
+          property: connectionString
+      - key: MESSAGING_TYPE
+        value: redis
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_OPTS
+        value: "-Xmx96m -XX:+UseContainerSupport"
+      - key: SERVER_PORT
+        value: "8082"
+
+  # Inventory Service (Worker)
+  - type: worker
+    name: gestao-pedidos-inventory
+    env: docker
+    plan: free
+    region: oregon
+    repo: https://github.com/Lucasantunesribeiro/Sistema_de_Gestao_de_Pedidos_Distribu-do_com_Event_Sourcing.git
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SERVICE_TYPE
+        value: inventory
+      - key: DATABASE_URL
+        fromDatabase:
+          name: order-postgres-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: order-redis-cache
+          property: connectionString
+      - key: MESSAGING_TYPE
+        value: redis
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_OPTS
+        value: "-Xmx96m -XX:+UseContainerSupport"
+      - key: SERVER_PORT
+        value: "8083"

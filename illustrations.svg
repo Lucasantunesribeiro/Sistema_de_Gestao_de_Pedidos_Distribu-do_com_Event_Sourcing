@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BIBLIOTECA DE ILUSTRAÇÕES - Sistema de Gestão de Pedidos v2.0
+  Ilustrações e empty states para melhorar a experiência do usuário
+  Cores baseadas no design system: #0891b2 (primary), #f97316 (secondary)
+-->
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" style="display: none;">
+  
+  <!-- EMPTY STATE: NENHUM PEDIDO -->
+  <g id="empty-orders-illustration">
+    <!-- Background Circles -->
+    <circle cx="200" cy="150" r="100" fill="#f8fafc" opacity="0.6"/>
+    <circle cx="300" cy="80" r="60" fill="#e2e8f0" opacity="0.4"/>
+    
+    <!-- Main Illustration -->
+    <rect x="140" y="120" width="120" height="80" rx="8" fill="none" stroke="#0891b2" stroke-width="3" stroke-dasharray="8,8"/>
+    <circle cx="200" cy="160" r="25" fill="#f1f5f9"/>
+    <path d="M185 155l10 10 20-20" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+    
+    <!-- Floating Elements -->
+    <circle cx="120" cy="90" r="3" fill="#f97316" opacity="0.7"/>
+    <circle cx="280" cy="180" r="4" fill="#0891b2" opacity="0.5"/>
+    <rect x="110" y="170" width="6" height="6" fill="#cbd5e1" opacity="0.6"/>
+    
+    <!-- Text Elements -->
+    <text x="200" y="230" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="14" font-weight="500">
+      Nenhum pedido encontrado
+    </text>
+    <text x="200" y="250" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="12">
+      Comece criando seu primeiro pedido
+    </text>
+  </g>
+  
+  <!-- EMPTY STATE: NENHUM CLIENTE -->
+  <g id="empty-clients-illustration">
+    <!-- Background -->
+    <circle cx="200" cy="150" r="80" fill="#f8fafc" opacity="0.5"/>
+    
+    <!-- Main Illustration -->
+    <circle cx="200" cy="140" r="30" fill="none" stroke="#0891b2" stroke-width="3"/>
+    <path d="M185 130c0-8 7-15 15-15s15 7 15 15" fill="none" stroke="#0891b2" stroke-width="3" stroke-linecap="round"/>
+    <path d="M170 175c0-17 13-30 30-30s30 13 30 30" fill="none" stroke="#0891b2" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Decorative Elements -->
+    <circle cx="160" cy="110" r="2" fill="#f97316"/>
+    <circle cx="240" cy="120" r="3" fill="#94a3b8"/>
+    <rect x="150" y="190" width="4" height="4" fill="#cbd5e1"/>
+    
+    <text x="200" y="220" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="14" font-weight="500">
+      Nenhum cliente cadastrado
+    </text>
+    <text x="200" y="240" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="12">
+      Adicione clientes para começar
+    </text>
+  </g>
+  
+  <!-- EMPTY STATE: SEM RESULTADOS DE BUSCA -->
+  <g id="empty-search-illustration">
+    <!-- Search Icon -->
+    <circle cx="195" cy="135" r="20" fill="none" stroke="#0891b2" stroke-width="3"/>
+    <line x1="210" y1="150" x2="225" y2="165" stroke="#0891b2" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Question Mark -->
+    <path d="M195 125c0-5 4-9 9-9s9 4 9 9c0 3-2 5-4 6l-1 4" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="199" cy="145" r="1" fill="#94a3b8"/>
+    
+    <!-- Decorative -->
+    <circle cx="170" cy="120" r="2" fill="#f97316" opacity="0.7"/>
+    <circle cx="230" cy="140" r="2" fill="#0891b2" opacity="0.5"/>
+    
+    <text x="200" y="200" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="14" font-weight="500">
+      Nenhum resultado encontrado
+    </text>
+    <text x="200" y="220" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="12">
+      Tente ajustar os filtros de busca
+    </text>
+  </g>
+  
+  <!-- SUCCESS STATE: PEDIDO CRIADO -->
+  <g id="success-order-illustration">
+    <!-- Background Circle -->
+    <circle cx="200" cy="150" r="70" fill="#d1fae5" opacity="0.3"/>
+    
+    <!-- Main Checkmark -->
+    <circle cx="200" cy="150" r="35" fill="#10b981"/>
+    <path d="M185 150l8 8 16-16" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Floating Elements -->
+    <circle cx="150" cy="120" r="3" fill="#059669" opacity="0.7"/>
+    <circle cx="250" cy="130" r="2" fill="#10b981" opacity="0.6"/>
+    <circle cx="160" cy="180" r="2" fill="#047857" opacity="0.5"/>
+    
+    <text x="200" y="220" text-anchor="middle" fill="#047857" font-family="Inter, sans-serif" font-size="14" font-weight="600">
+      Pedido criado com sucesso!
+    </text>
+    <text x="200" y="240" text-anchor="middle" fill="#059669" font-family="Inter, sans-serif" font-size="12">
+      Event Sourcing aplicado
+    </text>
+  </g>
+  
+  <!-- ERROR STATE: ERRO NO SISTEMA -->
+  <g id="error-system-illustration">
+    <!-- Background -->
+    <circle cx="200" cy="150" r="70" fill="#fee2e2" opacity="0.3"/>
+    
+    <!-- Warning Triangle -->
+    <path d="M180 130l20-20 20 20-20 40-20-40z" fill="#fef2f2" stroke="#ef4444" stroke-width="2"/>
+    <line x1="200" y1="125" x2="200" y2="145" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="200" cy="155" r="2" fill="#ef4444"/>
+    
+    <!-- Decorative -->
+    <circle cx="160" cy="120" r="2" fill="#dc2626" opacity="0.5"/>
+    <circle cx="240" cy="140" r="3" fill="#b91c1c" opacity="0.4"/>
+    
+    <text x="200" y="200" text-anchor="middle" fill="#b91c1c" font-family="Inter, sans-serif" font-size="14" font-weight="500">
+      Algo deu errado
+    </text>
+    <text x="200" y="220" text-anchor="middle" fill="#dc2626" font-family="Inter, sans-serif" font-size="12">
+      Tente novamente em alguns instantes
+    </text>
+  </g>
+  
+  <!-- LOADING STATE: CARREGANDO DADOS -->
+  <g id="loading-data-illustration">
+    <!-- Animated Circles -->
+    <circle cx="180" cy="150" r="8" fill="#0891b2" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1.5s" repeatCount="indefinite" begin="0s"/>
+    </circle>
+    <circle cx="200" cy="150" r="8" fill="#0891b2" opacity="0.6">
+      <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1.5s" repeatCount="indefinite" begin="0.5s"/>
+    </circle>
+    <circle cx="220" cy="150" r="8" fill="#0891b2" opacity="0.4">
+      <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1.5s" repeatCount="indefinite" begin="1s"/>
+    </circle>
+    
+    <text x="200" y="190" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="14" font-weight="500">
+      Carregando dados...
+    </text>
+  </g>
+  
+  <!-- LOGIN ILLUSTRATION -->
+  <g id="login-illustration">
+    <!-- Background Pattern -->
+    <defs>
+      <pattern id="loginPattern" patternUnits="userSpaceOnUse" width="60" height="60">
+        <circle cx="30" cy="30" r="2" fill="white" opacity="0.1"/>
+      </pattern>
+    </defs>
+    
+    <rect x="400" y="0" width="400" height="400" fill="url(#loginPattern)"/>
+    
+    <!-- Main Elements -->
+    <circle cx="600" cy="180" r="80" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+    <circle cx="600" cy="180" r="50" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+    
+    <!-- Lock Icon -->
+    <rect x="590" y="170" width="20" height="25" rx="3" fill="none" stroke="white" stroke-width="2"/>
+    <path d="M595 170v-8c0-4 2-8 8-8s8 4 8 8v8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    
+    <!-- Floating Elements -->
+    <circle cx="550" cy="120" r="3" fill="rgba(249,115,22,0.6)"/>
+    <circle cx="650" cy="140" r="4" fill="rgba(255,255,255,0.4)"/>
+    <rect x="520" y="220" width="6" height="6" rx="1" fill="rgba(255,255,255,0.3)"/>
+  </g>
+  
+  <!-- DASHBOARD CHARTS PLACEHOLDER -->
+  <g id="chart-placeholder-illustration">
+    <!-- Chart Bars -->
+    <rect x="140" y="180" width="12" height="40" fill="#0891b2" opacity="0.7"/>
+    <rect x="158" y="160" width="12" height="60" fill="#0891b2" opacity="0.8"/>
+    <rect x="176" y="140" width="12" height="80" fill="#f97316" opacity="0.9"/>
+    <rect x="194" y="170" width="12" height="50" fill="#0891b2" opacity="0.6"/>
+    <rect x="212" y="150" width="12" height="70" fill="#0891b2" opacity="0.7"/>
+    <rect x="230" y="130" width="12" height="90" fill="#f97316" opacity="0.8"/>
+    <rect x="248" y="165" width="12" height="55" fill="#0891b2" opacity="0.6"/>
+    
+    <!-- Axis Lines -->
+    <line x1="130" y1="120" x2="130" y2="230" stroke="#e2e8f0" stroke-width="1"/>
+    <line x1="130" y1="220" x2="270" y2="220" stroke="#e2e8f0" stroke-width="1"/>
+    
+    <text x="200" y="250" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="12" font-weight="500">
+      Dados dos últimos 7 dias
+    </text>
+  </g>
+  
+  <!-- UNDER MAINTENANCE -->
+  <g id="maintenance-illustration">
+    <!-- Tools -->
+    <rect x="180" y="120" width="40" height="8" rx="4" fill="#f97316" transform="rotate(45 200 124)"/>
+    <circle cx="200" cy="160" r="15" fill="#0891b2" opacity="0.8"/>
+    <rect x="195" y="140" width="10" height="20" fill="white"/>
+    
+    <!-- Gears -->
+    <g transform="translate(220,140)">
+      <circle r="12" fill="none" stroke="#94a3b8" stroke-width="2"/>
+      <circle r="8" fill="none" stroke="#94a3b8" stroke-width="1"/>
+      <animateTransform attributeName="transform" type="rotate" values="0;360" dur="4s" repeatCount="indefinite"/>
+    </g>
+    
+    <g transform="translate(170,170)">
+      <circle r="8" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
+      <circle r="5" fill="none" stroke="#94a3b8" stroke-width="1"/>
+      <animateTransform attributeName="transform" type="rotate" values="360;0" dur="3s" repeatCount="indefinite"/>
+    </g>
+    
+    <text x="200" y="220" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="14" font-weight="500">
+      Sistema em manutenção
+    </text>
+    <text x="200" y="240" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="12">
+      Voltaremos em breve
+    </text>
+  </g>
+  
+</svg>
