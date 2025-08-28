@@ -2,13 +2,17 @@ package com.ordersystem.query.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.jboss.logging.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +34,9 @@ public class OrderQueryService {
 
     @Autowired
     private CacheInvalidationService cacheInvalidationService;
+
+    @Autowired
+    private CacheManager cacheManager;
 
     private void validateOrderCreatedEvent(OrderCreatedEvent event, String correlationId) {
         if (event.getOrderId() == null || event.getOrderId().trim().isEmpty()) {
@@ -345,5 +352,94 @@ public class OrderQueryService {
     @Cacheable(value = "customer-orders", key = "#customerId + '::' + #status")
     public List<OrderReadModel> getOrdersByCustomerIdAndStatus(String customerId, String status) {
         return orderReadModelRepository.findByCustomerIdAndStatus(customerId, status);
+    }
+
+    // New methods for optimized performance and pagination
+
+    @Cacheable(value = "orders-paged", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
+    public Page<OrderReadModel> getAllOrdersPaged(Pageable pageable) {
+        logger.debug("🔍 Getting paginated orders: page={}, size={}", 
+                pageable.getPageNumber(), pageable.getPageSize());
+        return orderReadModelRepository.findAll(pageable);
+    }
+
+    @Cacheable(value = "order-count", key = "'total-count'")
+    public long getOrderCount() {
+        logger.debug("📊 Getting total order count for health check");
+        try {
+            return orderReadModelRepository.count();
+        } catch (Exception e) {
+            logger.error("❌ Failed to get order count: {}", e.getMessage());
+            return -1; // Indicate failure
+        }
+    }
+
+    public boolean isCacheHealthy() {
+        try {
+            // Check if cache manager is available and healthy
+            if (cacheManager == null) {
+                return false;
+            }
+            
+            // Try to access a cache - this will fail if cache is unhealthy
+            cacheManager.getCache("orders");
+            return true;
+            
+        } catch (Exception e) {
+            logger.warn("⚠️ Cache health check failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    @Cacheable(value = "dashboard-metrics", key = "'metrics'")
+    public Map<String, Object> getDashboardMetricsOptimized() {
+        logger.debug("📊 Calculating optimized dashboard metrics");
+        
+        try {
+            // Use aggregate queries instead of loading all data
+            long totalOrders = orderReadModelRepository.count();
+            
+            if (totalOrders == 0) {
+                return Map.of(
+                    "totalOrders", 0L,
+                    "totalRevenue", 0.0,
+                    "completedOrders", 0L,
+                    "pendingOrders", 0L,
+                    "cancelledOrders", 0L,
+                    "averageOrderValue", 0.0
+                );
+            }
+
+            // Use native queries or repository methods for aggregation
+            Double totalRevenue = orderReadModelRepository.getTotalRevenue();
+            Long completedOrders = orderReadModelRepository.countByStatusIn(List.of("COMPLETED", "PAID"));
+            Long pendingOrders = orderReadModelRepository.countByStatusIn(List.of("PENDING", "PROCESSING"));
+            Long cancelledOrders = orderReadModelRepository.countByStatus("CANCELLED");
+            
+            double averageOrderValue = totalRevenue != null && totalOrders > 0 ? 
+                totalRevenue / totalOrders : 0.0;
+
+            return Map.of(
+                "totalOrders", totalOrders,
+                "totalRevenue", Math.round((totalRevenue != null ? totalRevenue : 0.0) * 100.0) / 100.0,
+                "completedOrders", completedOrders != null ? completedOrders : 0L,
+                "pendingOrders", pendingOrders != null ? pendingOrders : 0L,
+                "cancelledOrders", cancelledOrders != null ? cancelledOrders : 0L,
+                "averageOrderValue", Math.round(averageOrderValue * 100.0) / 100.0
+            );
+
+        } catch (Exception e) {
+            logger.error("❌ Failed to calculate dashboard metrics: {}", e.getMessage());
+            // Return empty metrics on failure
+            return Map.of(
+                "totalOrders", 0L,
+                "totalRevenue", 0.0,
+                "completedOrders", 0L,
+                "pendingOrders", 0L,
+                "cancelledOrders", 0L,
+                "averageOrderValue", 0.0,
+                "error", "Failed to calculate metrics"
+            );
+        }
     }
 }

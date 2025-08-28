@@ -6,10 +6,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -18,14 +28,22 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ordersystem.query.entity.OrderReadModel;
 import com.ordersystem.query.service.OrderQueryService;
+import com.ordersystem.query.metrics.CustomMetricsService;
+import io.micrometer.core.instrument.Timer;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = "*")
+@CrossOrigin(
+    origins = {"${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}"},
+    allowedHeaders = {"*"},
+    methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE}
+)
 public class OrderQueryController {
 
     private static final Logger logger = LoggerFactory.getLogger(OrderQueryController.class);
@@ -33,47 +51,80 @@ public class OrderQueryController {
     @Autowired
     private OrderQueryService orderQueryService;
 
+    @Autowired
+    private CustomMetricsService metricsService;
+
+    @Value("${app.pagination.default-size:20}")
+    private int defaultPageSize;
+
+    @Value("${app.pagination.max-size:100}")
+    private int maxPageSize;
+
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllOrders() {
+    @Cacheable(value = "orders", key = "#page + '-' + #size + '-' + #sort")
+    public ResponseEntity<Map<String, Object>> getAllOrders(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) int size,
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction) {
+        
         String correlationId = UUID.randomUUID().toString();
         MDC.put("correlationId", correlationId);
 
-        logger.info("📋 Query service received getAllOrders request, correlationId={}", correlationId);
+        // Limit page size to prevent abuse
+        size = Math.min(size, maxPageSize);
+
+        logger.info("📋 Query service received paginated getAllOrders request: page={}, size={}, sort={}, correlationId={}", 
+                page, size, sort, correlationId);
 
         try {
-            logger.debug("🔍 Calling OrderQueryService.getAllOrders(), correlationId={}", correlationId);
-
+            Timer.Sample sample = metricsService.startQueryTimer();
             long startTime = System.currentTimeMillis();
-            List<OrderReadModel> orders = orderQueryService.getAllOrders();
+            
+            Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction) ? 
+                Sort.Direction.ASC : Sort.Direction.DESC;
+            Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+            
+            Page<OrderReadModel> ordersPage = orderQueryService.getAllOrdersPaged(pageable);
             long queryTime = System.currentTimeMillis() - startTime;
 
-            logger.info("✅ Successfully retrieved {} orders from read model: queryTime={}ms, correlationId={}",
-                    orders.size(), queryTime, correlationId);
+            // Record metrics
+            metricsService.recordQueryExecution(sample, "getAllOrders", true);
+            metricsService.updateLastQueryTime(queryTime);
 
-            if (logger.isDebugEnabled()) {
-                logger.debug("📊 Order summary: correlationId={}, orders={}", correlationId,
-                        orders.stream().map(o -> String.format("id=%s,status=%s,amount=%.2f",
-                                o.getOrderId(), o.getStatus(), o.getTotalAmount())).toList());
-            }
+            logger.info("✅ Successfully retrieved {} orders (page {} of {}) from read model: queryTime={}ms, correlationId={}",
+                    ordersPage.getContent().size(), page + 1, ordersPage.getTotalPages(), queryTime, correlationId);
+
+            Map<String, Object> pagination = Map.of(
+                "currentPage", page,
+                "totalPages", ordersPage.getTotalPages(),
+                "totalElements", ordersPage.getTotalElements(),
+                "size", size,
+                "hasNext", ordersPage.hasNext(),
+                "hasPrevious", ordersPage.hasPrevious()
+            );
 
             Map<String, Object> response = Map.of(
                     "success", true,
-                    "message", "Orders retrieved successfully from read model (CQRS)",
-                    "count", orders.size(),
+                    "message", "Orders retrieved successfully from read model (CQRS with pagination)",
                     "queryTime", queryTime,
                     "correlationId", correlationId,
-                    "orders", orders);
+                    "pagination", pagination,
+                    "orders", ordersPage.getContent());
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            logger.error("❌ Failed to retrieve orders from read model: error={}, correlationId={}",
+            // Record error metrics
+            metricsService.recordError("query_execution", "getAllOrders");
+            
+            logger.error("❌ Failed to retrieve paginated orders from read model: error={}, correlationId={}",
                     e.getMessage(), correlationId, e);
 
             Map<String, Object> errorResponse = Map.of(
                     "success", false,
                     "error", e.getMessage(),
-                    "message", "Failed to retrieve orders from read model",
+                    "message", "Failed to retrieve paginated orders from read model",
                     "correlationId", correlationId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         } finally {
@@ -290,31 +341,59 @@ public class OrderQueryController {
     }
 
     @GetMapping("/health")
+    @Cacheable(value = "health", key = "'health'", unless = "#result.statusCode != 200")
     public ResponseEntity<Map<String, Object>> health() {
         String correlationId = UUID.randomUUID().toString();
         MDC.put("correlationId", correlationId);
 
-        logger.info("🏥 Query service health check request, correlationId={}", correlationId);
+        logger.debug("🏥 Query service health check request, correlationId={}", correlationId);
 
         try {
-            // Test database connectivity by trying to get order count
             long startTime = System.currentTimeMillis();
-            List<OrderReadModel> orders = orderQueryService.getAllOrders();
+            
+            // Lightweight database connectivity test - just get count without fetching data
+            long orderCount = orderQueryService.getOrderCount();
+            boolean cacheHealthy = orderQueryService.isCacheHealthy();
+            
             long queryTime = System.currentTimeMillis() - startTime;
 
-            logger.info("✅ Query service health check passed: orderCount={}, queryTime={}ms, correlationId={}",
-                    orders.size(), queryTime, correlationId);
+            Map<String, Object> healthChecks = Map.of(
+                "database", orderCount >= 0 ? "healthy" : "unhealthy",
+                "cache", cacheHealthy ? "healthy" : "degraded",
+                "memory", getMemoryStatus(),
+                "uptime", System.currentTimeMillis()
+            );
 
-            Map<String, Object> response = Map.of(
-                    "status", "healthy",
-                    "service", "Order Query Service (CQRS Read Model)",
-                    "timestamp", System.currentTimeMillis(),
-                    "database", "connected",
-                    "orderCount", orders.size(),
-                    "queryTime", queryTime,
-                    "correlationId", correlationId);
+            boolean isHealthy = orderCount >= 0 && queryTime < 5000; // 5s threshold
 
-            return ResponseEntity.ok(response);
+            if (isHealthy) {
+                logger.debug("✅ Query service health check passed: orderCount={}, queryTime={}ms, correlationId={}",
+                        orderCount, queryTime, correlationId);
+
+                Map<String, Object> response = Map.of(
+                        "status", "healthy",
+                        "service", "Order Query Service (CQRS Read Model)",
+                        "timestamp", System.currentTimeMillis(),
+                        "orderCount", orderCount,
+                        "queryTime", queryTime,
+                        "checks", healthChecks,
+                        "correlationId", correlationId);
+
+                return ResponseEntity.ok(response);
+            } else {
+                logger.warn("⚠️ Query service health check degraded: queryTime={}ms, correlationId={}", 
+                        queryTime, correlationId);
+                
+                Map<String, Object> response = Map.of(
+                        "status", "degraded",
+                        "service", "Order Query Service (CQRS Read Model)",
+                        "timestamp", System.currentTimeMillis(),
+                        "queryTime", queryTime,
+                        "checks", healthChecks,
+                        "correlationId", correlationId);
+
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+            }
 
         } catch (Exception e) {
             logger.error("❌ Query service health check failed: error={}, correlationId={}",
@@ -325,6 +404,7 @@ public class OrderQueryController {
                     "service", "Order Query Service (CQRS Read Model)",
                     "timestamp", System.currentTimeMillis(),
                     "error", e.getMessage(),
+                    "checks", Map.of("database", "unhealthy", "error", e.getMessage()),
                     "correlationId", correlationId);
 
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
@@ -333,69 +413,64 @@ public class OrderQueryController {
         }
     }
 
+    private Map<String, Object> getMemoryStatus() {
+        Runtime runtime = Runtime.getRuntime();
+        long maxMemory = runtime.maxMemory();
+        long totalMemory = runtime.totalMemory();
+        long freeMemory = runtime.freeMemory();
+        long usedMemory = totalMemory - freeMemory;
+        
+        double memoryUsagePercent = (double) usedMemory / maxMemory * 100;
+        
+        return Map.of(
+            "used", usedMemory / 1024 / 1024 + "MB",
+            "free", freeMemory / 1024 / 1024 + "MB",
+            "total", totalMemory / 1024 / 1024 + "MB",
+            "max", maxMemory / 1024 / 1024 + "MB",
+            "usagePercent", Math.round(memoryUsagePercent * 100.0) / 100.0,
+            "status", memoryUsagePercent > 85 ? "critical" : memoryUsagePercent > 70 ? "warning" : "healthy"
+        );
+    }
+
     @GetMapping("/dashboard/metrics")
+    @Cacheable(value = "dashboard-metrics", key = "'metrics'")
     public ResponseEntity<Map<String, Object>> getDashboardMetrics() {
         String correlationId = UUID.randomUUID().toString();
         MDC.put("correlationId", correlationId);
 
-        logger.info("📊 Query service received dashboard metrics request (CQRS analytics), correlationId={}",
+        logger.info("📊 Query service received dashboard metrics request (optimized CQRS analytics), correlationId={}",
                 correlationId);
 
         try {
-            logger.debug("🔍 Calling OrderQueryService.getAllOrders() for metrics, correlationId={}", correlationId);
-
             long startTime = System.currentTimeMillis();
-            List<OrderReadModel> allOrders = orderQueryService.getAllOrders();
+            
+            // Use optimized method instead of loading all orders
+            Map<String, Object> metrics = orderQueryService.getDashboardMetricsOptimized();
             long queryTime = System.currentTimeMillis() - startTime;
 
-            logger.debug("📊 Calculating dashboard metrics from {} orders, correlationId={}", allOrders.size(),
-                    correlationId);
-
-            Map<String, Object> metrics = new HashMap<>();
-            metrics.put("totalOrders", allOrders.size());
-
-            double totalRevenue = allOrders.stream()
-                    .mapToDouble(OrderReadModel::getTotalAmount)
-                    .sum();
-            metrics.put("totalRevenue", Math.round(totalRevenue * 100.0) / 100.0);
-
-            long completedOrders = allOrders.stream()
-                    .filter(order -> "COMPLETED".equals(order.getStatus()) || "PAID".equals(order.getStatus()))
-                    .count();
-            metrics.put("completedOrders", completedOrders);
-
-            long pendingOrders = allOrders.stream()
-                    .filter(order -> "PENDING".equals(order.getStatus()) || "PROCESSING".equals(order.getStatus()))
-                    .count();
-            metrics.put("pendingOrders", pendingOrders);
-
-            long cancelledOrders = allOrders.stream()
-                    .filter(order -> "CANCELLED".equals(order.getStatus()))
-                    .count();
-            metrics.put("cancelledOrders", cancelledOrders);
-
-            double averageOrderValue = allOrders.isEmpty() ? 0.0 : totalRevenue / allOrders.size();
-            metrics.put("averageOrderValue", Math.round(averageOrderValue * 100.0) / 100.0);
-
             // Add query performance metrics
-            metrics.put("queryTime", queryTime);
-            metrics.put("correlationId", correlationId);
-            metrics.put("timestamp", System.currentTimeMillis());
+            Map<String, Object> enhancedMetrics = new HashMap<>(metrics);
+            enhancedMetrics.put("queryTime", queryTime);
+            enhancedMetrics.put("correlationId", correlationId);
+            enhancedMetrics.put("timestamp", System.currentTimeMillis());
+            enhancedMetrics.put("optimized", true);
 
             logger.info(
-                    "✅ Dashboard metrics calculated successfully (CQRS analytics): totalOrders={}, totalRevenue={}, queryTime={}ms, correlationId={}",
-                    allOrders.size(), totalRevenue, queryTime, correlationId);
+                    "✅ Dashboard metrics calculated successfully (optimized CQRS analytics): totalOrders={}, totalRevenue={}, queryTime={}ms, correlationId={}",
+                    metrics.get("totalOrders"), metrics.get("totalRevenue"), queryTime, correlationId);
 
             Map<String, Object> response = Map.of(
                     "success", true,
-                    "message", "Dashboard metrics retrieved successfully from read model (CQRS)",
+                    "message", "Dashboard metrics retrieved successfully from read model (optimized CQRS)",
                     "queryTime", queryTime,
                     "correlationId", correlationId,
-                    "metrics", metrics);
+                    "metrics", enhancedMetrics);
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            metricsService.recordError("metrics_calculation", "getDashboardMetrics");
+            
             logger.error("❌ Failed to calculate dashboard metrics: error={}, correlationId={}",
                     e.getMessage(), correlationId, e);
 
@@ -403,6 +478,44 @@ public class OrderQueryController {
                     "success", false,
                     "error", e.getMessage(),
                     "message", "Failed to calculate dashboard metrics",
+                    "correlationId", correlationId);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    @GetMapping("/metrics/performance")
+    public ResponseEntity<Map<String, Object>> getPerformanceMetrics() {
+        String correlationId = UUID.randomUUID().toString();
+        MDC.put("correlationId", correlationId);
+
+        logger.info("📊 Query service received performance metrics request, correlationId={}", correlationId);
+
+        try {
+            Map<String, Double> performanceSummary = metricsService.getPerformanceSummary();
+            Map<String, Object> healthMetrics = metricsService.getHealthMetrics();
+
+            Map<String, Object> response = Map.of(
+                    "success", true,
+                    "message", "Performance metrics retrieved successfully",
+                    "timestamp", System.currentTimeMillis(),
+                    "correlationId", correlationId,
+                    "performance", performanceSummary,
+                    "health", healthMetrics);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            metricsService.recordError("metrics_retrieval", "getPerformanceMetrics");
+            
+            logger.error("❌ Failed to retrieve performance metrics: error={}, correlationId={}",
+                    e.getMessage(), correlationId, e);
+
+            Map<String, Object> errorResponse = Map.of(
+                    "success", false,
+                    "error", e.getMessage(),
+                    "message", "Failed to retrieve performance metrics",
                     "correlationId", correlationId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         } finally {

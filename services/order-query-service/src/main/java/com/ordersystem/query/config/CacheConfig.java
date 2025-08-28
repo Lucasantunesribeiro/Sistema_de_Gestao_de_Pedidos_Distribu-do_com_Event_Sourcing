@@ -1,5 +1,9 @@
 package com.ordersystem.query.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -12,6 +16,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
@@ -22,11 +27,16 @@ import java.util.Map;
 @EnableCaching
 public class CacheConfig {
 
+    private static final Logger logger = LoggerFactory.getLogger(CacheConfig.class);
+
     @Value("${spring.redis.host:localhost}")
     private String redisHost;
 
     @Value("${spring.redis.port:6379}")
     private int redisPort;
+
+    @Autowired(required = false)
+    private ObjectMapper optimizedObjectMapper;
 
     @Bean
     @Primary
@@ -54,37 +64,52 @@ public class CacheConfig {
     @Bean
     @Primary
     public CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
-        // Default cache configuration with 5 minutes TTL
+        logger.info("🔧 Configuring optimized Redis cache manager");
+        
+        // Use optimized Jackson serializer if available, fallback to default
+        GenericJackson2JsonRedisSerializer jsonSerializer = optimizedObjectMapper != null ?
+                new GenericJackson2JsonRedisSerializer(optimizedObjectMapper) :
+                new GenericJackson2JsonRedisSerializer();
+        
+        // Default cache configuration with performance optimizations
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(5))
-                .serializeKeysWith(org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair
+                .serializeKeysWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair
-                        .fromSerializer(new GenericJackson2JsonRedisSerializer()))
-                .disableCachingNullValues();
+                .serializeValuesWith(RedisSerializationContext.SerializationPair
+                        .fromSerializer(jsonSerializer))
+                .disableCachingNullValues() // Performance: don't cache nulls
+                .computePrefixWith(cacheName -> "order-query:" + cacheName + ":"); // Organized keys
 
-        // Specific cache configurations with different TTLs
+        // Specific cache configurations with different TTLs optimized for use patterns
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
         
-        // Orders cache - 5 minutes TTL for frequently accessed order data
-        cacheConfigurations.put("orders", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        // Very short-lived cache for high-frequency, changing data
+        cacheConfigurations.put("orders", defaultConfig.entryTtl(Duration.ofMinutes(2)));
+        cacheConfigurations.put("orders-paged", defaultConfig.entryTtl(Duration.ofMinutes(3)));
         
-        // Customer orders cache - 5 minutes TTL for customer-specific queries
+        // Short-lived cache for user-specific data
         cacheConfigurations.put("customer-orders", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        cacheConfigurations.put("status-orders", defaultConfig.entryTtl(Duration.ofMinutes(7)));
         
-        // Order stats cache - 1 hour TTL for aggregated statistics
+        // Medium-lived cache for individual entities
+        cacheConfigurations.put("single-order", defaultConfig.entryTtl(Duration.ofMinutes(15)));
+        cacheConfigurations.put("order-count", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        
+        // Longer-lived cache for aggregated data
+        cacheConfigurations.put("dashboard-metrics", defaultConfig.entryTtl(Duration.ofMinutes(3)));
         cacheConfigurations.put("order-stats", defaultConfig.entryTtl(Duration.ofHours(1)));
         
-        // Single order cache - 5 minutes TTL for individual order lookups
-        cacheConfigurations.put("single-order", defaultConfig.entryTtl(Duration.ofMinutes(5)));
-        
-        // Status-based orders cache - 5 minutes TTL for status queries
-        cacheConfigurations.put("status-orders", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        // System health cache - short TTL to ensure fresh health data
+        cacheConfigurations.put("health", defaultConfig.entryTtl(Duration.ofSeconds(30)));
 
-        return RedisCacheManager.builder(redisConnectionFactory)
+        RedisCacheManager cacheManager = RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(defaultConfig)
                 .withInitialCacheConfigurations(cacheConfigurations)
-                .transactionAware()
+                .transactionAware() // Support Spring transactions
                 .build();
+
+        logger.info("✅ Redis cache manager configured with {} cache types", cacheConfigurations.size());
+        return cacheManager;
     }
 }
