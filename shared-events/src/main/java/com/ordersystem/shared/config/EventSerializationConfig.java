@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fasterxml.jackson.module.afterburner.AfterburnerModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -30,26 +29,23 @@ public class EventSerializationConfig {
 
         // Performance Optimizations
         
-        // 1. Afterburner module for faster serialization/deserialization (up to 40% faster)
-        mapper.registerModule(new AfterburnerModule());
-        
-        // 2. Java Time module for LocalDateTime handling
+        // 1. Java Time module for LocalDateTime handling
         mapper.registerModule(new JavaTimeModule());
         
-        // 3. Disable timestamp serialization as ISO string (faster)
+        // 2. Disable timestamp serialization as ISO string (faster)
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         
-        // 4. Performance-oriented deserialization settings
+        // 3. Performance-oriented deserialization settings
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         mapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
         mapper.configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
         
-        // 5. Serialization optimizations
+        // 4. Serialization optimizations
         mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         mapper.configure(SerializationFeature.WRITE_EMPTY_JSON_ARRAYS, false);
         mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
         
-        // 6. Type information for polymorphic events (but optimized)
+        // 5. Type information for polymorphic events (but optimized)
         mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
         
         logger.info("✅ ObjectMapper configured with performance optimizations");
