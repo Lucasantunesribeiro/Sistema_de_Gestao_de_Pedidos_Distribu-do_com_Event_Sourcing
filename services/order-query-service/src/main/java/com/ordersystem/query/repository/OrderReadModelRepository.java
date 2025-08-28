@@ -21,4 +21,21 @@ public interface OrderReadModelRepository extends JpaRepository<OrderReadModel, 
     
     @Query("SELECT o FROM OrderReadModel o ORDER BY o.createdAt DESC")
     List<OrderReadModel> findAllOrderByCreatedAtDesc();
+
+    // Optimized aggregate queries for performance
+    
+    @Query("SELECT SUM(o.totalAmount) FROM OrderReadModel o")
+    Double getTotalRevenue();
+    
+    Long countByStatus(String status);
+    
+    @Query("SELECT COUNT(o) FROM OrderReadModel o WHERE o.status IN :statuses")
+    Long countByStatusIn(@Param("statuses") List<String> statuses);
+    
+    @Query("SELECT AVG(o.totalAmount) FROM OrderReadModel o")
+    Double getAverageOrderValue();
+    
+    // Custom query for health checks - lightweight count
+    @Query("SELECT COUNT(o.orderId) FROM OrderReadModel o")
+    Long countOrders();
 }

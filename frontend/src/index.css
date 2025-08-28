@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,107 +7,275 @@
 
 @layer base {
   :root {
-    /* Design System: Azul petróleo como primary */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 184 91% 17%; /* Azul petróleo */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 184 91% 17%;
-    --radius: 0.5rem;
+    /* Modern Enterprise Design System */
     
-    /* Custom animation timing */
+    /* Base colors */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    
+    /* Brand colors - Modern blue gradient system */
+    --primary: 214 84% 56%; /* Modern blue */
+    --primary-foreground: 0 0% 98%;
+    --primary-hover: 214 84% 50%;
+    --primary-active: 214 84% 44%;
+    
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --secondary-hover: 220 14.3% 91.9%;
+    
+    /* Neutral colors */
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    
+    /* State colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 98%;
+    
+    /* UI colors */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 214 84% 56%;
+    --sidebar: 240 10% 3.9%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 214 84% 56%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Layout */
+    --header-height: 4rem;
+    --sidebar-width: 16rem;
+    --sidebar-width-collapsed: 4rem;
+    --radius: 0.75rem;
+    
+    /* Animation system */
     --animation-duration: 200ms;
-    --animation-timing: cubic-bezier(0.2, 0.9, 0.3, 1);
+    --animation-timing: cubic-bezier(0.4, 0.0, 0.2, 1);
+    --animation-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    
+    /* Typography scale */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.875rem;
+    
+    /* Spacing scale */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+    
+    /* Shadow system */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 184 81% 25%; /* Azul petróleo mais claro para dark mode */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Dark mode colors */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    
+    /* Brand colors - Dark mode */
+    --primary: 214 84% 56%;
+    --primary-foreground: 240 10% 3.9%;
+    --primary-hover: 214 84% 62%;
+    --primary-active: 214 84% 68%;
+    
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-hover: 240 3.7% 20.9%;
+    
+    /* Neutral colors - Dark mode */
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    
+    /* State colors - Dark mode */
+    --success: 142 76% 42%;
+    --success-foreground: 240 10% 3.9%;
+    --warning: 38 92% 56%;
+    --warning-foreground: 240 10% 3.9%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 184 81% 25%;
+    --destructive-foreground: 0 0% 98%;
+    --info: 199 89% 54%;
+    --info-foreground: 240 10% 3.9%;
+    
+    /* UI colors - Dark mode */
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 214 84% 56%;
+    --sidebar: 240 5.9% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 214 84% 56%;
+    --sidebar-primary-foreground: 240 10% 3.9%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 5% 84.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Dark mode shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
   }
   
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-background text-foreground font-inter antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   
-  /* Improve focus visibility */
+  /* Enhanced focus visibility for accessibility */
   *:focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
+    border-radius: calc(var(--radius) - 2px);
   }
+  
+  /* Typography improvements */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+  
+  h1 { @apply text-3xl lg:text-4xl; }
+  h2 { @apply text-2xl lg:text-3xl; }
+  h3 { @apply text-xl lg:text-2xl; }
+  h4 { @apply text-lg lg:text-xl; }
+  h5 { @apply text-base lg:text-lg; }
+  h6 { @apply text-sm lg:text-base; }
 }
 
 @layer utilities {
-  /* Custom font family */
+  /* Typography utilities */
   .font-inter {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   
-  /* Improved animations */
+  .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+  }
+  
+  /* Animation utilities */
   .animate-in {
     animation-duration: var(--animation-duration);
     animation-timing-function: var(--animation-timing);
+    animation-fill-mode: both;
   }
   
   .animate-out {
     animation-duration: calc(var(--animation-duration) * 0.75);
     animation-timing-function: var(--animation-timing);
+    animation-fill-mode: both;
+  }
+  
+  .animate-bounce-in {
+    animation-timing-function: var(--animation-bounce);
+  }
+  
+  /* Layout utilities */
+  .sidebar-width {
+    width: var(--sidebar-width);
+  }
+  
+  .sidebar-width-collapsed {
+    width: var(--sidebar-width-collapsed);
+  }
+  
+  .header-height {
+    height: var(--header-height);
+  }
+  
+  /* Glass morphism effect */
+  .glass {
+    backdrop-filter: blur(16px) saturate(180%);
+    background-color: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(209, 213, 219, 0.3);
+  }
+  
+  .dark .glass {
+    background-color: rgba(17, 24, 39, 0.75);
+    border-color: rgba(75, 85, 99, 0.3);
+  }
+  
+  /* Loading skeleton */
+  .skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+  
+  /* Gradient utilities */
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-active)));
+  }
+  
+  .gradient-secondary {
+    background: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-hover)));
   }
 }
 
-/* Custom scrollbar */
+/* Enhanced scrollbar styles */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-muted;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/30 rounded-md;
+  @apply bg-muted-foreground/20 rounded-full border-2 border-transparent;
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/50;
+  @apply bg-muted-foreground/40;
+}
+
+::-webkit-scrollbar-corner {
+  @apply bg-transparent;
 }
 
 /* Loading animations */
@@ -120,67 +289,75 @@
   animation: spin 1s linear infinite;
 }
 
-/* Status colors */
+/* Modern status badge system */
+.status-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-all duration-200;
+}
+
 .status-pending {
-  @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+  @apply status-badge bg-yellow-100 text-yellow-800 border border-yellow-200;
 }
 
 .status-processing {
-  @apply bg-blue-100 text-blue-800 border-blue-200;
+  @apply status-badge bg-blue-100 text-blue-800 border border-blue-200;
 }
 
-.status-approved {
-  @apply bg-green-100 text-green-800 border-green-200;
-}
-
-.status-confirmed {
-  @apply bg-green-100 text-green-800 border-green-200;
-}
-
+.status-approved,
+.status-confirmed,
 .status-completed {
-  @apply bg-green-100 text-green-800 border-green-200;
+  @apply status-badge bg-green-100 text-green-800 border border-green-200;
 }
 
-.status-failed {
-  @apply bg-red-100 text-red-800 border-red-200;
+.status-failed,
+.status-declined {
+  @apply status-badge bg-red-100 text-red-800 border border-red-200;
 }
 
 .status-cancelled {
-  @apply bg-gray-100 text-gray-800 border-gray-200;
+  @apply status-badge bg-gray-100 text-gray-800 border border-gray-200;
 }
 
-.status-declined {
-  @apply bg-red-100 text-red-800 border-red-200;
-}
-
+/* Dark mode status colors */
 .dark .status-pending {
-  @apply bg-yellow-900/20 text-yellow-300 border-yellow-800;
+  @apply bg-yellow-500/10 text-yellow-400 border-yellow-500/20;
 }
 
 .dark .status-processing {
-  @apply bg-blue-900/20 text-blue-300 border-blue-800;
+  @apply bg-blue-500/10 text-blue-400 border-blue-500/20;
 }
 
-.dark .status-approved {
-  @apply bg-green-900/20 text-green-300 border-green-800;
-}
-
-.dark .status-confirmed {
-  @apply bg-green-900/20 text-green-300 border-green-800;
-}
-
+.dark .status-approved,
+.dark .status-confirmed,
 .dark .status-completed {
-  @apply bg-green-900/20 text-green-300 border-green-800;
+  @apply bg-green-500/10 text-green-400 border-green-500/20;
 }
 
-.dark .status-failed {
-  @apply bg-red-900/20 text-red-300 border-red-800;
+.dark .status-failed,
+.dark .status-declined {
+  @apply bg-red-500/10 text-red-400 border-red-500/20;
 }
 
 .dark .status-cancelled {
-  @apply bg-gray-900/20 text-gray-300 border-gray-800;
+  @apply bg-gray-500/10 text-gray-400 border-gray-500/20;
 }
 
-.dark .status-declined {
-  @apply bg-red-900/20 text-red-300 border-red-800;
+/* Status indicators with pulse animation */
+.status-indicator {
+  @apply relative inline-flex h-3 w-3 rounded-full;
+}
+
+.status-indicator.processing {
+  @apply bg-blue-400 animate-pulse;
+}
+
+.status-indicator.success {
+  @apply bg-green-400;
+}
+
+.status-indicator.error {
+  @apply bg-red-400;
+}
+
+.status-indicator.warning {
+  @apply bg-yellow-400;
 }
