@@ -1,11 +1,9 @@
 package com.ordersystem.query.metrics;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Tags;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,11 +11,12 @@ import org.springframework.stereotype.Service;
 
 import com.ordersystem.query.service.OrderQueryService;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.TimeUnit;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Custom Metrics Service for Order Query System
@@ -193,7 +192,7 @@ public class CustomMetricsService {
         long totalMemory = runtime.totalMemory();
         long freeMemory = runtime.freeMemory();
         long usedMemory = totalMemory - freeMemory;
-        
+
         double memoryUsagePercent = (double) usedMemory / maxMemory * 100;
         memoryUsage.set((long) memoryUsagePercent);
     }
@@ -228,19 +227,18 @@ public class CustomMetricsService {
         double hits = cacheHitCounter.count();
         double misses = cacheMissCounter.count();
         double total = hits + misses;
-        
+
         return total > 0 ? (hits / total) * 100 : 0;
     }
 
     public Map<String, Double> getPerformanceSummary() {
         return Map.of(
-            "totalQueries", ordersQueriedCounter.count(),
-            "cacheHitRate", getCacheHitRate(),
-            "totalErrors", errorCounter.count(),
-            "averageQueryTime", queryExecutionTimer.mean(TimeUnit.MILLISECONDS),
-            "memoryUsagePercent", getMemoryUsagePercent(),
-            "totalOrders", getTotalOrderCount()
-        );
+                "totalQueries", ordersQueriedCounter.count(),
+                "cacheHitRate", getCacheHitRate(),
+                "totalErrors", errorCounter.count(),
+                "averageQueryTime", queryExecutionTimer.mean(TimeUnit.MILLISECONDS),
+                "memoryUsagePercent", getMemoryUsagePercent(),
+                "totalOrders", getTotalOrderCount());
     }
 
     // Health Check Integration
@@ -248,7 +246,7 @@ public class CustomMetricsService {
     public boolean isSystemHealthy() {
         double memoryPercent = getMemoryUsagePercent();
         double errorRate = errorCounter.count() / Math.max(1, ordersQueriedCounter.count());
-        
+
         // System is healthy if:
         // - Memory usage < 85%
         // - Error rate < 5%
@@ -258,13 +256,12 @@ public class CustomMetricsService {
 
     public Map<String, Object> getHealthMetrics() {
         return Map.of(
-            "memoryUsagePercent", getMemoryUsagePercent(),
-            "activeConnections", getActiveConnections(),
-            "cacheHitRate", getCacheHitRate(),
-            "totalErrors", errorCounter.count(),
-            "rateLimitExceeded", rateLimitExceededCounter.count(),
-            "systemHealthy", isSystemHealthy(),
-            "lastQueryTime", getLastQueryTime()
-        );
+                "memoryUsagePercent", getMemoryUsagePercent(),
+                "activeConnections", getActiveConnections(),
+                "cacheHitRate", getCacheHitRate(),
+                "totalErrors", errorCounter.count(),
+                "rateLimitExceeded", rateLimitExceededCounter.count(),
+                "systemHealthy", isSystemHealthy(),
+                "lastQueryTime", getLastQueryTime());
     }
 }
