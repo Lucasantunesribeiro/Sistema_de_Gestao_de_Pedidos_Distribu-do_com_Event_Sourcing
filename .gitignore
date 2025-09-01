@@ -108,6 +108,9 @@ temp/
 # Claude
 .claude/
 
+# Kiro settings (may contain sensitive tokens)
+.kiro/settings/
+
 # Development scripts
 *.ps1
 dev-*.sh
