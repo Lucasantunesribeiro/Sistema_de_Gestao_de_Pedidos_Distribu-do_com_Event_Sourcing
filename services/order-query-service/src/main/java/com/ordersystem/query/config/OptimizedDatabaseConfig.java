@@ -1,7 +1,7 @@
 package com.ordersystem.query.config;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import javax.sql.DataSource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,7 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-import javax.sql.DataSource;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
  * Optimized Database Configuration for High Performance
@@ -50,9 +51,14 @@ public class OptimizedDatabaseConfig {
         logger.info("🔧 Configuring optimized HikariCP connection pool");
 
         HikariConfig config = new HikariConfig();
-        
-        // Basic connection settings
-        config.setJdbcUrl(databaseUrl);
+
+        // Basic connection settings - Convert Render DATABASE_URL format to JDBC format
+        String jdbcUrl = databaseUrl;
+        if (databaseUrl.startsWith("postgresql://")) {
+            jdbcUrl = "jdbc:" + databaseUrl;
+            logger.info("🔄 Converted Render DATABASE_URL format: {} -> {}", databaseUrl, jdbcUrl);
+        }
+        config.setJdbcUrl(jdbcUrl);
         if (databaseUsername != null && !databaseUsername.isEmpty()) {
             config.setUsername(databaseUsername);
         }
@@ -62,24 +68,24 @@ public class OptimizedDatabaseConfig {
 
         // Performance optimizations for PostgreSQL
         config.setDriverClassName("org.postgresql.Driver");
-        
+
         // Pool size optimization for container environment
         config.setMinimumIdle(minimumIdle);
         config.setMaximumPoolSize(maximumPoolSize);
-        
+
         // Connection timing optimizations
         config.setConnectionTimeout(connectionTimeout); // 30 seconds
         config.setIdleTimeout(idleTimeout); // 10 minutes
         config.setMaxLifetime(maxLifetime); // 30 minutes
-        
+
         // Validation and reliability
         config.setValidationTimeout(5000); // 5 seconds
         config.setConnectionTestQuery("SELECT 1");
         config.setInitializationFailTimeout(30000); // 30 seconds
-        
+
         // Pool name for monitoring
         config.setPoolName("OrderQueryPool");
-        
+
         // Performance-oriented connection properties
         config.addDataSourceProperty("cachePrepStmts", "true");
         config.addDataSourceProperty("prepStmtCacheSize", "250");
@@ -90,24 +96,24 @@ public class OptimizedDatabaseConfig {
         config.addDataSourceProperty("cacheServerConfiguration", "true");
         config.addDataSourceProperty("elideSetAutoCommits", "true");
         config.addDataSourceProperty("maintainTimeStats", "false");
-        
+
         // PostgreSQL-specific optimizations
         config.addDataSourceProperty("defaultRowFetchSize", "100");
         config.addDataSourceProperty("logUnclosedConnections", "true");
         config.addDataSourceProperty("tcpKeepAlive", "true");
         config.addDataSourceProperty("socketTimeout", "30");
         config.addDataSourceProperty("loginTimeout", "10");
-        
+
         // Memory and performance
         config.addDataSourceProperty("stringtype", "unspecified");
         config.addDataSourceProperty("prepareThreshold", "5");
         config.addDataSourceProperty("binaryTransfer", "true");
-        
+
         HikariDataSource dataSource = new HikariDataSource(config);
-        
-        logger.info("✅ HikariCP connection pool configured: minIdle={}, maxPool={}, connectionTimeout={}ms", 
+
+        logger.info("✅ HikariCP connection pool configured: minIdle={}, maxPool={}, connectionTimeout={}ms",
                 minimumIdle, maximumPoolSize, connectionTimeout);
-        
+
         return dataSource;
     }
 
@@ -137,12 +143,12 @@ public class OptimizedDatabaseConfig {
                 // 1. Has connections available
                 // 2. Not all connections are active (some idle available)
                 // 3. No thread starvation
-                boolean healthy = totalConnections > 0 && 
-                                idleConnections >= 0 && 
-                                activeConnections < totalConnections;
+                boolean healthy = totalConnections > 0 &&
+                        idleConnections >= 0 &&
+                        activeConnections < totalConnections;
 
                 if (!healthy) {
-                    logger.warn("Connection pool unhealthy: active={}, total={}, idle={}", 
+                    logger.warn("Connection pool unhealthy: active={}, total={}, idle={}",
                             activeConnections, totalConnections, idleConnections);
                 }
 
@@ -190,12 +196,26 @@ public class OptimizedDatabaseConfig {
         }
 
         // Getters
-        public boolean isHealthy() { return healthy; }
-        public int getActiveConnections() { return activeConnections; }
-        public int getTotalConnections() { return totalConnections; }
-        public int getIdleConnections() { return idleConnections; }
-        public int getThreadsAwaiting() { return threadsAwaiting; }
-        
+        public boolean isHealthy() {
+            return healthy;
+        }
+
+        public int getActiveConnections() {
+            return activeConnections;
+        }
+
+        public int getTotalConnections() {
+            return totalConnections;
+        }
+
+        public int getIdleConnections() {
+            return idleConnections;
+        }
+
+        public int getThreadsAwaiting() {
+            return threadsAwaiting;
+        }
+
         public double getUtilizationPercent() {
             return totalConnections > 0 ? (double) activeConnections / totalConnections * 100 : 0;
         }
