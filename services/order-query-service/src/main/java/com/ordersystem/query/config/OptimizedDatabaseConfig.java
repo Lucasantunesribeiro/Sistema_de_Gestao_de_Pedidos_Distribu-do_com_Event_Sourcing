@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import com.zaxxer.hikari.HikariConfig;
@@ -16,7 +15,7 @@ import com.zaxxer.hikari.HikariDataSource;
  * Optimized Database Configuration for High Performance
  * Focuses on connection pooling and query optimization
  */
-@Configuration
+// @Configuration - TEMPORARILY DISABLED FOR DEBUGGING
 public class OptimizedDatabaseConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(OptimizedDatabaseConfig.class);
