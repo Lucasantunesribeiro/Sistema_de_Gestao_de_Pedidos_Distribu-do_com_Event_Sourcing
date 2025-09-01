@@ -1,52 +1,65 @@
 package com.ordersystem.query.security;
 
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
-
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 
 /**
  * Enterprise-grade JWT Token Service with Refresh Token Rotation
  * SECURITY TARGET: 15min access token, 7day refresh token, automatic rotation
+ * 
+ * TEMPORARILY DISABLED for H2 validation phase
  */
-@Service
+// @Service // DISABLED: Requires RedisTemplate which is not available during H2
+// testing
 public class JwtTokenService {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtTokenService.class);
-    
+
     // Token validity configuration
     private static final long ACCESS_TOKEN_VALIDITY = 15 * 60 * 1000; // 15 minutes
     private static final long REFRESH_TOKEN_VALIDITY = 7 * 24 * 60 * 60 * 1000; // 7 days
-    
+
     @Value("${jwt.secret:mySecretKey}")
     private String secret;
-    
+
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
     public TokenPair generateTokenPair(String userId, Set<String> roles) {
         String accessToken = createAccessToken(userId, roles);
         String refreshToken = createRefreshToken(userId);
-        
+
         // Store refresh token hash in Redis with expiration
         String hashedRefreshToken = hashToken(refreshToken);
         redisTemplate.opsForValue().set(
-            "refresh_token:" + userId, 
-            hashedRefreshToken, 
-            Duration.ofMillis(REFRESH_TOKEN_VALIDITY)
-        );
-        
+                "refresh_token:" + userId,
+                hashedRefreshToken,
+                Duration.ofMillis(REFRESH_TOKEN_VALIDITY));
+
         logger.info("Generated token pair for user: {}", userId);
         return new TokenPair(accessToken, refreshToken);
     }
@@ -54,22 +67,22 @@ public class JwtTokenService {
     public TokenPair refreshTokens(String refreshToken) {
         try {
             String userId = extractUserIdFromRefreshToken(refreshToken);
-            
+
             // Validate against stored hash
             String storedHash = redisTemplate.opsForValue().get("refresh_token:" + userId);
             if (storedHash == null || !verifyTokenHash(refreshToken, storedHash)) {
                 throw new InvalidTokenException("Invalid refresh token");
             }
-            
+
             // Get user roles (in real scenario, fetch from database/cache)
             Set<String> userRoles = getUserRoles(userId);
-            
+
             // Rotate: invalidate old, generate new
             redisTemplate.delete("refresh_token:" + userId);
-            
+
             logger.info("Refreshing tokens for user: {}", userId);
             return generateTokenPair(userId, userRoles);
-            
+
         } catch (Exception e) {
             logger.error("Error refreshing tokens", e);
             throw new InvalidTokenException("Failed to refresh tokens");
@@ -79,9 +92,9 @@ public class JwtTokenService {
     public boolean validateAccessToken(String token) {
         try {
             Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token);
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             logger.debug("Invalid access token: {}", e.getMessage());
@@ -109,7 +122,7 @@ public class JwtTokenService {
     private String createAccessToken(String userId, Set<String> roles) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("roles", new ArrayList<>(roles));
-        
+
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(userId)
