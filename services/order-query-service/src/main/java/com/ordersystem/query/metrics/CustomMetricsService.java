@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,8 +13,9 @@ import org.springframework.stereotype.Service;
 
 import com.ordersystem.query.service.OrderQueryService;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 import java.util.Map;
 
@@ -96,25 +98,25 @@ public class CustomMetricsService {
                 .register(meterRegistry);
 
         // System Health Gauges
-        Gauge.builder("system.active.connections")
+        Gauge.builder("system.active.connections", this, CustomMetricsService::getActiveConnections)
                 .description("Number of active database connections")
                 .tag("service", "order-query")
-                .register(meterRegistry, this, CustomMetricsService::getActiveConnections);
+                .register(meterRegistry);
 
-        Gauge.builder("system.memory.usage.percent")
+        Gauge.builder("system.memory.usage.percent", this, CustomMetricsService::getMemoryUsagePercent)
                 .description("Memory usage percentage")
                 .tag("service", "order-query")
-                .register(meterRegistry, this, CustomMetricsService::getMemoryUsagePercent);
+                .register(meterRegistry);
 
-        Gauge.builder("orders.total.count")
+        Gauge.builder("orders.total.count", this, CustomMetricsService::getTotalOrderCount)
                 .description("Total number of orders in the system")
                 .tag("service", "order-query")
-                .register(meterRegistry, this, CustomMetricsService::getTotalOrderCount);
+                .register(meterRegistry);
 
-        Gauge.builder("query.last.execution.time")
+        Gauge.builder("query.last.execution.time", this, CustomMetricsService::getLastQueryTime)
                 .description("Last query execution time in milliseconds")
                 .tag("service", "order-query")
-                .register(meterRegistry, this, CustomMetricsService::getLastQueryTime);
+                .register(meterRegistry);
 
         logger.info("✅ Custom metrics initialized successfully");
     }
@@ -132,37 +134,43 @@ public class CustomMetricsService {
                 .tag("success", String.valueOf(success))
                 .register(meterRegistry));
 
-        ordersQueriedCounter.increment(
-                Tag.of("query.type", queryType),
-                Tag.of("success", String.valueOf(success))
-        );
+        Counter queryCounter = meterRegistry.counter("orders.queried.total",
+                Tags.of("query.type", queryType, "success", String.valueOf(success)));
+        queryCounter.increment();
 
         if (!success) {
-            errorCounter.increment(Tag.of("type", "query_execution"));
+            Counter errorByType = meterRegistry.counter("errors.total",
+                    Tags.of("type", "query_execution", "service", "order-query"));
+            errorByType.increment();
         }
     }
 
     public void recordCacheHit(String cacheType) {
         Timer.Sample sample = Timer.start(meterRegistry);
         sample.stop(cacheHitTimer);
-        cacheHitCounter.increment(Tag.of("cache.type", cacheType));
+        Counter cacheHitByType = meterRegistry.counter("cache.hits.total",
+                Tags.of("cache.type", cacheType, "service", "order-query"));
+        cacheHitByType.increment();
     }
 
     public void recordCacheMiss(String cacheType) {
         Timer.Sample sample = Timer.start(meterRegistry);
         sample.stop(cacheMissTimer);
-        cacheMissCounter.increment(Tag.of("cache.type", cacheType));
+        Counter cacheMissByType = meterRegistry.counter("cache.misses.total",
+                Tags.of("cache.type", cacheType, "service", "order-query"));
+        cacheMissByType.increment();
     }
 
     public void recordError(String errorType, String operation) {
-        errorCounter.increment(
-                Tag.of("error.type", errorType),
-                Tag.of("operation", operation)
-        );
+        Counter errorByOperation = meterRegistry.counter("errors.total",
+                Tags.of("error.type", errorType, "operation", operation, "service", "order-query"));
+        errorByOperation.increment();
     }
 
     public void recordRateLimitExceeded(String clientType) {
-        rateLimitExceededCounter.increment(Tag.of("client.type", clientType));
+        Counter rateLimitByClient = meterRegistry.counter("rate.limit.exceeded.total",
+                Tags.of("client.type", clientType, "service", "order-query"));
+        rateLimitByClient.increment();
     }
 
     public void updateLastQueryTime(long executionTime) {
@@ -229,7 +237,7 @@ public class CustomMetricsService {
             "totalQueries", ordersQueriedCounter.count(),
             "cacheHitRate", getCacheHitRate(),
             "totalErrors", errorCounter.count(),
-            "averageQueryTime", queryExecutionTimer.mean(),
+            "averageQueryTime", queryExecutionTimer.mean(TimeUnit.MILLISECONDS),
             "memoryUsagePercent", getMemoryUsagePercent(),
             "totalOrders", getTotalOrderCount()
         );
