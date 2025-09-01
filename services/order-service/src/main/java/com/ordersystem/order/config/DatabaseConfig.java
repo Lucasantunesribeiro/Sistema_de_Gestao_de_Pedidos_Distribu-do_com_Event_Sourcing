@@ -7,14 +7,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 /**
  * Database Configuration for Render PostgreSQL
  * Handles URL format conversion from Render format to JDBC format
  */
-@Configuration
+// @Configuration - TEMPORARILY DISABLED FOR DEBUGGING
 public class DatabaseConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
