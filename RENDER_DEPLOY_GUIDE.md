@@ -5,6 +5,13 @@
 - Repositório Git público no GitHub
 - Código commitado na branch `main`
 
+## ⚠️ Correções Aplicadas
+Este deploy inclui as seguintes correções críticas:
+- ✅ **Removido HEALTHCHECK genérico** do Dockerfile (causa de timeout)
+- ✅ **Configurado Redis messaging** para substituir RabbitMQ no Render
+- ✅ **Otimizado uso de memória** (256MB por serviço)
+- ✅ **Configurado proxy reverso** nginx para conectividade frontend-backend
+
 ## 🎯 Deploy Automático com Blueprint
 
 ### Opção 1: Deploy via Blueprint (Recomendado)
@@ -16,7 +23,7 @@
 
 2. **Clique em "New" → "Blueprint"**
 
-3. **Cole o conteúdo do arquivo `render-blueprint.yaml`**
+3. **Cole o conteúdo do arquivo `render.yaml`**
    - O arquivo está na raiz do projeto
    - Contém toda a configuração necessária
 

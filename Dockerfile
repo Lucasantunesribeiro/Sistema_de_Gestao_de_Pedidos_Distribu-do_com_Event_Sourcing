@@ -114,9 +114,9 @@ exec /usr/bin/supervisord -c "$CONFIG"\n\
 # Expose port (will be set dynamically by Render)
 EXPOSE ${PORT:-8080}
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
-  CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
+# Health checks devem ser configurados individualmente na UI do Render para cada tipo de serviço
+# (web vs. workers), pois cada serviço tem diferentes portas e endpoints de saúde.
+# O Render gerencia health checks automaticamente através da configuração de serviço.
 
 # Start with our intelligent startup script
 CMD ["/app/startup.sh"]
