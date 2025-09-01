@@ -15,7 +15,6 @@ import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.shared.events.OrderCreatedEvent;
@@ -24,8 +23,11 @@ import com.ordersystem.shared.events.OrderStatusUpdatedEvent;
 /**
  * Redis Event Consumer for Order Query Service
  * Polls Redis Streams for order events using scheduled polling
+ * 
+ * TEMPORARILY DISABLED for H2 validation phase
  */
-@Service
+// @Service // DISABLED: Requires RedisTemplate which is not available during H2
+// testing
 public class RedisEventConsumer {
 
     private static final Logger logger = LoggerFactory.getLogger(RedisEventConsumer.class);
@@ -61,17 +63,16 @@ public class RedisEventConsumer {
 
             // Read from stream
             List<MapRecord<String, Object, Object>> messages = redisTemplate.opsForStream().read(
-                Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),
-                StreamReadOptions.empty().count(10).block(Duration.ofSeconds(1)),
-                StreamOffset.create(ORDER_EVENTS_STREAM, ReadOffset.lastConsumed())
-            );
+                    Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),
+                    StreamReadOptions.empty().count(10).block(Duration.ofSeconds(1)),
+                    StreamOffset.create(ORDER_EVENTS_STREAM, ReadOffset.lastConsumed()));
 
             if (messages != null && !messages.isEmpty()) {
                 logger.info("📨 Received {} messages from Redis Stream: {}", messages.size(), ORDER_EVENTS_STREAM);
-                
+
                 for (MapRecord<String, Object, Object> message : messages) {
                     processMessage(message);
-                    
+
                     // Acknowledge the message
                     redisTemplate.opsForStream().acknowledge(ORDER_EVENTS_STREAM, CONSUMER_GROUP, message.getId());
                 }
@@ -122,7 +123,8 @@ public class RedisEventConsumer {
         } catch (Exception e) {
             logger.error("❌ Failed to process Redis Stream event: eventType={}, orderId={}, error={}, correlationId={}",
                     eventType, orderId, e.getMessage(), correlationId, e);
-            // Don't re-throw - we'll acknowledge the message anyway to avoid infinite retries
+            // Don't re-throw - we'll acknowledge the message anyway to avoid infinite
+            // retries
         } finally {
             MDC.clear();
         }
@@ -133,7 +135,8 @@ public class RedisEventConsumer {
             String eventData = (String) messageBody.get("eventData");
             OrderCreatedEvent event = objectMapper.readValue(eventData, OrderCreatedEvent.class);
 
-            logger.info("🔧 Processing OrderCreatedEvent from Redis: orderId={}, customerId={}, totalAmount={}, itemCount={}, correlationId={}",
+            logger.info(
+                    "🔧 Processing OrderCreatedEvent from Redis: orderId={}, customerId={}, totalAmount={}, itemCount={}, correlationId={}",
                     event.getOrderId(), event.getCustomerId(), event.getTotalAmount(),
                     event.getItems() != null ? event.getItems().size() : 0, correlationId);
 
@@ -147,7 +150,8 @@ public class RedisEventConsumer {
             orderQueryService.handleOrderCreated(event);
             long processingTime = System.currentTimeMillis() - startTime;
 
-            logger.info("✅ Successfully processed OrderCreatedEvent from Redis: orderId={}, processingTime={}ms, correlationId={}",
+            logger.info(
+                    "✅ Successfully processed OrderCreatedEvent from Redis: orderId={}, processingTime={}ms, correlationId={}",
                     event.getOrderId(), processingTime, correlationId);
 
         } catch (IllegalArgumentException e) {
@@ -164,12 +168,15 @@ public class RedisEventConsumer {
             String eventData = (String) messageBody.get("eventData");
             OrderStatusUpdatedEvent event = objectMapper.readValue(eventData, OrderStatusUpdatedEvent.class);
 
-            logger.info("🔧 Processing OrderStatusUpdatedEvent from Redis: orderId={}, customerId={}, {} -> {}, correlationId={}",
-                    event.getOrderId(), event.getCustomerId(), event.getOldStatus(), event.getNewStatus(), correlationId);
+            logger.info(
+                    "🔧 Processing OrderStatusUpdatedEvent from Redis: orderId={}, customerId={}, {} -> {}, correlationId={}",
+                    event.getOrderId(), event.getCustomerId(), event.getOldStatus(), event.getNewStatus(),
+                    correlationId);
 
             // Validate event before processing
             if (event.getOrderId() == null || event.getOrderId().trim().isEmpty()) {
-                logger.error("❌ Received OrderStatusUpdatedEvent with null/empty orderId, correlationId={}", correlationId);
+                logger.error("❌ Received OrderStatusUpdatedEvent with null/empty orderId, correlationId={}",
+                        correlationId);
                 return; // Don't retry invalid events
             }
 
@@ -177,7 +184,8 @@ public class RedisEventConsumer {
             orderQueryService.handleOrderStatusUpdated(event);
             long processingTime = System.currentTimeMillis() - startTime;
 
-            logger.info("✅ Successfully processed OrderStatusUpdatedEvent from Redis: orderId={}, {} -> {}, processingTime={}ms, correlationId={}",
+            logger.info(
+                    "✅ Successfully processed OrderStatusUpdatedEvent from Redis: orderId={}, {} -> {}, processingTime={}ms, correlationId={}",
                     event.getOrderId(), event.getOldStatus(), event.getNewStatus(), processingTime, correlationId);
 
         } catch (IllegalArgumentException e) {
