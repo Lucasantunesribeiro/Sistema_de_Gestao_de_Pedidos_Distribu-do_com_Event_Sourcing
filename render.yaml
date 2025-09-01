@@ -41,7 +41,7 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: render
       - key: JAVA_OPTS
-        value: "-Xmx384m -Xms256m -XX:+UseG1GC -XX:+UseContainerSupport -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof -server"
+        value: "-Xmx256m -Xms128m -XX:+UseG1GC -XX:+UseContainerSupport -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof -server"
 
   # Order Service Worker
   - type: worker
