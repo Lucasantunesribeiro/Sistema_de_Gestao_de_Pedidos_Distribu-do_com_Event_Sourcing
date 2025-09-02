@@ -106,11 +106,12 @@ class InventoryServiceTest {
         
         when(inventoryRepository.findByProductIdInWithLock(anyList())).thenReturn(lowStockItems);
 
-        // When & Then
-        assertThatThrownBy(() -> inventoryService.reserveItems(orderItems, correlationId))
-            .isInstanceOf(InsufficientInventoryException.class)
-            .hasMessageContaining("Insufficient inventory for product");
+        // When
+        InventoryResult result = inventoryService.reserveItems(orderItems, correlationId);
 
+        // Then
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).contains("Insufficient stock");
         verify(inventoryRepository, never()).saveAll(anyList());
     }
 
@@ -155,7 +156,10 @@ class InventoryServiceTest {
     @Test
     void shouldHandleReleaseWhenProductNotFound() {
         // Given
+        // Setup inventory with reserved quantities for the found product
+        inventoryItems.get(0).reserve(2);
         when(inventoryRepository.findByProductIdInWithLock(anyList())).thenReturn(Arrays.asList(inventoryItems.get(0))); // Only one product found
+        when(inventoryRepository.saveAll(anyList())).thenReturn(Arrays.asList(inventoryItems.get(0)));
 
         // When
         InventoryResult result = inventoryService.releaseItems(orderItems, correlationId);

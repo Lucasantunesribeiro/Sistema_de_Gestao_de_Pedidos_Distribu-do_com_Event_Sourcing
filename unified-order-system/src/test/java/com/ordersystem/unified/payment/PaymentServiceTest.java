@@ -53,7 +53,13 @@ class PaymentServiceTest {
     void shouldProcessPaymentSuccessfully() {
         // Given
         when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.empty());
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            if (payment.getId() == null) {
+                payment.setId("payment-" + System.currentTimeMillis());
+            }
+            return payment;
+        });
 
         // When
         PaymentResult result = paymentService.processPayment(orderId, amount, correlationId);
@@ -103,15 +109,20 @@ class PaymentServiceTest {
         // Given
         when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.save(any(Payment.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0)) // First save (pending)
-            .thenThrow(new RuntimeException("Database error")); // Second save (update status)
+            .thenAnswer(invocation -> {
+                Payment payment = invocation.getArgument(0);
+                payment.setId("payment-" + System.currentTimeMillis());
+                return payment;
+            }) // First save succeeds
+            .thenThrow(new RuntimeException("Database error")) // Second save fails
+            .thenAnswer(invocation -> invocation.getArgument(0)); // Third save in catch block succeeds
 
         // When & Then
         assertThatThrownBy(() -> paymentService.processPayment(orderId, amount, correlationId))
             .isInstanceOf(PaymentProcessingException.class)
             .hasMessageContaining("Payment processing failed");
 
-        verify(paymentRepository, times(2)).save(any(Payment.class));
+        verify(paymentRepository, times(3)).save(any(Payment.class)); // First, second (fails), third (in catch)
     }
 
     @Test
@@ -204,7 +215,11 @@ class PaymentServiceTest {
         // Given
         String emptyOrderId = "";
         when(paymentRepository.findByOrderId(emptyOrderId)).thenReturn(Optional.empty());
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            payment.setId("payment-" + System.currentTimeMillis());
+            return payment;
+        });
 
         // When
         PaymentResult result = paymentService.processPayment(emptyOrderId, amount, correlationId);
@@ -212,6 +227,7 @@ class PaymentServiceTest {
         // Then
         assertThat(result.isSuccess()).isTrue();
         verify(paymentRepository).findByOrderId(emptyOrderId);
+        verify(paymentRepository, times(2)).save(any(Payment.class)); // Once for pending, once for completed
     }
 
     @Test
