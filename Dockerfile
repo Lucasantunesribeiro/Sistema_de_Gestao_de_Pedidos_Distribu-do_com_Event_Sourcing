@@ -1,25 +1,27 @@
 # Dockerfile simplificado para gestão de pedidos
 # Otimizado para deploy no Render
 
-# Stage 1: Build Java services
+# Stage 1: Build unified application
 FROM maven:3.9.8-eclipse-temurin-17 AS java-builder
 WORKDIR /app
 
-# Copy all source files
-COPY . .
+# Copy unified-order-system source
+COPY unified-order-system/ ./unified-order-system/
 
-# Build everything in one step
+# Build unified application
+WORKDIR /app/unified-order-system
 RUN mvn clean package -DskipTests -B
 
-# Stage 2: Build frontend (fallback strategy)
+# Stage 2: Build frontend
 FROM node:18-alpine AS frontend-builder
-WORKDIR /app/frontend
+WORKDIR /app
 
 # Copy frontend files
-COPY frontend/ ./
+COPY frontend/ ./frontend/
 
-# Try simple build first, fallback to full build if needed
-RUN node build-simple.js || (npm install && npm run build)
+# Build frontend
+WORKDIR /app/frontend
+RUN npm install && npm run build
 
 # Stage 3: Runtime environment
 FROM eclipse-temurin:17-jdk-alpine
