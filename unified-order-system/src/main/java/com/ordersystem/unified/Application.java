@@ -1,8 +1,10 @@
 package com.ordersystem.unified;
 
+import com.ordersystem.unified.config.JpaRepositoriesConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableCaching
 @EnableAsync
 @EnableTransactionManagement
+@Import(JpaRepositoriesConfig.class)
 public class Application {
 
     public static void main(String[] args) {
