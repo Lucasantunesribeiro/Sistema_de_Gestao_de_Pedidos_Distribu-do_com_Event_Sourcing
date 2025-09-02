@@ -1,67 +1,60 @@
 package com.ordersystem.unified.config;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
-import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.beans.factory.annotation.Value;
 
 /**
- * Database configuration for the unified order system.
- * Handles different database configurations for different environments.
+ * Database configuration that handles Render.com PostgreSQL URL format conversion.
  */
 @Configuration
-@EnableJpaRepositories(basePackages = "com.ordersystem.unified")
-@EnableTransactionManagement
 public class DatabaseConfig {
 
-    @Value("${spring.datasource.url}")
-    private String url;
+    @Value("${DATABASE_URL:jdbc:h2:mem:devdb}")
+    private String databaseUrl;
 
-    @Value("${spring.datasource.username}")
+    @Value("${DATABASE_USERNAME:sa}")
     private String username;
 
-    @Value("${spring.datasource.password}")
+    @Value("${DATABASE_PASSWORD:}")
     private String password;
 
-    @Value("${spring.datasource.driver-class-name}")
-    private String driverClassName;
-
-    /**
-     * Primary DataSource configuration.
-     * Uses environment-specific database settings.
-     */
     @Bean
-    @ConditionalOnProperty(name = "spring.datasource.url")
+    @Primary
     public DataSource dataSource() {
+        // Convert Render.com PostgreSQL URL format to JDBC format
+        String jdbcUrl = convertToJdbcUrl(databaseUrl);
+        
         return DataSourceBuilder.create()
-                .url(url)
-                .username(username)
-                .password(password)
-                .driverClassName(driverClassName)
-                .build();
+            .url(jdbcUrl)
+            .username(username)
+            .password(password)
+            .driverClassName(getDriverClassName(jdbcUrl))
+            .build();
     }
 
-    /**
-     * Development profile specific configuration for H2 database.
-     */
-    @Configuration
-    @Profile("dev")
-    static class DevelopmentDatabaseConfig {
-        // H2 specific configurations if needed
+    private String convertToJdbcUrl(String url) {
+        if (url.startsWith("postgresql://")) {
+            // Convert postgresql:// to jdbc:postgresql://
+            return "jdbc:" + url;
+        } else if (url.startsWith("postgres://")) {
+            // Convert postgres:// to jdbc:postgresql://
+            return url.replace("postgres://", "jdbc:postgresql://");
+        }
+        // Already in JDBC format or H2
+        return url;
     }
 
-    /**
-     * Production profile specific configuration for PostgreSQL.
-     */
-    @Configuration
-    @Profile("production")
-    static class ProductionDatabaseConfig {
-        // PostgreSQL specific configurations if needed
+    private String getDriverClassName(String url) {
+        if (url.contains("postgresql")) {
+            return "org.postgresql.Driver";
+        } else if (url.contains("h2")) {
+            return "org.h2.Driver";
+        }
+        return "org.postgresql.Driver"; // Default
     }
 }
