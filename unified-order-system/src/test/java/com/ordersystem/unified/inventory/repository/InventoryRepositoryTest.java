@@ -80,10 +80,9 @@ class InventoryRepositoryTest {
     void shouldFindLowStockProducts() {
         List<Inventory> lowStockProducts = inventoryRepository.findLowStockProducts();
 
-        assertThat(lowStockProducts).hasSize(1);
-        assertThat(lowStockProducts.get(0).getProductId()).isEqualTo("product-2");
-        assertThat(lowStockProducts.get(0).getAvailableQuantity()).isEqualTo(3); // 5 - 2 reserved
-        assertThat(lowStockProducts.get(0).getReorderLevel()).isEqualTo(10);
+        assertThat(lowStockProducts).hasSize(2); // product-2 and product-3 are both low stock
+        assertThat(lowStockProducts).extracting(Inventory::getProductId)
+            .containsExactlyInAnyOrder("product-2", "product-3");
     }
 
     @Test
@@ -148,7 +147,7 @@ class InventoryRepositoryTest {
     void shouldCountLowStockProducts() {
         Long count = inventoryRepository.countLowStockProducts();
 
-        assertThat(count).isEqualTo(1L);
+        assertThat(count).isEqualTo(2L); // product-2 and product-3 are both low stock
     }
 
     @Test

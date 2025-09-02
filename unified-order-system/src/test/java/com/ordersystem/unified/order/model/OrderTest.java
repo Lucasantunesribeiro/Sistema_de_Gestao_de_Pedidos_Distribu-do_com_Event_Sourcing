@@ -50,11 +50,13 @@ class OrderTest {
         order.addItem(item1);
         order.addItem(item2);
         
+        // Verify initial state
+        assertThat(order.getItems()).hasSize(2);
+        
         order.removeItem(item1);
 
         assertThat(order.getItems()).hasSize(1);
-        assertThat(order.getItems()).contains(item2);
-        assertThat(order.getItems()).doesNotContain(item1);
+        assertThat(order.getItems()).extracting(OrderItemEntity::getProductId).containsOnly("product-2");
         assertThat(item1.getOrder()).isNull();
     }
 

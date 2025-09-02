@@ -58,7 +58,7 @@ class OrderItemEntityTest {
 
         BigDecimal totalPrice = orderItem.getTotalPrice();
 
-        assertThat(totalPrice).isEqualTo(BigDecimal.ZERO);
+        assertThat(totalPrice).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test

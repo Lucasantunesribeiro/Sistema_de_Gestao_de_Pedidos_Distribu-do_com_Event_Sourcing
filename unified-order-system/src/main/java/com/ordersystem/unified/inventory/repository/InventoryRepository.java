@@ -3,9 +3,11 @@ package com.ordersystem.unified.inventory.repository;
 import com.ordersystem.unified.inventory.model.Inventory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.LockModeType;
 import java.util.List;
@@ -133,12 +135,16 @@ public interface InventoryRepository extends JpaRepository<Inventory, String> {
     /**
      * Update available quantity for a product (use with caution - prefer entity methods).
      */
+    @Modifying
+    @Transactional
     @Query("UPDATE Inventory i SET i.availableQuantity = :quantity WHERE i.productId = :productId")
     int updateAvailableQuantity(@Param("productId") String productId, @Param("quantity") Integer quantity);
 
     /**
      * Bulk update reorder levels for multiple products.
      */
+    @Modifying
+    @Transactional
     @Query("UPDATE Inventory i SET i.reorderLevel = :reorderLevel WHERE i.productId IN :productIds")
     int updateReorderLevels(@Param("productIds") List<String> productIds, @Param("reorderLevel") Integer reorderLevel);
 }
