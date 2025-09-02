@@ -52,14 +52,22 @@ public class DatabaseConfig {
 
     private DataSource createPostgreSQLDataSource(String databaseUrl) {
         try {
+            logger.info("Parsing Render DATABASE_URL for PostgreSQL connection");
+            
             URI dbUri = new URI(databaseUrl);
             
-            // Extract components
+            // Extract components with validation
             String host = dbUri.getHost();
-            int port = dbUri.getPort();
-            String database = dbUri.getPath().substring(1); // Remove leading '/'
+            int port = dbUri.getPort() == -1 ? 5432 : dbUri.getPort(); // Default PostgreSQL port
+            String path = dbUri.getPath();
+            String database = (path != null && path.length() > 1) ? path.substring(1) : "postgres";
             
-            // Extract credentials from userInfo
+            // Validate required components
+            if (host == null || host.trim().isEmpty()) {
+                throw new IllegalArgumentException("Database host is required in DATABASE_URL");
+            }
+            
+            // Extract credentials from userInfo with validation
             String userInfo = dbUri.getUserInfo();
             String username = "";
             String password = "";
@@ -67,24 +75,43 @@ public class DatabaseConfig {
             if (userInfo != null && userInfo.contains(":")) {
                 String[] credentials = userInfo.split(":", 2);
                 username = credentials[0];
-                password = credentials[1];
+                password = credentials.length > 1 ? credentials[1] : "";
+            } else if (userInfo != null) {
+                username = userInfo;
             }
             
-            // Build JDBC URL
+            // Validate credentials
+            if (username.trim().isEmpty()) {
+                throw new IllegalArgumentException("Database username is required in DATABASE_URL");
+            }
+            
+            // Build JDBC URL with proper formatting
             String jdbcUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
             
-            logger.info("Connecting to PostgreSQL at {}:{}/{} as user: {}", host, port, database, username);
+            logger.info("PostgreSQL Connection Details:");
+            logger.info("  Host: {}", host);
+            logger.info("  Port: {}", port);
+            logger.info("  Database: {}", database);
+            logger.info("  Username: {}", username);
+            logger.info("  JDBC URL: {}", jdbcUrl);
             
-            return DataSourceBuilder.create()
+            // Create DataSource with explicit configuration
+            DataSource dataSource = DataSourceBuilder.create()
                 .url(jdbcUrl)
                 .username(username)
                 .password(password)
                 .driverClassName("org.postgresql.Driver")
                 .build();
                 
+            logger.info("PostgreSQL DataSource created successfully");
+            return dataSource;
+                
         } catch (URISyntaxException e) {
-            logger.error("Failed to parse DATABASE_URL: {}", databaseUrl, e);
-            throw new RuntimeException("Invalid DATABASE_URL format: " + databaseUrl, e);
+            logger.error("Failed to parse DATABASE_URL as URI: {}", databaseUrl, e);
+            throw new RuntimeException("Invalid DATABASE_URL format. Expected: postgresql://user:pass@host:port/db", e);
+        } catch (Exception e) {
+            logger.error("Failed to create PostgreSQL DataSource", e);
+            throw new RuntimeException("Database configuration error: " + e.getMessage(), e);
         }
     }
 }
