@@ -33,7 +33,7 @@ spring:
         min-idle: 0
   
   cache:
-    type: redis
+    type: ${CACHE_TYPE:simple}
     redis:
       time-to-live: ${CACHE_TTL:3600000}
 
@@ -71,7 +71,7 @@ logging:
 # Custom application properties
 app:
   redis:
-    enabled: ${REDIS_ENABLED:true}
+    enabled: ${REDIS_ENABLED:false}
     cache-ttl: ${CACHE_TTL:3600}
   
   order:
