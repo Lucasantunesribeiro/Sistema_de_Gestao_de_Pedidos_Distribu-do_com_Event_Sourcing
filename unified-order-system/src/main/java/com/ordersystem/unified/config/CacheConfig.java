@@ -8,12 +8,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Cache configuration fallback when Redis is not available.
- * Uses in-memory caching as alternative.
+ * Cache configuration using in-memory caching.
+ * Simple and efficient caching solution for the unified order system.
  */
 @Configuration
 @EnableCaching
-@ConditionalOnProperty(name = "app.redis.enabled", havingValue = "false", matchIfMissing = true)
 public class CacheConfig {
 
     @Bean
