@@ -3,7 +3,7 @@
  * 
  * Contains all Spring configuration classes including:
  * - Database configuration
- * - Redis configuration  
+ * - JPA configuration
  * - Web configuration
  * - Security configuration
  * - Cache configuration
