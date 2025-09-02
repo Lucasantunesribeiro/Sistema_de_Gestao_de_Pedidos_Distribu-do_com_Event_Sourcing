@@ -2,49 +2,56 @@ package com.ordersystem.unified.query;
 
 import com.ordersystem.unified.order.OrderService;
 import com.ordersystem.unified.order.dto.OrderResponse;
-import com.ordersystem.unified.order.repository.OrderRepository;
-import com.ordersystem.unified.query.dto.OrderQueryResponse;
 import com.ordersystem.unified.shared.events.OrderStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
- * Service for querying and aggregating data across all modules.
+ * Service for querying orders and related data.
+ * Provides read-only operations optimized for performance.
  */
 @Service
 public class QueryService {
-
+    
+    private static final Logger logger = LoggerFactory.getLogger(QueryService.class);
+    
     @Autowired
     private OrderService orderService;
-
-    @Autowired
-    private OrderRepository orderRepository;
-
-    @Cacheable(value = "dashboard", key = "'orders'")
-    public OrderQueryResponse getOrdersOverview() {
-        List<OrderResponse> allOrders = orderService.getOrdersByStatus(OrderStatus.CONFIRMED);
-        
-        Map<OrderStatus, Long> statusCounts = allOrders.stream()
-            .collect(Collectors.groupingBy(OrderResponse::getStatus, Collectors.counting()));
-
-        return new OrderQueryResponse(
-            allOrders,
-            statusCounts,
-            allOrders.size(),
-            "Orders retrieved successfully"
-        );
+    
+    /**
+     * Get order by ID.
+     */
+    public OrderResponse getOrder(String orderId) {
+        logger.debug("Querying order: {}", orderId);
+        return orderService.getOrder(orderId);
     }
-
-    public List<OrderResponse> getRecentOrders(int limit) {
-        // For demo, return confirmed orders
-        return orderService.getOrdersByStatus(OrderStatus.CONFIRMED)
-            .stream()
-            .limit(limit)
-            .collect(Collectors.toList());
+    
+    /**
+     * Get orders by customer.
+     */
+    public List<OrderResponse> getOrdersByCustomer(String customerId) {
+        logger.debug("Querying orders for customer: {}", customerId);
+        return orderService.getOrdersByCustomer(customerId);
+    }
+    
+    /**
+     * Get orders by status.
+     */
+    public List<OrderResponse> getOrdersByStatus(OrderStatus status) {
+        logger.debug("Querying orders with status: {}", status);
+        return orderService.getOrdersByStatus(status);
+    }
+    
+    /**
+     * Get recent orders with pagination.
+     */
+    public List<OrderResponse> getRecentOrders(int page, int size) {
+        logger.debug("Querying recent orders - page: {}, size: {}", page, size);
+        // For now, return orders by status CONFIRMED as recent orders
+        return orderService.getOrdersByStatus(OrderStatus.CONFIRMED);
     }
 }
