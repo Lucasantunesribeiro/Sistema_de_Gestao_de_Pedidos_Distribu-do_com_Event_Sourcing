@@ -1,0 +1,64 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: unified-order-db
+    plan: starter
+    region: oregon
+    databaseName: unified_order_system
+    databaseUser: unified_user
+    ipAllowList: []
+
+  # Redis Instance  
+  - type: redis
+    name: unified-order-redis
+    plan: starter
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  # Unified Order System Web Service
+  - type: web
+    name: unified-order-system
+    env: java
+    plan: starter
+    region: oregon
+    buildCommand: cd unified-order-system && ./mvnw clean package -DskipTests
+    startCommand: cd unified-order-system && java -Dspring.profiles.active=prod -Xms256m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom -Dspring.backgroundpreinitializer.ignore=true -Dspring.jmx.enabled=false -jar target/unified-order-system-1.0.0.jar
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SERVER_PORT
+        value: "8080"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: unified-order-db
+          property: connectionString
+      - key: DATABASE_USERNAME
+        fromDatabase:
+          name: unified-order-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: unified-order-db
+          property: password
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: unified-order-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: unified-order-redis
+          property: port
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: unified-order-redis
+          property: password
+      - key: JPA_DDL_AUTO
+        value: update
+      - key: JPA_SHOW_SQL
+        value: "false"
+    autoDeploy: true
