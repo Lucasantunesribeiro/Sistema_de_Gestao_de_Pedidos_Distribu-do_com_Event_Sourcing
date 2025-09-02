@@ -48,8 +48,8 @@ http {
     limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
     limit_req_zone $binary_remote_addr zone=general:10m rate=30r/s;
 
-    upstream query_service {
-        server localhost:8084 max_fails=3 fail_timeout=30s;
+    upstream unified_service {
+        server localhost:10000 max_fails=3 fail_timeout=30s;
     }
 
     server {
@@ -70,7 +70,7 @@ http {
             # Try proxy first, fallback to static response
             error_page 502 503 504 = @health_fallback;
             
-            proxy_pass http://query_service/health;
+            proxy_pass http://unified_service/health;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -91,7 +91,7 @@ http {
             limit_req zone=api burst=20 nodelay;
             error_page 502 503 504 = @api_fallback;
             
-            proxy_pass http://query_service/api/;
+            proxy_pass http://unified_service/api/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -120,7 +120,7 @@ http {
 
         # Actuator endpoints
         location /actuator/ {
-            proxy_pass http://query_service/actuator/;
+            proxy_pass http://unified_service/actuator/;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
