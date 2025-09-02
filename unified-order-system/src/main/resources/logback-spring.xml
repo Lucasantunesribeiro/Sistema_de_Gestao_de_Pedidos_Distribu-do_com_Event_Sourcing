@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProfile name="!prod">
+        <!-- Development logging configuration -->
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+        
+        <logger name="com.ordersystem" level="DEBUG"/>
+        <logger name="org.springframework.cache" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+    
+    <springProfile name="prod">
+        <!-- Production logging configuration with JSON format -->
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp/>
+                    <logLevel/>
+                    <loggerName/>
+                    <mdc/>
+                    <arguments/>
+                    <message/>
+                    <stackTrace/>
+                </providers>
+            </encoder>
+        </appender>
+        
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/unified-order-system.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>logs/unified-order-system.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+                <maxFileSize>100MB</maxFileSize>
+                <maxHistory>30</maxHistory>
+                <totalSizeCap>3GB</totalSizeCap>
+            </rollingPolicy>
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp/>
+                    <logLevel/>
+                    <loggerName/>
+                    <mdc/>
+                    <arguments/>
+                    <message/>
+                    <stackTrace/>
+                </providers>
+            </encoder>
+        </appender>
+        
+        <logger name="com.ordersystem" level="INFO"/>
+        <logger name="org.springframework.cache" level="WARN"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
+        
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </root>
+    </springProfile>
+</configuration>

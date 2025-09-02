@@ -1,0 +1,35 @@
+# JVM Options for Render.com deployment
+# Memory settings for 512MB container
+-Xms256m
+-Xmx512m
+-XX:MetaspaceSize=128m
+-XX:MaxMetaspaceSize=256m
+
+# Garbage Collection optimization
+-XX:+UseG1GC
+-XX:MaxGCPauseMillis=200
+-XX:G1HeapRegionSize=16m
+-XX:+UseStringDeduplication
+
+# Performance tuning
+-XX:+OptimizeStringConcat
+-XX:+UseCompressedOops
+-XX:+UseCompressedClassPointers
+
+# Monitoring and debugging
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:HeapDumpPath=/tmp/heapdump.hprof
+-XX:+PrintGCDetails
+-XX:+PrintGCTimeStamps
+-XX:+PrintGCApplicationStoppedTime
+
+# Security
+-Djava.security.egd=file:/dev/./urandom
+
+# Network optimization
+-Djava.net.preferIPv4Stack=true
+-Dnetworkaddress.cache.ttl=60
+
+# Spring Boot optimization
+-Dspring.backgroundpreinitializer.ignore=true
+-Dspring.jmx.enabled=false
