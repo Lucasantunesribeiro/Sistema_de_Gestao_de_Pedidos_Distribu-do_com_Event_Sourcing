@@ -1,5 +1,5 @@
 # Multi-stage build for unified order system
-FROM maven:3.9.5-openjdk-17-slim AS build
+FROM maven:3.9-eclipse-temurin-17 AS build
 
 # Set working directory
 WORKDIR /app
