@@ -1,5 +1,8 @@
 package com.ordersystem.unified.config;
 
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -31,6 +34,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableTransactionManagement
 public class JpaRepositoriesConfig {
     
+    private static final Logger log = LoggerFactory.getLogger(JpaRepositoriesConfig.class);
+    
     /**
      * Explicit JPA configuration to resolve Spring Data module conflicts.
      * 
@@ -39,4 +44,8 @@ public class JpaRepositoriesConfig {
      * and prevents the application from completing its startup sequence.
      */
     
+    @PostConstruct
+    public void started() {
+        log.info("JpaRepositoriesConfig loaded - JPA-only repositories configured");
+    }
 }
