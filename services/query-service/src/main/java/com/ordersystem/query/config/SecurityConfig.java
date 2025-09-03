@@ -31,9 +31,8 @@ public class SecurityConfig {
             
             // Authorization rules
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/api/orders/health", "/actuator/**").permitAll()
-                .requestMatchers("/api/orders/**").permitAll() // For now, allow all API access
-                .anyRequest().authenticated()
+                .requestMatchers("/api/**", "/actuator/**").permitAll()
+                .anyRequest().permitAll()
             )
             
             // Security headers
