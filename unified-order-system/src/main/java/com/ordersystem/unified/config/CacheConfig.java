@@ -1,30 +1,33 @@
 package com.ordersystem.unified.config;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 /**
- * Cache configuration using in-memory caching.
- * Simple and efficient caching solution for the unified order system.
+ * Cache configuration for performance optimization
  */
 @Configuration
 @EnableCaching
 public class CacheConfig {
 
     @Bean
+    @Profile("!redis")
     public CacheManager cacheManager() {
+        // Use in-memory cache for development/testing
         ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager();
-        cacheManager.setCacheNames(java.util.Arrays.asList(
+        cacheManager.setCacheNames(
             "orders",
-            "inventory", 
+            "customers", 
+            "products",
+            "inventory",
             "payments",
-            "query-results"
-        ));
-        cacheManager.setAllowNullValues(false);
+            "health-checks",
+            "statistics"
+        );
         return cacheManager;
     }
 }

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Unified Order System</title>
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+
+<body class="app">
+  <div th:replace="~{layout/base :: layout(~{::main})}">
+    <main class="main">
+      <!-- Hero Section -->
+      <div class="page-header">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">Welcome back! Here's what's happening with your business today.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-outline" onclick="refreshDashboard()">
+              <i class="fas fa-refresh"></i>
+              Refresh
+            </button>
+            <a href="/orders/create" class="btn btn-primary">
+              <i class="fas fa-plus"></i>
+              New Order
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Health Banner -->
+      <div class="section">
+        <div class="card card-elevated" id="system-health-banner">
+          <div class="flex items-center gap-4">
+            <div class="health-indicator-large">
+              <div class="status-dot status-loading" id="overall-status-dot"></div>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold" id="system-status-text">Checking System Health...</h3>
+              <p class="text-secondary" id="system-status-details">Please wait while we verify all services...</p>
+            </div>
+            <div class="flex gap-2">
+              <a href="/health/detailed" class="btn btn-outline btn-sm">
+                <i class="fas fa-chart-line"></i>
+                Details
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Metrics -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">Key Metrics</h2>
+          <p class="section-description">Real-time business performance indicators</p>
+        </div>
+
+        <div class="stats-grid" id="metrics-grid">
+          <div class="stat-card fade-in" style="animation-delay: 0.1s">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="stat-value" id="total-orders" th:text="${totalOrders ?: '0'}">0</div>
+                <div class="stat-label">Total Orders</div>
+                <div class="stat-change positive" id="orders-change" th:text="${orderGrowth ?: '+12%'}">+12%</div>
+              </div>
+              <div class="stat-icon bg-primary-100 text-primary-600">
+                <i class="fas fa-shopping-cart"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card fade-in" style="animation-delay: 0.2s">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="stat-value" id="total-revenue" th:text="${'$' + (totalRevenue ?: '0')}">$0</div>
+                <div class="stat-label">Revenue Today</div>
+                <div class="stat-change positive" id="revenue-change" th:text="${revenueGrowth ?: '+8.2%'}">+8.2%</div>
+              </div>
+              <div class="stat-icon bg-success-100 text-success-600">
+                <i class="fas fa-dollar-sign"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card fade-in" style="animation-delay: 0.3s">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="stat-value" id="pending-orders" th:text="${pendingOrders ?: '0'}">0</div>
+                <div class="stat-label">Pending Orders</div>
+                <div class="stat-change" id="pending-change"
+                  th:classappend="${pendingOrdersChange < 0} ? 'negative' : 'positive'"
+                  th:text="${pendingOrdersChange ?: '0'} + '%'">0%</div>
+              </div>
+              <div class="stat-icon bg-warning-100 text-warning-600">
+                <i class="fas fa-clock"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card fade-in" style="animation-delay: 0.4s">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="stat-value" id="success-rate" th:text="${(successRate ?: '0') + '%'}">0%</div>
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-change positive" id="success-change" th:text="${successRateChange ?: '+2.1%'}">+2.1%
+                </div>
+              </div>
+              <div class="stat-icon bg-info-100 text-info-600">
+                <i class="fas fa-check-circle"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service Status Grid -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">Service Status</h2>
+          <p class="section-description">Monitor the health of all system components</p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6" id="service-status-grid">
+          <div class="card service-status-card fade-in" data-service="database" style="animation-delay: 0.1s">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="service-icon bg-blue-100 text-blue-600">
+                <i class="fas fa-database"></i>
+              </div>
+              <div>
+                <h3 class="font-semibold">Database</h3>
+                <p class="text-sm text-secondary">PostgreSQL Connection</p>
+              </div>
+            </div>
+            <div class="service-status">
+              <div class="status-indicator">
+                <div class="status-dot"
+                  th:classappend="${systemHealth?.services?.database?.status == 'UP'} ? 'status-up' : 'status-down'">
+                </div>
+                <span class="status-text"
+                  th:text="${systemHealth?.services?.database?.status ?: 'Checking...'}">Checking...</span>
+              </div>
+              <div class="service-metrics">
+                <div class="metric">
+                  <span class="metric-label">Response Time</span>
+                  <span class="metric-value" th:text="${avgResponseTime ?: '-'}">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card service-status-card fade-in" data-service="payment" style="animation-delay: 0.2s">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="service-icon bg-green-100 text-green-600">
+                <i class="fas fa-credit-card"></i>
+              </div>
+              <div>
+                <h3 class="font-semibold">Payment Service</h3>
+                <p class="text-sm text-secondary">Payment Processing</p>
+              </div>
+            </div>
+            <div class="service-status">
+              <div class="status-indicator">
+                <div class="status-dot status-loading"></div>
+                <span class="status-text">Checking...</span>
+              </div>
+              <div class="service-metrics">
+                <div class="metric">
+                  <span class="metric-label">Transactions</span>
+                  <span class="metric-value">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card service-status-card fade-in" data-service="inventory" style="animation-delay: 0.3s">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="service-icon bg-purple-100 text-purple-600">
+                <i class="fas fa-boxes"></i>
+              </div>
+              <div>
+                <h3 class="font-semibold">Inventory Service</h3>
+                <p class="text-sm text-secondary">Stock Management</p>
+              </div>
+            </div>
+            <div class="service-status">
+              <div class="status-indicator">
+                <div class="status-dot status-loading"></div>
+                <span class="status-text">Checking...</span>
+              </div>
+              <div class="service-metrics">
+                <div class="metric">
+                  <span class="metric-label">Items</span>
+                  <span class="metric-value">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card service-status-card fade-in" data-service="order" style="animation-delay: 0.4s">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="service-icon bg-orange-100 text-orange-600">
+                <i class="fas fa-shopping-bag"></i>
+              </div>
+              <div>
+                <h3 class="font-semibold">Order Service</h3>
+                <p class="text-sm text-secondary">Order Processing</p>
+              </div>
+            </div>
+            <div class="service-status">
+              <div class="status-indicator">
+                <div class="status-dot status-loading"></div>
+                <span class="status-text">Checking...</span>
+              </div>
+              <div class="service-metrics">
+                <div class="metric">
+                  <span class="metric-label">Queue</span>
+                  <span class="metric-value">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity & Quick Actions -->
+      <div class="section">
+        <div class="grid lg:grid-cols-2 gap-8">
+          <!-- Recent Orders -->
+          <div class="card fade-in" style="animation-delay: 0.5s">
+            <div class="card-header">
+              <div class="flex justify-between items-center">
+                <div>
+                  <h3 class="card-title">Recent Orders</h3>
+                  <p class="card-subtitle">Latest customer orders</p>
+                </div>
+                <a href="/orders" class="btn btn-outline btn-sm">
+                  View All
+                  <i class="fas fa-arrow-right ml-2"></i>
+                </a>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="recent-orders-list">
+                <div th:if="${not #lists.isEmpty(recentOrders)}" class="space-y-3">
+                  <div th:each="order, orderStat : ${recentOrders}" th:if="${orderStat.index < 5}"
+                    class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                      <div class="status-dot"
+                        th:classappend="${order.status == 'CONFIRMED'} ? 'status-up' : 
+                                                                ${order.status == 'PENDING'} ? 'status-warning' : 
+                                                                ${order.status == 'CANCELLED'} ? 'status-down' : 'status-loading'"></div>
+                      <div>
+                        <div class="font-medium text-sm" th:text="${'#' + order.orderId}">Order #12345</div>
+                        <div class="text-xs text-secondary" th:text="${order.customerName}">Customer Name</div>
+                      </div>
+                    </div>
+                    <div class="text-right">
+                      <div class="font-semibold text-sm" th:text="${'$' + order.totalAmount}">$99.99</div>
+                      <div class="text-xs text-secondary" th:text="${#temporals.format(order.createdAt, 'HH:mm')}">14:30
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div th:if="${#lists.isEmpty(recentOrders)}" class="loading-state">
+                  <div class="spinner"></div>
+                  <span class="text-sm text-muted">Loading recent orders...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="card fade-in" style="animation-delay: 0.6s">
+            <div class="card-header">
+              <h3 class="card-title">Quick Actions</h3>
+              <p class="card-subtitle">Common tasks and operations</p>
+            </div>
+            <div class="card-body">
+              <div class="grid grid-cols-2 gap-4">
+                <a href="/orders/create" class="action-button">
+                  <div class="action-icon bg-primary-100 text-primary-600">
+                    <i class="fas fa-plus"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-medium">Create Order</h4>
+                    <p class="text-xs text-secondary">New customer order</p>
+                  </div>
+                </a>
+
+                <a href="/inventory" class="action-button">
+                  <div class="action-icon bg-purple-100 text-purple-600">
+                    <i class="fas fa-boxes"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-medium">Check Stock</h4>
+                    <p class="text-xs text-secondary">Inventory levels</p>
+                  </div>
+                </a>
+
+                <a href="/payments" class="action-button">
+                  <div class="action-icon bg-green-100 text-green-600">
+                    <i class="fas fa-credit-card"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-medium">Payments</h4>
+                    <p class="text-xs text-secondary">Transaction history</p>
+                  </div>
+                </a>
+
+                <a href="/health/detailed" class="action-button">
+                  <div class="action-icon bg-red-100 text-red-600">
+                    <i class="fas fa-heartbeat"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-medium">System Health</h4>
+                    <p class="text-xs text-secondary">Detailed diagnostics</p>
+                  </div>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script th:src="@{/js/app.js}"></script>
+  <script th:src="@{/js/dashboard.js}"></script>
+</body>
+
+</html>

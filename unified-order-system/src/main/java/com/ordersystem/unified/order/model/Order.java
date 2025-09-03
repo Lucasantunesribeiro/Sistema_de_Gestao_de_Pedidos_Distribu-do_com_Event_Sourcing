@@ -56,6 +56,18 @@ public class Order {
     @Column(name = "correlation_id")
     private String correlationId;
 
+    @Column(name = "reservation_id")
+    private String reservationId;
+
+    @Column(name = "payment_id")
+    private String paymentId;
+
+    @Column(name = "transaction_id")
+    private String transactionId;
+
+    @Column(name = "cancellation_reason")
+    private String cancellationReason;
+
     // Default constructor for JPA
     protected Order() {}
 
@@ -117,6 +129,18 @@ public class Order {
 
     public String getCorrelationId() { return correlationId; }
     public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
+
+    public String getReservationId() { return reservationId; }
+    public void setReservationId(String reservationId) { this.reservationId = reservationId; }
+
+    public String getPaymentId() { return paymentId; }
+    public void setPaymentId(String paymentId) { this.paymentId = paymentId; }
+
+    public String getTransactionId() { return transactionId; }
+    public void setTransactionId(String transactionId) { this.transactionId = transactionId; }
+
+    public String getCancellationReason() { return cancellationReason; }
+    public void setCancellationReason(String cancellationReason) { this.cancellationReason = cancellationReason; }
 
     @Override
     public boolean equals(Object o) {

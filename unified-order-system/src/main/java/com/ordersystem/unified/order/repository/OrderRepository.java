@@ -65,4 +65,31 @@ public interface OrderRepository extends JpaRepository<Order, String> {
      * Check if an order exists by ID.
      */
     boolean existsById(String id);
+
+    /**
+     * Get total revenue by status.
+     */
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status = :status")
+    java.math.BigDecimal getTotalRevenueByStatus(@Param("status") OrderStatus status);
+
+    /**
+     * Find orders by reservation ID.
+     */
+    Optional<Order> findByReservationId(String reservationId);
+
+    /**
+     * Find orders by payment ID.
+     */
+    Optional<Order> findByPaymentId(String paymentId);
+
+    /**
+     * Find orders by transaction ID.
+     */
+    Optional<Order> findByTransactionId(String transactionId);
+
+    /**
+     * Find orders that need cleanup (old pending orders).
+     */
+    @Query("SELECT o FROM Order o WHERE o.status = 'PENDING' AND o.createdAt < :cutoffTime")
+    List<Order> findOrdersNeedingCleanup(@Param("cutoffTime") LocalDateTime cutoffTime);
 }
