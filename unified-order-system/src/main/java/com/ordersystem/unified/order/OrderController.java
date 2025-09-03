@@ -3,6 +3,7 @@ package com.ordersystem.unified.order;
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
 import com.ordersystem.unified.order.dto.SimpleOrderRequest;
+import com.ordersystem.unified.order.dto.OrderItemRequest;
 import com.ordersystem.unified.shared.events.OrderStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,6 +24,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -69,22 +72,32 @@ public class OrderController {
                 }
             }
             
-            // If we get here, it should be standard format - but let's be safe
+            // If we get here, it should be standard format
             logger.info("Attempting standard format processing...");
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "orderId", UUID.randomUUID().toString(),
-                "status", "CREATED",
-                "message", "Order created successfully (mock response)",
-                "timestamp", System.currentTimeMillis()
-            ));
+            
+            // Try to process as CreateOrderRequest
+            try {
+                // This would need proper deserialization, but for now return error
+                logger.warn("Standard format not fully implemented, use /simple endpoint");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "error", "Please use /api/orders/simple endpoint for order creation",
+                    "status", "UNSUPPORTED_FORMAT",
+                    "timestamp", System.currentTimeMillis()
+                ));
+            } catch (Exception standardError) {
+                logger.error("Error processing standard format: {}", standardError.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "error", "Invalid order format: " + standardError.getMessage(),
+                    "status", "FORMAT_ERROR",
+                    "timestamp", System.currentTimeMillis()
+                ));
+            }
             
         } catch (Exception e) {
             logger.error("Error creating order: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "orderId", UUID.randomUUID().toString(),
-                "status", "CREATED", 
-                "message", "Order created successfully (fallback)",
-                "error", "Processed with fallback due to: " + e.getMessage(),
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Internal server error: " + e.getMessage(),
+                "status", "ERROR",
                 "timestamp", System.currentTimeMillis()
             ));
         }
@@ -95,26 +108,43 @@ public class OrderController {
             String customerName = (String) requestMap.get("customerName");
             List<Map<String, Object>> items = (List<Map<String, Object>>) requestMap.get("items");
             
-            logger.info("Processing simplified order for customer: {} with {} items", customerName, items != null ? items.size() : 0);
+            logger.info("Processing simplified order for customer: {} with {} items", 
+                       customerName, items != null ? items.size() : 0);
             
-            // Create a simple successful response
-            String orderId = UUID.randomUUID().toString();
+            // Validate the simplified request
+            validateSimplifiedRequest(requestMap);
             
+            // Convert to standard format
+            CreateOrderRequest createRequest = convertToCreateOrderRequest(requestMap);
+            
+            // Create order using OrderService (real persistence)
+            OrderResponse orderResponse = orderService.createOrder(createRequest);
+            
+            logger.info("Order created successfully via OrderService: {}", orderResponse.getOrderId());
+            
+            // Return response in expected format
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "orderId", orderId,
-                "status", "CREATED",
+                "orderId", orderResponse.getOrderId(),
+                "status", orderResponse.getStatus().toString(),
                 "message", "Order created successfully",
-                "customerName", customerName,
-                "itemCount", items != null ? items.size() : 0,
+                "customerName", orderResponse.getCustomerName(),
+                "totalAmount", orderResponse.getTotalAmount(),
+                "itemCount", orderResponse.getItems().size(),
                 "timestamp", System.currentTimeMillis()
             ));
             
+        } catch (IllegalArgumentException e) {
+            logger.warn("Validation error in simplified order: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "error", e.getMessage(),
+                "status", "VALIDATION_ERROR",
+                "timestamp", System.currentTimeMillis()
+            ));
         } catch (Exception e) {
             logger.error("Error processing simplified order: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "orderId", UUID.randomUUID().toString(),
-                "status", "CREATED",
-                "message", "Order created successfully (simplified fallback)",
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Failed to create order: " + e.getMessage(),
+                "status", "ERROR",
                 "timestamp", System.currentTimeMillis()
             ));
         }
@@ -158,13 +188,24 @@ public class OrderController {
     })
     public ResponseEntity<OrderResponse> getOrder(
             @PathVariable @NotBlank @Parameter(description = "Order ID") String orderId) {
-        logger.debug("Getting order: {}", orderId);
-        
-        OrderResponse response = orderService.getOrder(orderId);
-        
-        logger.debug("Order retrieved: {} with status: {}", orderId, response.getStatus());
-        
-        return ResponseEntity.ok(response);
+        try {
+            logger.debug("Getting order: {}", orderId);
+            
+            OrderResponse response = orderService.getOrder(orderId);
+            
+            logger.debug("Order retrieved: {} with status: {}", orderId, response.getStatus());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error retrieving order {}: {}", orderId, e.getMessage(), e);
+            
+            if (e.getMessage().contains("not found") || e.getClass().getSimpleName().contains("NotFound")) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping
@@ -185,50 +226,30 @@ public class OrderController {
             logger.info("Getting orders with filters - customerId: {}, status: {}, page: {}, size: {}", 
                         customerId, status, page, size);
             
-            // Try to use the service first
-            try {
-                Pageable pageable = PageRequest.of(page, size);
-                List<OrderResponse> responses;
-                
-                if (customerId != null && !customerId.trim().isEmpty()) {
-                    responses = orderService.getOrdersByCustomer(customerId);
-                    logger.debug("Retrieved {} orders for customer: {}", responses.size(), customerId);
-                } else if (status != null) {
-                    responses = orderService.getOrdersByStatus(status);
-                    logger.debug("Retrieved {} orders with status: {}", responses.size(), status);
-                } else {
-                    // Return recent orders when no filters are provided
-                    responses = orderService.getRecentOrders(pageable);
-                    logger.debug("Retrieved {} recent orders", responses.size());
-                }
-                
-                return ResponseEntity.ok(responses);
-            } catch (Exception serviceError) {
-                logger.warn("OrderService failed, returning mock data: {}", serviceError.getMessage());
-                
-                // Return mock orders for now
-                List<Map<String, Object>> mockOrders = List.of(
-                    Map.of(
-                        "orderId", "mock-order-1",
-                        "customerName", "Cliente Exemplo",
-                        "status", "CREATED",
-                        "totalAmount", 25.50,
-                        "createdAt", System.currentTimeMillis() - 300000, // 5 minutes ago
-                        "items", List.of(Map.of(
-                            "productName", "Produto Exemplo",
-                            "quantity", 1,
-                            "price", 25.50
-                        ))
-                    )
-                );
-                
-                return ResponseEntity.ok(mockOrders);
+            Pageable pageable = PageRequest.of(page, size);
+            List<OrderResponse> responses;
+            
+            if (customerId != null && !customerId.trim().isEmpty()) {
+                responses = orderService.getOrdersByCustomer(customerId);
+                logger.debug("Retrieved {} orders for customer: {}", responses.size(), customerId);
+            } else if (status != null) {
+                responses = orderService.getOrdersByStatus(status);
+                logger.debug("Retrieved {} orders with status: {}", responses.size(), status);
+            } else {
+                // Return recent orders when no filters are provided
+                responses = orderService.getRecentOrders(pageable);
+                logger.debug("Retrieved {} recent orders", responses.size());
             }
             
+            return ResponseEntity.ok(responses);
+            
         } catch (Exception e) {
-            logger.error("Error getting orders: {}", e.getMessage(), e);
-            // Always return empty list instead of error
-            return ResponseEntity.ok(List.of());
+            logger.error("Error getting orders from database: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Failed to retrieve orders: " + e.getMessage(),
+                "status", "ERROR",
+                "timestamp", System.currentTimeMillis()
+            ));
         }
     }
 
@@ -242,13 +263,19 @@ public class OrderController {
     })
     public ResponseEntity<List<OrderResponse>> getOrdersByCustomer(
             @PathVariable @NotBlank @Parameter(description = "Customer ID") String customerId) {
-        logger.debug("Getting orders for customer: {}", customerId);
-        
-        List<OrderResponse> responses = orderService.getOrdersByCustomer(customerId);
-        
-        logger.debug("Retrieved {} orders for customer: {}", responses.size(), customerId);
-        
-        return ResponseEntity.ok(responses);
+        try {
+            logger.debug("Getting orders for customer: {}", customerId);
+            
+            List<OrderResponse> responses = orderService.getOrdersByCustomer(customerId);
+            
+            logger.debug("Retrieved {} orders for customer: {}", responses.size(), customerId);
+            
+            return ResponseEntity.ok(responses);
+            
+        } catch (Exception e) {
+            logger.error("Error retrieving orders for customer {}: {}", customerId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/status/{status}")
@@ -261,12 +288,174 @@ public class OrderController {
     })
     public ResponseEntity<List<OrderResponse>> getOrdersByStatus(
             @PathVariable @Parameter(description = "Order status") OrderStatus status) {
-        logger.debug("Getting orders with status: {}", status);
+        try {
+            logger.debug("Getting orders with status: {}", status);
+            
+            List<OrderResponse> responses = orderService.getOrdersByStatus(status);
+            
+            logger.debug("Retrieved {} orders with status: {}", responses.size(), status);
+            
+            return ResponseEntity.ok(responses);
+            
+        } catch (Exception e) {
+            logger.error("Error retrieving orders with status {}: {}", status, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // Data conversion utilities for simplified order format
+
+    /**
+     * Converts simplified order request (Map) to CreateOrderRequest
+     */
+    private CreateOrderRequest convertToCreateOrderRequest(Map<String, Object> requestMap) {
+        logger.debug("Converting simplified request to CreateOrderRequest: {}", requestMap);
         
-        List<OrderResponse> responses = orderService.getOrdersByStatus(status);
+        String customerName = (String) requestMap.get("customerName");
+        String customerId = generateCustomerId();
+        List<Map<String, Object>> itemsMap = (List<Map<String, Object>>) requestMap.get("items");
         
-        logger.debug("Retrieved {} orders with status: {}", responses.size(), status);
+        List<OrderItemRequest> items = new ArrayList<>();
+        if (itemsMap != null) {
+            for (Map<String, Object> itemMap : itemsMap) {
+                OrderItemRequest item = convertToOrderItemRequest(itemMap);
+                items.add(item);
+            }
+        }
         
-        return ResponseEntity.ok(responses);
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setCustomerId(customerId);
+        request.setCustomerName(customerName);
+        request.setItems(items);
+        request.setCorrelationId(UUID.randomUUID().toString());
+        
+        logger.debug("Converted to CreateOrderRequest: customerId={}, itemCount={}", 
+                    customerId, items.size());
+        
+        return request;
+    }
+
+    /**
+     * Converts item map to OrderItemRequest
+     */
+    private OrderItemRequest convertToOrderItemRequest(Map<String, Object> itemMap) {
+        String productName = (String) itemMap.get("productName");
+        String productId = generateProductId(productName);
+        
+        Object priceObj = itemMap.get("price");
+        Object quantityObj = itemMap.get("quantity");
+        
+        BigDecimal price = convertToDecimal(priceObj);
+        Integer quantity = convertToInteger(quantityObj);
+        
+        OrderItemRequest item = new OrderItemRequest();
+        item.setProductId(productId);
+        item.setProductName(productName);
+        item.setQuantity(quantity);
+        item.setUnitPrice(price);
+        
+        return item;
+    }
+
+    /**
+     * Generates a unique customer ID
+     */
+    private String generateCustomerId() {
+        return "CUST-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    /**
+     * Generates a unique product ID based on product name
+     */
+    private String generateProductId(String productName) {
+        String prefix = productName != null && !productName.trim().isEmpty() 
+            ? productName.replaceAll("[^A-Za-z0-9]", "").toUpperCase().substring(0, Math.min(4, productName.length()))
+            : "PROD";
+        return prefix + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    /**
+     * Validates simplified request format
+     */
+    private void validateSimplifiedRequest(Map<String, Object> requestMap) {
+        if (requestMap == null) {
+            throw new IllegalArgumentException("Request body cannot be null");
+        }
+        
+        String customerName = (String) requestMap.get("customerName");
+        if (customerName == null || customerName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Customer name is required");
+        }
+        
+        List<Map<String, Object>> items = (List<Map<String, Object>>) requestMap.get("items");
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("At least one item is required");
+        }
+        
+        for (Map<String, Object> item : items) {
+            validateItemData(item);
+        }
+    }
+
+    /**
+     * Validates individual item data
+     */
+    private void validateItemData(Map<String, Object> item) {
+        String productName = (String) item.get("productName");
+        if (productName == null || productName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Product name is required for all items");
+        }
+        
+        Object price = item.get("price");
+        if (price == null) {
+            throw new IllegalArgumentException("Price is required for all items");
+        }
+        
+        Object quantity = item.get("quantity");
+        if (quantity == null) {
+            throw new IllegalArgumentException("Quantity is required for all items");
+        }
+        
+        BigDecimal priceDecimal = convertToDecimal(price);
+        if (priceDecimal.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Price must be positive");
+        }
+        
+        Integer quantityInt = convertToInteger(quantity);
+        if (quantityInt <= 0) {
+            throw new IllegalArgumentException("Quantity must be positive");
+        }
+    }
+
+    /**
+     * Converts object to BigDecimal safely
+     */
+    private BigDecimal convertToDecimal(Object value) {
+        if (value instanceof Number) {
+            return BigDecimal.valueOf(((Number) value).doubleValue());
+        } else if (value instanceof String) {
+            try {
+                return new BigDecimal((String) value);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid price format: " + value);
+            }
+        }
+        throw new IllegalArgumentException("Price must be a number");
+    }
+
+    /**
+     * Converts object to Integer safely
+     */
+    private Integer convertToInteger(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        } else if (value instanceof String) {
+            try {
+                return Integer.parseInt((String) value);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid quantity format: " + value);
+            }
+        }
+        throw new IllegalArgumentException("Quantity must be a number");
     }
 }
