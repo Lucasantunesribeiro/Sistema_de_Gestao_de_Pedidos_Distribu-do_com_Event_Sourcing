@@ -388,7 +388,7 @@ const indexHtml = `<!DOCTYPE html>
                     document.getElementById('product-quantity').value = '';
                     
                     // Reload orders
-                    setTimeout(loadOrders, 1000);
+                    loadOrders();
                 } else {
                     throw new Error(\`HTTP \${response.status}\`);
                 }
