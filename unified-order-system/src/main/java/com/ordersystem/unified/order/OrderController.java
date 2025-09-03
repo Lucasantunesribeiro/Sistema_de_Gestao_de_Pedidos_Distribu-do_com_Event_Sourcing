@@ -4,6 +4,7 @@ import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
 import com.ordersystem.unified.order.dto.SimpleOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
+import com.ordersystem.unified.order.dto.OrderStatistics;
 import com.ordersystem.unified.shared.events.OrderStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -458,4 +460,61 @@ public class OrderController {
         }
         throw new IllegalArgumentException("Quantity must be a number");
     }
-}
+} 
+   @PostMapping("/cancel/{orderId}")
+    @Operation(summary = "Cancel order", description = "Cancel an existing order with proper cleanup")
+    public ResponseEntity<OrderResponse> cancelOrder(
+            @PathVariable @Parameter(description = "Order ID") String orderId,
+            @RequestBody @Parameter(description = "Cancellation request") Map<String, String> request) {
+        
+        try {
+            String reason = request.getOrDefault("reason", "Customer requested cancellation");
+            String correlationId = request.get("correlationId");
+            
+            logger.info("Cancelling order: orderId={}, reason={}", orderId, reason);
+            
+            OrderResponse response = orderService.cancelOrder(orderId, reason, correlationId);
+            
+            logger.info("Order cancelled successfully: orderId={}, status={}", orderId, response.getStatus());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error cancelling order: orderId={}", orderId, e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/statistics")
+    @Operation(summary = "Get order statistics", description = "Get order statistics for dashboard")
+    public ResponseEntity<Object> getOrderStatistics() {
+        
+        try {
+            logger.debug("Getting order statistics");
+            
+            OrderStatistics statistics = orderService.getOrderStatistics();
+            return ResponseEntity.ok(statistics);
+            
+        } catch (Exception e) {
+            logger.error("Error getting order statistics", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/health")
+    @Operation(summary = "Order service health check")
+    public ResponseEntity<Map<String, Object>> healthCheck() {
+        Map<String, Object> health = new HashMap<>();
+        health.put("service", "order-service");
+        health.put("status", "UP");
+        health.put("timestamp", System.currentTimeMillis());
+        health.put("version", "2.0");
+        health.put("features", List.of(
+            "order-creation",
+            "payment-integration", 
+            "inventory-integration",
+            "order-cancellation",
+            "transaction-orchestration"
+        ));
+        
+        return ResponseEntity.ok(health);
+    }
