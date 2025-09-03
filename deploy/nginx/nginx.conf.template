@@ -140,23 +140,31 @@ http {
             try_files $uri $uri/ =404;
         }
 
-        # Frontend routes (SPA)
+        # Frontend routes - Proxy to Spring Boot for web pages
         location / {
             limit_req zone=general burst=50 nodelay;
             
-            try_files $uri $uri/ /index.html;
+            # Try static files first, then proxy to Spring Boot
+            try_files $uri @spring_boot;
             
-            # Cache HTML for short period
-            location ~* \.html$ {
-                expires 5m;
-                add_header Cache-Control "public, no-cache";
-            }
-            
-            # Cache other assets
+            # Cache static assets
             location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
                 expires 1y;
                 add_header Cache-Control "public, immutable";
             }
+        }
+        
+        # Proxy to Spring Boot for web pages
+        location @spring_boot {
+            proxy_pass http://unified_service;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 10s;
+            proxy_read_timeout 10s;
         }
 
         # Error pages

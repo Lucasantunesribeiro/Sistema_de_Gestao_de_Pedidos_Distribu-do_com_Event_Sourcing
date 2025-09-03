@@ -1,5 +1,9 @@
 package com.ordersystem.unified.web;
 
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
@@ -7,9 +11,29 @@ import java.util.ArrayList;
 
 /**
  * Dashboard controller for web interface.
- * Minimal version for deployment compatibility.
+ * Handles both web pages and API endpoints for dashboard data.
  */
+@Controller
 public class DashboardController {
+
+    @GetMapping("/")
+    public String home(Model model) {
+        return "redirect:/dashboard";
+    }
+
+    @GetMapping("/dashboard")
+    public String dashboard(Model model) {
+        model.addAttribute("totalOrders", 100);
+        model.addAttribute("pendingOrders", 25);
+        model.addAttribute("completedOrders", 70);
+        model.addAttribute("totalRevenue", "$10,000");
+        model.addAttribute("recentOrders", getRecentOrders());
+        model.addAttribute("systemHealth", getSystemHealth());
+        return "dashboard";
+    }
+
+    @GetMapping("/api/dashboard")
+    @ResponseBody
 
     public Map<String, Object> getDashboard() {
         Map<String, Object> dashboard = new HashMap<>();
