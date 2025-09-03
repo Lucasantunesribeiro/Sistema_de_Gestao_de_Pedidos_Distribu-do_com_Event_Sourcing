@@ -20,6 +20,24 @@ public class InventoryController {
     @Autowired
     private InventoryService inventoryService;
 
+    @GetMapping
+    public ResponseEntity<List<Map<String, Object>>> getInventory() {
+        List<Map<String, Object>> items = new ArrayList<>();
+
+        for (int i = 1; i <= 10; i++) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("productId", "PROD-" + i);
+            item.put("productName", "Product " + i);
+            item.put("availableQuantity", 40 + i);
+            item.put("reservedQuantity", 5);
+            item.put("totalQuantity", 45 + i);
+            item.put("lastUpdated", System.currentTimeMillis());
+            items.add(item);
+        }
+
+        return ResponseEntity.ok(items);
+    }
+
     @GetMapping("/check/{productId}")
     public ResponseEntity<Map<String, Object>> checkStock(@PathVariable String productId, 
                                                          @RequestParam int quantity) {
@@ -44,23 +62,6 @@ public class InventoryController {
     public ResponseEntity<Map<String, Object>> getInventoryStatus() {
         Map<String, Object> status = inventoryService.getInventoryStatus();
         return ResponseEntity.ok(status);
-    }
-
-    @GetMapping("/products")
-    public ResponseEntity<List<Map<String, Object>>> getAllProducts() {
-        List<Map<String, Object>> products = new ArrayList<>();
-        
-        for (int i = 1; i <= 10; i++) {
-            Map<String, Object> product = new HashMap<>();
-            product.put("productId", "PROD-" + i);
-            product.put("name", "Product " + i);
-            product.put("stock", 50 + i);
-            product.put("price", 10.0 * i);
-            product.put("timestamp", System.currentTimeMillis());
-            products.add(product);
-        }
-        
-        return ResponseEntity.ok(products);
     }
 
     @GetMapping("/health")
