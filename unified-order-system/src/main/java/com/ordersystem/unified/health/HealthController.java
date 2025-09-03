@@ -24,7 +24,6 @@ import java.util.Map;
  * Comprehensive Health Controller with service dependency monitoring
  */
 @RestController
-@RequestMapping("/api/health")
 @Tag(name = "Health Check", description = "Comprehensive system health monitoring")
 public class HealthController {
     
@@ -42,7 +41,17 @@ public class HealthController {
     @Autowired
     private DataSource dataSource;
     
-    @GetMapping
+    @GetMapping("/health")
+    @Operation(summary = "Simple health check", description = "Simple health endpoint for Render")
+    public ResponseEntity<Map<String, Object>> simpleHealthCheck() {
+        Map<String, Object> health = new HashMap<>();
+        health.put("status", "UP");
+        health.put("service", "unified-order-system");
+        health.put("timestamp", LocalDateTime.now());
+        return ResponseEntity.ok(health);
+    }
+    
+    @GetMapping("/api/health")
     @Operation(summary = "System health check", description = "Returns the overall health status of the system with service dependencies")
     public ResponseEntity<Map<String, Object>> healthCheck() {
         logger.debug("Comprehensive health check requested");
