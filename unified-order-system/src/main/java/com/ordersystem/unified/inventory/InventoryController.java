@@ -1,35 +1,53 @@
 package com.ordersystem.unified.inventory;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 
 /**
- * Inventory controller for stock operations.
- * Minimal version for deployment compatibility.
+ * REST controller for inventory operations.
+ * Spring Boot compatible version with proper annotations.
  */
+@RestController
+@RequestMapping("/api/inventory")
 public class InventoryController {
 
-    private InventoryService inventoryService = new InventoryService();
+    @Autowired
+    private InventoryService inventoryService;
 
-    public Map<String, Object> checkStock(String productId, int quantity) {
-        return inventoryService.checkAvailability(productId, quantity);
+    @GetMapping("/check/{productId}")
+    public ResponseEntity<Map<String, Object>> checkStock(@PathVariable String productId, 
+                                                         @RequestParam int quantity) {
+        Map<String, Object> result = inventoryService.checkAvailability(productId, quantity);
+        return ResponseEntity.ok(result);
     }
 
-    public Map<String, Object> reserveStock(String orderId, Map<String, Object> items) {
-        return inventoryService.reserveItems(orderId, items);
+    @PostMapping("/reserve")
+    public ResponseEntity<Map<String, Object>> reserveStock(@RequestParam String orderId, 
+                                                           @RequestBody Map<String, Object> items) {
+        Map<String, Object> result = inventoryService.reserveItems(orderId, items);
+        return ResponseEntity.ok(result);
     }
 
-    public Map<String, Object> releaseStock(String reservationId) {
-        return inventoryService.releaseReservation(reservationId);
+    @PutMapping("/release/{reservationId}")
+    public ResponseEntity<Map<String, Object>> releaseStock(@PathVariable String reservationId) {
+        Map<String, Object> result = inventoryService.releaseReservation(reservationId);
+        return ResponseEntity.ok(result);
     }
 
-    public Map<String, Object> getInventoryStatus() {
-        return inventoryService.getInventoryStatus();
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> getInventoryStatus() {
+        Map<String, Object> status = inventoryService.getInventoryStatus();
+        return ResponseEntity.ok(status);
     }
 
-    public List<Map<String, Object>> getAllProducts() {
+    @GetMapping("/products")
+    public ResponseEntity<List<Map<String, Object>>> getAllProducts() {
         List<Map<String, Object>> products = new ArrayList<>();
         
         for (int i = 1; i <= 10; i++) {
@@ -42,14 +60,15 @@ public class InventoryController {
             products.add(product);
         }
         
-        return products;
+        return ResponseEntity.ok(products);
     }
 
-    public Map<String, Object> healthCheck() {
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> healthCheck() {
         Map<String, Object> health = new HashMap<>();
         health.put("service", "inventory-service");
         health.put("status", "UP");
         health.put("timestamp", System.currentTimeMillis());
-        return health;
+        return ResponseEntity.ok(health);
     }
 }

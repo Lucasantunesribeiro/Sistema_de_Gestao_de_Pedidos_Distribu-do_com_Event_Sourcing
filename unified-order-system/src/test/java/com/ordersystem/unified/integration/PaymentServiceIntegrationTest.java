@@ -73,7 +73,7 @@ public class PaymentServiceIntegrationTest {
                 .andExpect(jsonPath("$.amount").value(199.99))
                 .andExpect(jsonPath("$.currency").value("BRL"))
                 .andExpect(jsonPath("$.transactionId").exists())
-                .andExpected(jsonPath("$.message").value("Payment processed successfully"))
+                .andExpect(jsonPath("$.message").value("Payment processed successfully"))
                 .andReturn();
 
         String responseContent = result.getResponse().getContentAsString();
