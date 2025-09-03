@@ -3,8 +3,6 @@ package com.ordersystem.unified.health;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/health")
 @Tag(name = "Health", description = "System health check operations")
-public class HealthController implements HealthIndicator {
+public class HealthController {
 
     public HealthController() {
         System.out.println("HealthController initialized");
@@ -32,7 +30,7 @@ public class HealthController implements HealthIndicator {
 
     @GetMapping
     @Operation(summary = "Health check", description = "Returns the health status of the application")
-    public ResponseEntity<Map<String, Object>> health() {
+    public ResponseEntity<Map<String, Object>> getHealth() {
         Map<String, Object> healthStatus = new HashMap<>();
         
         try {
@@ -56,32 +54,6 @@ public class HealthController implements HealthIndicator {
             healthStatus.put("timestamp", System.currentTimeMillis());
             
             return ResponseEntity.status(503).body(healthStatus);
-        }
-    }
-
-    @Override
-    public Health health() {
-        try {
-            try (Connection connection = dataSource.getConnection()) {
-                boolean isValid = connection.isValid(5);
-                if (isValid) {
-                    return Health.up()
-                            .withDetail("database", "UP")
-                            .withDetail("service", "unified-order-system")
-                            .build();
-                } else {
-                    return Health.down()
-                            .withDetail("database", "DOWN")
-                            .withDetail("service", "unified-order-system")
-                            .build();
-                }
-            }
-        } catch (Exception e) {
-            return Health.down()
-                    .withDetail("database", "DOWN")
-                    .withDetail("error", e.getMessage())
-                    .withDetail("service", "unified-order-system")
-                    .build();
         }
     }
 }
