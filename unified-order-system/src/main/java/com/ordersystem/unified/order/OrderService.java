@@ -1,5 +1,13 @@
 package com.ordersystem.unified.order;
 
+import com.ordersystem.unified.order.dto.CreateOrderRequest;
+import com.ordersystem.unified.order.dto.OrderResponse;
+import com.ordersystem.unified.order.dto.OrderItemResponse;
+import com.ordersystem.unified.shared.events.OrderStatus;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
@@ -7,78 +15,121 @@ import java.util.ArrayList;
 
 /**
  * Order service for business logic.
- * Minimal version for deployment compatibility.
+ * Enhanced version with proper DTO support.
  */
+@Service
 public class OrderService {
 
-    public Map<String, Object> createOrder(Map<String, Object> request) {
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", "ORDER-" + System.currentTimeMillis());
-        order.put("status", "CREATED");
-        order.put("customerName", request.get("customerName"));
-        order.put("totalAmount", 100.0);
-        order.put("timestamp", System.currentTimeMillis());
-        return order;
-    }
-
-    public Map<String, Object> getOrder(String orderId) {
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", orderId);
-        order.put("status", "PENDING");
-        order.put("customerName", "Sample Customer");
-        order.put("totalAmount", 100.0);
-        order.put("timestamp", System.currentTimeMillis());
-        return order;
-    }
-
-    public List<Map<String, Object>> getRecentOrders(Object pageable) {
-        List<Map<String, Object>> orders = new ArrayList<>();
+    public OrderResponse createOrder(CreateOrderRequest request) {
+        String orderId = "ORDER-" + System.currentTimeMillis();
         
-        for (int i = 1; i <= 10; i++) {
-            Map<String, Object> order = new HashMap<>();
-            order.put("orderId", "ORDER-" + i);
-            order.put("status", "PENDING");
-            order.put("customerName", "Customer " + i);
-            order.put("totalAmount", 100.0 * i);
-            order.put("timestamp", System.currentTimeMillis());
+        // Convert OrderItemRequest to OrderItemResponse
+        List<OrderItemResponse> itemResponses = new ArrayList<>();
+        if (request.getItems() != null) {
+            for (var item : request.getItems()) {
+                OrderItemResponse itemResponse = new OrderItemResponse();
+                itemResponse.setProductId(item.getProductId());
+                itemResponse.setProductName(item.getProductName());
+                itemResponse.setQuantity(item.getQuantity());
+                itemResponse.setUnitPrice(item.getUnitPrice());
+                itemResponse.setTotalPrice(item.getTotalPrice());
+                itemResponses.add(itemResponse);
+            }
+        }
+        
+        OrderResponse response = new OrderResponse();
+        response.setOrderId(orderId);
+        response.setCustomerId(request.getCustomerId());
+        response.setCustomerName(request.getCustomerName());
+        response.setStatus(OrderStatus.PENDING);
+        response.setTotalAmount(calculateTotal(request));
+        response.setItems(itemResponses);
+        response.setCreatedAt(LocalDateTime.now());
+        response.setUpdatedAt(LocalDateTime.now());
+        response.setCorrelationId(request.getCorrelationId());
+        
+        return response;
+    }
+
+    public OrderResponse getOrder(String orderId) {
+        OrderResponse response = new OrderResponse();
+        response.setOrderId(orderId);
+        response.setCustomerId("CUST-123");
+        response.setCustomerName("Sample Customer");
+        response.setStatus(OrderStatus.PENDING);
+        response.setTotalAmount(new BigDecimal("100.00"));
+        response.setItems(new ArrayList<>());
+        response.setCreatedAt(LocalDateTime.now().minusHours(1));
+        response.setUpdatedAt(LocalDateTime.now());
+        response.setCorrelationId("CORR-" + System.currentTimeMillis());
+        
+        return response;
+    }
+
+    public List<OrderResponse> getOrders(String customerId, String status, int page, int size) {
+        List<OrderResponse> orders = new ArrayList<>();
+        
+        for (int i = 1; i <= size; i++) {
+            OrderResponse order = new OrderResponse();
+            order.setOrderId("ORDER-" + (page * size + i));
+            order.setCustomerId(customerId != null ? customerId : "CUST-" + i);
+            order.setCustomerName("Customer " + i);
+            order.setStatus(status != null ? OrderStatus.valueOf(status.toUpperCase()) : OrderStatus.PENDING);
+            order.setTotalAmount(new BigDecimal(100.0 * i));
+            order.setItems(new ArrayList<>());
+            order.setCreatedAt(LocalDateTime.now().minusHours(i));
+            order.setUpdatedAt(LocalDateTime.now());
+            order.setCorrelationId("CORR-" + System.currentTimeMillis());
             orders.add(order);
         }
         
         return orders;
     }
 
-    public List<Map<String, Object>> getOrdersByCustomer(String customerId) {
-        List<Map<String, Object>> orders = new ArrayList<>();
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", "ORDER-123");
-        order.put("status", "PENDING");
-        order.put("customerName", "Sample Customer");
-        order.put("customerId", customerId);
-        order.put("totalAmount", 100.0);
-        order.put("timestamp", System.currentTimeMillis());
+    public List<OrderResponse> getOrdersByCustomer(String customerId) {
+        List<OrderResponse> orders = new ArrayList<>();
+        OrderResponse order = new OrderResponse();
+        order.setOrderId("ORDER-123");
+        order.setCustomerId(customerId);
+        order.setCustomerName("Sample Customer");
+        order.setStatus(OrderStatus.PENDING);
+        order.setTotalAmount(new BigDecimal("100.00"));
+        order.setItems(new ArrayList<>());
+        order.setCreatedAt(LocalDateTime.now().minusHours(1));
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setCorrelationId("CORR-" + System.currentTimeMillis());
         orders.add(order);
         return orders;
     }
 
-    public List<Map<String, Object>> getOrdersByStatus(Object status) {
-        List<Map<String, Object>> orders = new ArrayList<>();
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", "ORDER-123");
-        order.put("status", status.toString());
-        order.put("customerName", "Sample Customer");
-        order.put("totalAmount", 100.0);
-        order.put("timestamp", System.currentTimeMillis());
+    public List<OrderResponse> getOrdersByStatus(String status) {
+        List<OrderResponse> orders = new ArrayList<>();
+        OrderResponse order = new OrderResponse();
+        order.setOrderId("ORDER-123");
+        order.setCustomerId("CUST-123");
+        order.setCustomerName("Sample Customer");
+        order.setStatus(OrderStatus.valueOf(status.toUpperCase()));
+        order.setTotalAmount(new BigDecimal("100.00"));
+        order.setItems(new ArrayList<>());
+        order.setCreatedAt(LocalDateTime.now().minusHours(1));
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setCorrelationId("CORR-" + System.currentTimeMillis());
         orders.add(order);
         return orders;
     }
 
-    public Map<String, Object> cancelOrder(String orderId, String reason, String correlationId) {
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", orderId);
-        order.put("status", "CANCELLED");
-        order.put("reason", reason);
-        order.put("correlationId", correlationId);
-        order.put("timestamp", System.currentTimeMillis());
+    public OrderResponse cancelOrder(String orderId, String reason) {
+        OrderResponse order = new OrderResponse();
+        order.setOrderId(orderId);
+        order.setCustomerId("CUST-123");
+        order.setCustomerName("Sample Customer");
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setTotalAmount(new BigDecimal("100.00"));
+        order.setItems(new ArrayList<>());
+        order.setCreatedAt(LocalDateTime.now().minusHours(1));
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setCancellationReason(reason);
+        order.setCorrelationId("CORR-" + System.currentTimeMillis());
         return order;
     }
 
@@ -91,5 +142,15 @@ public class OrderService {
         statistics.put("totalRevenue", 10000.0);
         statistics.put("timestamp", System.currentTimeMillis());
         return statistics;
+    }
+
+    private BigDecimal calculateTotal(CreateOrderRequest request) {
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        
+        return request.getItems().stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

@@ -1,5 +1,8 @@
 package com.ordersystem.unified.payment;
 
+import com.ordersystem.unified.payment.dto.PaymentRequest;
+import com.ordersystem.unified.payment.dto.PaymentResponse;
+import com.ordersystem.unified.payment.dto.PaymentStatus;
 import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
 import com.ordersystem.unified.shared.events.PaymentProcessedEvent;
@@ -11,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +31,51 @@ public class PaymentService {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    /**
+     * Processes a payment using PaymentRequest DTO.
+     */
+    public PaymentResponse processPayment(PaymentRequest request) {
+        logger.info("Processing payment request for order: {}, amount: {}, method: {}", 
+                   request.getOrderId(), request.getAmount(), request.getPaymentMethod());
+
+        String paymentId = UUID.randomUUID().toString();
+        
+        try {
+            // Simulate payment processing
+            boolean success = Math.random() < 0.95; // 95% success rate
+            
+            if (success) {
+                String transactionId = "txn_" + UUID.randomUUID().toString().substring(0, 8);
+                return new PaymentResponse(
+                    paymentId,
+                    request.getOrderId(),
+                    PaymentStatus.COMPLETED,
+                    request.getAmount(),
+                    transactionId,
+                    LocalDateTime.now(),
+                    request.getCorrelationId()
+                );
+            } else {
+                return new PaymentResponse(
+                    paymentId,
+                    request.getOrderId(),
+                    PaymentStatus.FAILED,
+                    "Insufficient funds",
+                    request.getCorrelationId()
+                );
+            }
+        } catch (Exception e) {
+            logger.error("Payment processing failed for order: {}", request.getOrderId(), e);
+            return new PaymentResponse(
+                paymentId,
+                request.getOrderId(),
+                PaymentStatus.FAILED,
+                "Payment processing error: " + e.getMessage(),
+                request.getCorrelationId()
+            );
+        }
+    }
 
     /**
      * Processes a payment for an order with synchronous processing.

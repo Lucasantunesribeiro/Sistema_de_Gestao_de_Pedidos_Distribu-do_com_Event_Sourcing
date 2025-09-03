@@ -195,7 +195,7 @@ public class InventoryServiceIntegrationTest {
                 .param("quantity", "5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.productId").value("PROD-INV-001"))
-                .andExpected(jsonPath("$.requestedQuantity").value(5))
+                .andExpect(jsonPath("$.requestedQuantity").value(5))
                 .andExpect(jsonPath("$.available").value(true));
 
         // Check availability for non-existent product

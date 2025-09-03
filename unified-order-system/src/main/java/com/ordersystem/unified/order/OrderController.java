@@ -1,118 +1,73 @@
 package com.ordersystem.unified.order;
 
-import java.util.Map;
-import java.util.HashMap;
+import com.ordersystem.unified.order.dto.CreateOrderRequest;
+import com.ordersystem.unified.order.dto.OrderResponse;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
-import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * REST controller for order operations.
- * Minimal version for deployment compatibility.
+ * Spring Boot compatible version with proper annotations.
  */
+@RestController
+@RequestMapping("/api/orders")
 public class OrderController {
 
-    public Map<String, Object> createOrder(Map<String, Object> requestBody) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("orderId", "ORDER-" + System.currentTimeMillis());
-        response.put("status", "CREATED");
-        response.put("message", "Order created successfully");
-        response.put("timestamp", System.currentTimeMillis());
-        return response;
+    @Autowired
+    private OrderService orderService;
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request) {
+        OrderResponse response = orderService.createOrder(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    public Map<String, Object> createSimpleOrder(Map<String, Object> request) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("orderId", "ORDER-" + System.currentTimeMillis());
-        response.put("status", "CREATED");
-        response.put("message", "Order created successfully");
-        response.put("customerName", request.get("customerName"));
-        response.put("timestamp", System.currentTimeMillis());
-        return response;
+    @GetMapping("/{orderId}")
+    public ResponseEntity<OrderResponse> getOrder(@PathVariable String orderId) {
+        OrderResponse response = orderService.getOrder(orderId);
+        return ResponseEntity.ok(response);
     }
 
-    public Map<String, Object> getOrder(String orderId) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("orderId", orderId);
-        response.put("status", "PENDING");
-        response.put("customerName", "Sample Customer");
-        response.put("totalAmount", 100.0);
-        response.put("timestamp", System.currentTimeMillis());
-        return response;
+    @GetMapping
+    public ResponseEntity<List<OrderResponse>> getOrders(
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<OrderResponse> orders = orderService.getOrders(customerId, status, page, size);
+        return ResponseEntity.ok(orders);
     }
 
-    public List<Map<String, Object>> getOrders(String customerId, String status, int page, int size) {
-        List<Map<String, Object>> orders = new ArrayList<>();
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", "ORDER-123");
-        order.put("status", "PENDING");
-        order.put("customerName", "Sample Customer");
-        order.put("totalAmount", 100.0);
-        order.put("timestamp", System.currentTimeMillis());
-        orders.add(order);
-        return orders;
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<List<OrderResponse>> getOrdersByCustomer(@PathVariable String customerId) {
+        List<OrderResponse> orders = orderService.getOrdersByCustomer(customerId);
+        return ResponseEntity.ok(orders);
     }
 
-    public List<Map<String, Object>> getOrdersByCustomer(String customerId) {
-        List<Map<String, Object>> orders = new ArrayList<>();
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", "ORDER-123");
-        order.put("status", "PENDING");
-        order.put("customerName", "Sample Customer");
-        order.put("customerId", customerId);
-        order.put("totalAmount", 100.0);
-        order.put("timestamp", System.currentTimeMillis());
-        orders.add(order);
-        return orders;
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<OrderResponse>> getOrdersByStatus(@PathVariable String status) {
+        List<OrderResponse> orders = orderService.getOrdersByStatus(status);
+        return ResponseEntity.ok(orders);
     }
 
-    public List<Map<String, Object>> getOrdersByStatus(String status) {
-        List<Map<String, Object>> orders = new ArrayList<>();
-        Map<String, Object> order = new HashMap<>();
-        order.put("orderId", "ORDER-123");
-        order.put("status", status);
-        order.put("customerName", "Sample Customer");
-        order.put("totalAmount", 100.0);
-        order.put("timestamp", System.currentTimeMillis());
-        orders.add(order);
-        return orders;
+    @PutMapping("/{orderId}/cancel")
+    public ResponseEntity<OrderResponse> cancelOrder(@PathVariable String orderId, 
+                                                   @RequestBody Map<String, String> request) {
+        String reason = request.getOrDefault("reason", "Customer requested cancellation");
+        OrderResponse response = orderService.cancelOrder(orderId, reason);
+        return ResponseEntity.ok(response);
     }
 
-    public Map<String, Object> cancelOrder(String orderId, Map<String, String> request) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("orderId", orderId);
-        response.put("status", "CANCELLED");
-        response.put("message", "Order cancelled successfully");
-        response.put("reason", request.getOrDefault("reason", "Customer requested cancellation"));
-        response.put("timestamp", System.currentTimeMillis());
-        return response;
-    }
-
-    public Map<String, Object> getOrderStatistics() {
-        Map<String, Object> statistics = new HashMap<>();
-        statistics.put("totalOrders", 100);
-        statistics.put("pendingOrders", 25);
-        statistics.put("completedOrders", 70);
-        statistics.put("cancelledOrders", 5);
-        statistics.put("totalRevenue", 10000.0);
-        statistics.put("timestamp", System.currentTimeMillis());
-        return statistics;
-    }
-
-    public Map<String, Object> healthCheck() {
-        Map<String, Object> health = new HashMap<>();
-        health.put("service", "order-service");
-        health.put("status", "UP");
-        health.put("timestamp", System.currentTimeMillis());
-        health.put("version", "2.0");
-        
-        List<String> features = new ArrayList<>();
-        features.add("order-creation");
-        features.add("payment-integration");
-        features.add("inventory-integration");
-        features.add("order-cancellation");
-        features.add("transaction-orchestration");
-        health.put("features", features);
-        
-        return health;
+    @GetMapping("/statistics")
+    public ResponseEntity<Map<String, Object>> getOrderStatistics() {
+        Map<String, Object> statistics = orderService.getOrderStatistics();
+        return ResponseEntity.ok(statistics);
     }
 }

@@ -1,12 +1,16 @@
 package com.ordersystem.unified.payment;
 
+import com.ordersystem.unified.payment.dto.PaymentRequest;
+import com.ordersystem.unified.payment.dto.PaymentResponse;
 import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,6 +35,9 @@ public class PaymentController {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private PaymentService paymentService;
 
     @GetMapping
     @Operation(summary = "Get all payments", description = "Retrieves all payments in the system")
@@ -64,6 +71,19 @@ public class PaymentController {
         } catch (Exception e) {
             logger.error("Error getting payments for order {}: {}", orderId, e.getMessage(), e);
             return ResponseEntity.status(500).body(null);
+        }
+    }
+
+    @PostMapping("/process")
+    @Operation(summary = "Process payment", description = "Processes a payment request")
+    public ResponseEntity<PaymentResponse> processPayment(@Valid @RequestBody PaymentRequest request) {
+        logger.debug("Processing payment for order: {}", request.getOrderId());
+        try {
+            PaymentResponse response = paymentService.processPayment(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            logger.error("Error processing payment for order {}: {}", request.getOrderId(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
