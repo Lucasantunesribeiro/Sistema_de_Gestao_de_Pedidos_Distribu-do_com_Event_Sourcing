@@ -19,7 +19,7 @@ public class CacheConfig {
     public CacheManager cacheManager() {
         // Use in-memory cache for development/testing
         ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager();
-        cacheManager.setCacheNames(
+        cacheManager.setCacheNames(java.util.Arrays.asList(
             "orders",
             "customers", 
             "products",
@@ -27,7 +27,7 @@ public class CacheConfig {
             "payments",
             "health-checks",
             "statistics"
-        );
+        ));
         return cacheManager;
     }
 }
