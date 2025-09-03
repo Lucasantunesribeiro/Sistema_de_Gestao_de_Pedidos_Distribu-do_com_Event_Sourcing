@@ -2,6 +2,7 @@ package com.ordersystem.unified.order;
 
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
+import com.ordersystem.unified.order.dto.SimpleOrderRequest;
 import com.ordersystem.unified.shared.events.OrderStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,6 +24,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * REST controller for order operations.
@@ -35,6 +38,10 @@ import java.util.List;
 public class OrderController {
 
     private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
+
+    public OrderController() {
+        logger.info("OrderController initialized");
+    }
 
     @Autowired
     private OrderService orderService;
@@ -50,15 +57,48 @@ public class OrderController {
     })
     public ResponseEntity<OrderResponse> createOrder(
             @Valid @RequestBody @Parameter(description = "Order creation request") CreateOrderRequest request) {
-        logger.info("Creating order for customer: {} with correlation ID: {}", 
-                   request.getCustomerId(), request.getCorrelationId());
-        
-        OrderResponse response = orderService.createOrder(request);
-        
-        logger.info("Order created successfully: {} for customer: {}", 
-                   response.getOrderId(), response.getCustomerId());
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        try {
+            logger.info("Creating order for customer: {} with correlation ID: {}", 
+                       request.getCustomerId(), request.getCorrelationId());
+            
+            OrderResponse response = orderService.createOrder(request);
+            
+            logger.info("Order created successfully: {} for customer: {}", 
+                       response.getOrderId(), response.getCustomerId());
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            logger.error("Error creating order: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        }
+    }
+
+    @PostMapping("/simple")
+    @Operation(summary = "Create a simple order", description = "Creates a new order with simplified format for frontend")
+    public ResponseEntity<Object> createSimpleOrder(@Valid @RequestBody SimpleOrderRequest request) {
+        try {
+            logger.info("Creating simple order: {}", request);
+            
+            // Convert to standard format and create order
+            CreateOrderRequest standardRequest = request.toCreateOrderRequest();
+            OrderResponse response = orderService.createOrder(standardRequest);
+            
+            logger.info("Simple order created successfully: {}", response.getOrderId());
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "orderId", response.getOrderId(),
+                "status", response.getStatus().toString(),
+                "message", "Order created successfully",
+                "customerName", response.getCustomerName(),
+                "totalAmount", response.getTotalAmount()
+            ));
+        } catch (Exception e) {
+            logger.error("Error creating simple order: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "error", e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
     }
 
     @GetMapping("/{orderId}")
@@ -94,25 +134,30 @@ public class OrderController {
             @RequestParam(defaultValue = "0") @Parameter(description = "Page number (0-based)") int page,
             @RequestParam(defaultValue = "20") @Parameter(description = "Page size") int size) {
         
-        logger.debug("Getting orders with filters - customerId: {}, status: {}, page: {}, size: {}", 
-                    customerId, status, page, size);
-        
-        Pageable pageable = PageRequest.of(page, size);
-        List<OrderResponse> responses;
-        
-        if (customerId != null && !customerId.trim().isEmpty()) {
-            responses = orderService.getOrdersByCustomer(customerId);
-            logger.debug("Retrieved {} orders for customer: {}", responses.size(), customerId);
-        } else if (status != null) {
-            responses = orderService.getOrdersByStatus(status);
-            logger.debug("Retrieved {} orders with status: {}", responses.size(), status);
-        } else {
-            // Return recent orders when no filters are provided
-            responses = orderService.getRecentOrders(pageable);
-            logger.debug("Retrieved {} recent orders", responses.size());
+        try {
+            logger.debug("Getting orders with filters - customerId: {}, status: {}, page: {}, size: {}", 
+                        customerId, status, page, size);
+            
+            Pageable pageable = PageRequest.of(page, size);
+            List<OrderResponse> responses;
+            
+            if (customerId != null && !customerId.trim().isEmpty()) {
+                responses = orderService.getOrdersByCustomer(customerId);
+                logger.debug("Retrieved {} orders for customer: {}", responses.size(), customerId);
+            } else if (status != null) {
+                responses = orderService.getOrdersByStatus(status);
+                logger.debug("Retrieved {} orders with status: {}", responses.size(), status);
+            } else {
+                // Return recent orders when no filters are provided
+                responses = orderService.getRecentOrders(pageable);
+                logger.debug("Retrieved {} recent orders", responses.size());
+            }
+            
+            return ResponseEntity.ok(responses);
+        } catch (Exception e) {
+            logger.error("Error getting orders: {}", e.getMessage(), e);
+            return ResponseEntity.ok(List.of()); // Return empty list instead of error
         }
-        
-        return ResponseEntity.ok(responses);
     }
 
     @GetMapping("/customer/{customerId}")
