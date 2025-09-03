@@ -22,15 +22,19 @@ public class DatabaseConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
 
-    @Value("${DATABASE_URL:jdbc:h2:mem:devdb}")
+    @Value("${DATABASE_URL}")
     private String databaseUrl;
 
     @Bean
     @Primary
     public DataSource dataSource() {
-        logger.info("Configuring DataSource with DATABASE_URL: {}", 
+        logger.info("Configuring DataSource with DATABASE_URL: {}",
             databaseUrl.replaceAll("://[^@]+@", "://***:***@")); // Hide credentials in logs
-        
+
+        if (databaseUrl == null || databaseUrl.isBlank()) {
+            throw new IllegalStateException("DATABASE_URL must be provided");
+        }
+
         if (databaseUrl.startsWith("postgresql://") || databaseUrl.startsWith("postgres://")) {
             return createPostgreSQLDataSource(databaseUrl);
         } else if (databaseUrl.startsWith("jdbc:postgresql://")) {
@@ -40,13 +44,7 @@ public class DatabaseConfig {
                 .driverClassName("org.postgresql.Driver")
                 .build();
         } else {
-            // Default H2 for development
-            return DataSourceBuilder.create()
-                .url("jdbc:h2:mem:devdb")
-                .username("sa")
-                .password("")
-                .driverClassName("org.h2.Driver")
-                .build();
+            throw new IllegalArgumentException("Unsupported DATABASE_URL format: " + databaseUrl);
         }
     }
 

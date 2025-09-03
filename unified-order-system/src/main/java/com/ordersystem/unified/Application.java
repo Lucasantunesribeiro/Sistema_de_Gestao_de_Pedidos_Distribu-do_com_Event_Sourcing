@@ -1,6 +1,8 @@
 package com.ordersystem.unified;
 
+import com.ordersystem.unified.config.DatabaseConfig;
 import com.ordersystem.unified.config.JpaRepositoriesConfig;
+import com.ordersystem.unified.config.RedisConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
@@ -18,7 +20,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableCaching
 @EnableAsync
 @EnableTransactionManagement
-@Import(JpaRepositoriesConfig.class)
+@Import({DatabaseConfig.class, RedisConfig.class, JpaRepositoriesConfig.class})
 public class Application {
 
     public static void main(String[] args) {
