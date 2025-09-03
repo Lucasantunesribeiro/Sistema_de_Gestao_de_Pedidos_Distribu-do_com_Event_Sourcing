@@ -12,10 +12,13 @@ const indexHtml = `<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Gestão de Pedidos - Event Sourcing</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             color: #1a202c;
@@ -347,14 +350,18 @@ const indexHtml = `<!DOCTYPE html>
             resultDiv.innerHTML = '<div class="loading">🔄 Criando pedido...</div>';
 
             try {
+                const now = Date.now();
                 const orderData = {
+                    customerId: 'CUST-' + now,
                     customerName,
+                    customerEmail: 'cliente@example.com',
+                    paymentMethod: 'CREDIT_CARD',
                     items: [{
+                        productId: 'PROD-' + now,
                         productName,
-                        price: productPrice,
+                        unitPrice: productPrice,
                         quantity: productQuantity
-                    }],
-                    totalAmount: productPrice * productQuantity
+                    }]
                 };
 
                 const response = await fetch('/api/orders', {
@@ -431,11 +438,20 @@ const indexHtml = `<!DOCTYPE html>
 
         function displayOrders() {
             const container = document.getElementById('orders-container');
-            
+
             if (orders.length === 0) {
                 container.innerHTML = '<div class="result info">📝 Nenhum pedido encontrado. Crie o primeiro!</div>';
                 return;
             }
+
+            const formatDate = (date) => {
+                if (!date) return 'Agora';
+                if (Array.isArray(date)) {
+                    const [y, m, d, hh = 0, mm = 0, ss = 0] = date;
+                    return new Date(y, m - 1, d, hh, mm, ss).toLocaleString('pt-BR');
+                }
+                return new Date(date).toLocaleString('pt-BR');
+            };
 
             const tableHtml = \`
                 <table class="orders-table">
@@ -455,13 +471,13 @@ const indexHtml = `<!DOCTYPE html>
                                 <td>\${order.customerName || order.customer || 'N/A'}</td>
                                 <td>R$ \${(order.totalAmount || order.total || 0).toFixed(2)}</td>
                                 <td><span class="status \${order.status === 'COMPLETED' ? 'up' : 'loading'}">\${order.status || 'PENDING'}</span></td>
-                                <td>\${order.createdAt ? new Date(order.createdAt).toLocaleString('pt-BR') : 'Agora'}</td>
+                                <td>\${formatDate(order.createdAt)}</td>
                             </tr>
                         \`).join('')}
                     </tbody>
                 </table>
             \`;
-            
+
             container.innerHTML = tableHtml;
         }
 
