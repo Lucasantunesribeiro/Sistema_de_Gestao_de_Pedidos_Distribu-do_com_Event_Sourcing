@@ -56,6 +56,21 @@ public class OrderService {
         return response;
     }
 
+    public OrderResponse createBasicOrder(String customerId, double totalAmount) {
+        String orderId = "ORDER-" + System.currentTimeMillis();
+
+        OrderResponse response = new OrderResponse();
+        response.setOrderId(orderId);
+        response.setCustomerId(customerId);
+        response.setStatus(OrderStatus.PENDING);
+        response.setTotalAmount(BigDecimal.valueOf(totalAmount));
+        response.setCreatedAt(LocalDateTime.now());
+        response.setUpdatedAt(LocalDateTime.now());
+
+        orders.put(orderId, response);
+        return response;
+    }
+
     public OrderResponse getOrder(String orderId) {
         return orders.get(orderId);
     }
