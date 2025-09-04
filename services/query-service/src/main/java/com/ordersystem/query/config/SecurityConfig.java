@@ -22,7 +22,7 @@ public class SecurityConfig {
         http
             // CORS configuration
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            
+
             // CSRF protection (disabled for API)
             .csrf(csrf -> csrf.disable())
             // disable basic auth to prevent browser login prompt
