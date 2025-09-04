@@ -57,6 +57,7 @@ import {
   Users,
   DollarSign,
   Package,
+  ShoppingCart,
   Zap,
   CheckCircle2,
   Ban,
