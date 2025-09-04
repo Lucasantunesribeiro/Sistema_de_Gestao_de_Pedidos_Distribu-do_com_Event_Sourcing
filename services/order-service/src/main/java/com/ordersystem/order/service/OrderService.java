@@ -35,8 +35,8 @@ public class OrderService {
         @Autowired
         private OrderEventRepository eventRepository;
 
-        @Autowired
-        private RedisEventPublisher redisEventPublisher;
+       @Autowired(required = false)
+       private RedisEventPublisher redisEventPublisher;
 
         @Autowired
         private ObjectMapper objectMapper;
@@ -157,11 +157,17 @@ public class OrderService {
                 }
         }
 
-        private void publishOrderCreatedEvent(Order order, String correlationId) {
-                logger.debug("📤 Preparing to publish OrderCreatedEvent: orderId={}, correlationId={}",
-                                order.getId(), correlationId);
+       private void publishOrderCreatedEvent(Order order, String correlationId) {
+               logger.debug("📤 Preparing to publish OrderCreatedEvent: orderId={}, correlationId={}",
+                               order.getId(), correlationId);
 
-                try {
+               if (redisEventPublisher == null) {
+                       logger.warn("🚫 RedisEventPublisher not configured; skipping publish for orderId={}, correlationId={}",
+                                       order.getId(), correlationId);
+                       return;
+               }
+
+               try {
                         // Create proper OrderCreatedEvent with OrderItems
                         List<com.ordersystem.shared.events.OrderItem> eventItems = new ArrayList<>();
                         for (com.ordersystem.order.model.OrderItem item : order.getItems()) {
@@ -198,27 +204,33 @@ public class OrderService {
                                         order.getId(), event.getId(), correlationId);
 
                         // Publish event to Redis Stream
-                        logger.info("🚀 Publishing OrderCreatedEvent to Redis Stream: orderId={}, customerId={}, totalAmount={}, correlationId={}",
-                                        order.getId(), order.getCustomerId(), order.getTotalAmount(), correlationId);
+                       logger.info("🚀 Publishing OrderCreatedEvent to Redis Stream: orderId={}, customerId={}, totalAmount={}, correlationId={}",
+                                       order.getId(), order.getCustomerId(), order.getTotalAmount(), correlationId);
 
-                        redisEventPublisher.publishOrderCreatedEvent(orderCreatedEvent);
+                       redisEventPublisher.publishOrderCreatedEvent(orderCreatedEvent);
 
-                        logger.info("✅ Successfully published OrderCreatedEvent to Redis Stream: orderId={}, correlationId={}",
-                                        order.getId(), correlationId);
+                       logger.info("✅ Successfully published OrderCreatedEvent to Redis Stream: orderId={}, correlationId={}",
+                                       order.getId(), correlationId);
 
-                } catch (Exception e) {
-                        logger.error("❌ Error publishing order created event: orderId={}, error={}, correlationId={}",
-                                        order.getId(), e.getMessage(), correlationId, e);
-                        throw new RuntimeException("Failed to publish order created event: " + e.getMessage(), e);
-                }
-        }
+               } catch (Exception e) {
+                       logger.error("❌ Error publishing order created event: orderId={}, error={}, correlationId={}",
+                                       order.getId(), e.getMessage(), correlationId, e);
+               }
+       }
 
-        private void publishOrderStatusUpdatedEvent(Order order, String previousStatus, String newStatus,
-                        String correlationId) {
-                logger.debug("📤 Preparing to publish OrderStatusUpdatedEvent: orderId={}, {} -> {}, correlationId={}",
-                                order.getId(), previousStatus, newStatus, correlationId);
+       private void publishOrderStatusUpdatedEvent(Order order, String previousStatus, String newStatus,
+                       String correlationId) {
+               logger.debug("📤 Preparing to publish OrderStatusUpdatedEvent: orderId={}, {} -> {}, correlationId={}",
+                               order.getId(), previousStatus, newStatus, correlationId);
 
-                try {
+               if (redisEventPublisher == null) {
+                       logger.warn(
+                                       "🚫 RedisEventPublisher not configured; skipping status update publish for orderId={}, correlationId={}",
+                                       order.getId(), correlationId);
+                       return;
+               }
+
+               try {
                         // Create proper OrderStatusUpdatedEvent
                         OrderStatusUpdatedEvent statusUpdatedEvent = new OrderStatusUpdatedEvent(
                                         order.getId(),
@@ -243,21 +255,19 @@ public class OrderService {
                                         order.getId(), event.getId(), correlationId);
 
                         // Publish event to Redis Stream
-                        logger.info("🚀 Publishing OrderStatusUpdatedEvent to Redis Stream: orderId={}, {} -> {}, correlationId={}",
-                                        order.getId(), previousStatus, newStatus, correlationId);
+                       logger.info("🚀 Publishing OrderStatusUpdatedEvent to Redis Stream: orderId={}, {} -> {}, correlationId={}",
+                                       order.getId(), previousStatus, newStatus, correlationId);
 
-                        redisEventPublisher.publishOrderStatusUpdatedEvent(statusUpdatedEvent);
+                       redisEventPublisher.publishOrderStatusUpdatedEvent(statusUpdatedEvent);
 
-                        logger.info("✅ Successfully published OrderStatusUpdatedEvent to Redis Stream: orderId={}, correlationId={}",
-                                        order.getId(), correlationId);
+                       logger.info("✅ Successfully published OrderStatusUpdatedEvent to Redis Stream: orderId={}, correlationId={}",
+                                       order.getId(), correlationId);
 
-                } catch (Exception e) {
-                        logger.error("❌ Error publishing order status updated event: orderId={}, {} -> {}, error={}, correlationId={}",
-                                        order.getId(), previousStatus, newStatus, e.getMessage(), correlationId, e);
-                        throw new RuntimeException("Failed to publish order status updated event: " + e.getMessage(),
-                                        e);
-                }
-        }
+               } catch (Exception e) {
+                       logger.error("❌ Error publishing order status updated event: orderId={}, {} -> {}, error={}, correlationId={}",
+                                       order.getId(), previousStatus, newStatus, e.getMessage(), correlationId, e);
+               }
+       }
 
         public List<OrderEvent> getOrderEvents(String orderId) {
                 String correlationId = UUID.randomUUID().toString();
