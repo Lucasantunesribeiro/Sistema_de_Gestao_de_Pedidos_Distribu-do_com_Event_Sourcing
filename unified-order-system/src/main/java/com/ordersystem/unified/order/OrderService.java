@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Order service for business logic.
@@ -19,6 +21,8 @@ import java.util.ArrayList;
  */
 @Service
 public class OrderService {
+
+    private final Map<String, OrderResponse> orders = new ConcurrentHashMap<>();
 
     public OrderResponse createOrder(CreateOrderRequest request) {
         String orderId = "ORDER-" + System.currentTimeMillis();
@@ -47,99 +51,63 @@ public class OrderService {
         response.setCreatedAt(LocalDateTime.now());
         response.setUpdatedAt(LocalDateTime.now());
         response.setCorrelationId(request.getCorrelationId());
-        
+
+        orders.put(orderId, response);
         return response;
     }
 
     public OrderResponse getOrder(String orderId) {
-        OrderResponse response = new OrderResponse();
-        response.setOrderId(orderId);
-        response.setCustomerId("CUST-123");
-        response.setCustomerName("Sample Customer");
-        response.setStatus(OrderStatus.PENDING);
-        response.setTotalAmount(new BigDecimal("100.00"));
-        response.setItems(new ArrayList<>());
-        response.setCreatedAt(LocalDateTime.now().minusHours(1));
-        response.setUpdatedAt(LocalDateTime.now());
-        response.setCorrelationId("CORR-" + System.currentTimeMillis());
-        
-        return response;
+        return orders.get(orderId);
     }
 
     public List<OrderResponse> getOrders(String customerId, String status, int page, int size) {
-        List<OrderResponse> orders = new ArrayList<>();
-        
-        for (int i = 1; i <= size; i++) {
-            OrderResponse order = new OrderResponse();
-            order.setOrderId("ORDER-" + (page * size + i));
-            order.setCustomerId(customerId != null ? customerId : "CUST-" + i);
-            order.setCustomerName("Customer " + i);
-            order.setStatus(status != null ? OrderStatus.valueOf(status.toUpperCase()) : OrderStatus.PENDING);
-            order.setTotalAmount(new BigDecimal(100.0 * i));
-            order.setItems(new ArrayList<>());
-            order.setCreatedAt(LocalDateTime.now().minusHours(i));
-            order.setUpdatedAt(LocalDateTime.now());
-            order.setCorrelationId("CORR-" + System.currentTimeMillis());
-            orders.add(order);
-        }
-        
-        return orders;
+        return orders.values().stream()
+                .filter(o -> customerId == null || customerId.equals(o.getCustomerId()))
+                .filter(o -> status == null || status.equalsIgnoreCase(o.getStatus().name()))
+                .skip((long) page * size)
+                .limit(size)
+                .collect(Collectors.toList());
     }
 
     public List<OrderResponse> getOrdersByCustomer(String customerId) {
-        List<OrderResponse> orders = new ArrayList<>();
-        OrderResponse order = new OrderResponse();
-        order.setOrderId("ORDER-123");
-        order.setCustomerId(customerId);
-        order.setCustomerName("Sample Customer");
-        order.setStatus(OrderStatus.PENDING);
-        order.setTotalAmount(new BigDecimal("100.00"));
-        order.setItems(new ArrayList<>());
-        order.setCreatedAt(LocalDateTime.now().minusHours(1));
-        order.setUpdatedAt(LocalDateTime.now());
-        order.setCorrelationId("CORR-" + System.currentTimeMillis());
-        orders.add(order);
-        return orders;
+        return orders.values().stream()
+                .filter(o -> customerId.equals(o.getCustomerId()))
+                .collect(Collectors.toList());
     }
 
     public List<OrderResponse> getOrdersByStatus(String status) {
-        List<OrderResponse> orders = new ArrayList<>();
-        OrderResponse order = new OrderResponse();
-        order.setOrderId("ORDER-123");
-        order.setCustomerId("CUST-123");
-        order.setCustomerName("Sample Customer");
-        order.setStatus(OrderStatus.valueOf(status.toUpperCase()));
-        order.setTotalAmount(new BigDecimal("100.00"));
-        order.setItems(new ArrayList<>());
-        order.setCreatedAt(LocalDateTime.now().minusHours(1));
-        order.setUpdatedAt(LocalDateTime.now());
-        order.setCorrelationId("CORR-" + System.currentTimeMillis());
-        orders.add(order);
-        return orders;
+        return orders.values().stream()
+                .filter(o -> status.equalsIgnoreCase(o.getStatus().name()))
+                .collect(Collectors.toList());
     }
 
     public OrderResponse cancelOrder(String orderId, String reason) {
-        OrderResponse order = new OrderResponse();
-        order.setOrderId(orderId);
-        order.setCustomerId("CUST-123");
-        order.setCustomerName("Sample Customer");
-        order.setStatus(OrderStatus.CANCELLED);
-        order.setTotalAmount(new BigDecimal("100.00"));
-        order.setItems(new ArrayList<>());
-        order.setCreatedAt(LocalDateTime.now().minusHours(1));
-        order.setUpdatedAt(LocalDateTime.now());
-        order.setCancellationReason(reason);
-        order.setCorrelationId("CORR-" + System.currentTimeMillis());
+        OrderResponse order = orders.get(orderId);
+        if (order != null) {
+            order.setStatus(OrderStatus.CANCELLED);
+            order.setUpdatedAt(LocalDateTime.now());
+            order.setCancellationReason(reason);
+        }
         return order;
     }
 
     public Map<String, Object> getOrderStatistics() {
         Map<String, Object> statistics = new HashMap<>();
-        statistics.put("totalOrders", 100);
-        statistics.put("pendingOrders", 25);
-        statistics.put("completedOrders", 70);
-        statistics.put("cancelledOrders", 5);
-        statistics.put("totalRevenue", 10000.0);
+        long pending = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.PENDING).count();
+        long completed = orders.values().stream()
+                .filter(o -> o.getStatus() == OrderStatus.CONFIRMED || o.getStatus() == OrderStatus.COMPLETED)
+                .count();
+        long cancelled = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.CANCELLED).count();
+        BigDecimal revenue = orders.values().stream()
+                .filter(o -> o.getStatus() == OrderStatus.CONFIRMED || o.getStatus() == OrderStatus.COMPLETED)
+                .map(OrderResponse::getTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        statistics.put("totalOrders", orders.size());
+        statistics.put("pendingOrders", pending);
+        statistics.put("completedOrders", completed);
+        statistics.put("cancelledOrders", cancelled);
+        statistics.put("totalRevenue", revenue);
         statistics.put("timestamp", System.currentTimeMillis());
         return statistics;
     }

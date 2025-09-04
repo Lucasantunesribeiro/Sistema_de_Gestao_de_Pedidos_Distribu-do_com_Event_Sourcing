@@ -83,10 +83,10 @@ export function Header({
   onMenuClick, 
   onSearch, 
   notifications = 3,
-  user = { 
-    name: "Admin User", 
+  user = {
+    name: "Admin User",
     email: "admin@orderflow.com",
-    avatar: "/api/placeholder/32/32" 
+    avatar: "https://placehold.co/32x32"
   }
 }: HeaderProps) {
   const location = useLocation()

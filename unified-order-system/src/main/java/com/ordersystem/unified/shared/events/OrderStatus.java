@@ -8,6 +8,7 @@ public enum OrderStatus {
     INVENTORY_RESERVED("Inventory has been reserved"),
     PAYMENT_PROCESSING("Payment is being processed"),
     CONFIRMED("Order confirmed and payment successful"),
+    COMPLETED("Order has been completed"),
     CANCELLED("Order has been cancelled"),
     FAILED("Order processing failed");
 
@@ -22,10 +23,10 @@ public enum OrderStatus {
     }
 
     public boolean isTerminal() {
-        return this == CONFIRMED || this == CANCELLED || this == FAILED;
+        return this == CONFIRMED || this == COMPLETED || this == CANCELLED || this == FAILED;
     }
 
     public boolean isSuccessful() {
-        return this == CONFIRMED;
+        return this == CONFIRMED || this == COMPLETED;
     }
 }
