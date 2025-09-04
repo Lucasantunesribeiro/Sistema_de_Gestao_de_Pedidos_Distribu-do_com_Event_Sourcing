@@ -11,13 +11,13 @@ export function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-muted">
       <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
-      
+
       <div className="lg:pl-64">
         <Header onMenuClick={toggleSidebar} />
-        
-        <main className="mt-16 px-6 py-4 min-h-screen">
+
+        <main className="mt-16 px-6 py-4 min-h-screen container mx-auto">
           <Outlet />
         </main>
       </div>

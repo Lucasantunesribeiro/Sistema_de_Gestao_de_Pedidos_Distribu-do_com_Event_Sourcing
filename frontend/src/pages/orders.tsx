@@ -102,10 +102,18 @@ export function Orders() {
   const [productIds, setProductIds] = useState<string[]>([''])
 
   // Fetch orders from backend
-  const { data: ordersResponse, isLoading, refetch } = useQuery({
+  const { data: ordersResponse, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['orders'],
     queryFn: () => apiClient.getOrders(),
     refetchInterval: 30000,
+    retry: 1,
+    onError: (err: any) => {
+      toast({
+        title: 'Erro ao carregar pedidos',
+        description: err.message || 'O servidor retornou um erro inesperado.',
+        variant: 'destructive',
+      })
+    }
   })
 
   // Fetch order events
@@ -296,6 +304,25 @@ export function Orders() {
       title: "Dados atualizados",
       description: "A lista de pedidos foi atualizada com sucesso.",
     })
+  }
+
+  if (isError) {
+    return (
+      <Card className="max-w-lg mx-auto mt-20">
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2 text-destructive">
+            <AlertTriangle className="h-5 w-5" />
+            Erro ao carregar pedidos
+          </CardTitle>
+          <CardDescription>
+            {(error as any)?.message || 'O servidor retornou um erro inesperado.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center">
+          <Button variant="outline" onClick={() => refetch()}>Tentar novamente</Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
