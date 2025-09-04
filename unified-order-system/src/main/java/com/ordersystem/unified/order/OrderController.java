@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * REST controller for order operations.
@@ -24,9 +25,33 @@ public class OrderController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request) {
+    public ResponseEntity<OrderResponse> createOrder(@RequestBody Map<String, Object> orderRequest) {
+        String customerId = (String) orderRequest.get("customerId");
+        Object amountObj = orderRequest.get("totalAmount");
+
+        if (customerId == null || amountObj == null) {
+            throw new IllegalArgumentException("customerId and totalAmount are required");
+        }
+
+        double totalAmount = Double.parseDouble(amountObj.toString());
+        String correlationId = UUID.randomUUID().toString();
+        OrderResponse response = orderService.createBasicOrder(customerId, totalAmount);
+        response.setCorrelationId(correlationId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header("X-Correlation-ID", correlationId)
+                .body(response);
+    }
+
+    @PostMapping("/full")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ResponseEntity<OrderResponse> createDetailedOrder(@Valid @RequestBody CreateOrderRequest request) {
+        String correlationId = UUID.randomUUID().toString();
+        request.setCorrelationId(correlationId);
         OrderResponse response = orderService.createOrder(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        response.setCorrelationId(correlationId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header("X-Correlation-ID", correlationId)
+                .body(response);
     }
 
     @GetMapping("/{orderId}")
