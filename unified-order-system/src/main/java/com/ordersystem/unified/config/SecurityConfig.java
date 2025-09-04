@@ -19,6 +19,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            // disable HTTP basic to avoid browser login prompts
+            .httpBasic(http -> http.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/",

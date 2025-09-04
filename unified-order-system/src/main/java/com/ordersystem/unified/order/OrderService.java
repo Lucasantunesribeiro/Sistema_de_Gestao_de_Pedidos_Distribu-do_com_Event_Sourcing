@@ -26,7 +26,7 @@ public class OrderService {
 
     public OrderResponse createOrder(CreateOrderRequest request) {
         String orderId = "ORDER-" + System.currentTimeMillis();
-        
+
         // Convert OrderItemRequest to OrderItemResponse
         List<OrderItemResponse> itemResponses = new ArrayList<>();
         if (request.getItems() != null) {
@@ -40,7 +40,7 @@ public class OrderService {
                 itemResponses.add(itemResponse);
             }
         }
-        
+
         OrderResponse response = new OrderResponse();
         response.setOrderId(orderId);
         response.setCustomerId(request.getCustomerId());
@@ -94,10 +94,10 @@ public class OrderService {
     public Map<String, Object> getOrderStatistics() {
         Map<String, Object> statistics = new HashMap<>();
         long pending = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.PENDING).count();
-        long completed = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CONFIRMED).count();
+        long completed = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.CONFIRMED).count();
         long cancelled = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.CANCELLED).count();
         BigDecimal revenue = orders.values().stream()
-                .filter(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CONFIRMED)
+                .filter(o -> o.getStatus() == OrderStatus.CONFIRMED)
                 .map(OrderResponse::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -114,7 +114,7 @@ public class OrderService {
         if (request.getItems() == null || request.getItems().isEmpty()) {
             return BigDecimal.ZERO;
         }
-        
+
         return request.getItems().stream()
                 .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
