@@ -9,8 +9,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Production Security Configuration
- * Initial safe configuration with permitAll() for gradual security
- * implementation
+ * Initial safe configuration with permitAll() for gradual security implementation
  */
 @Configuration
 @EnableWebSecurity
@@ -18,7 +17,6 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // Production-ready configuration with initial permitAll() approach
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
