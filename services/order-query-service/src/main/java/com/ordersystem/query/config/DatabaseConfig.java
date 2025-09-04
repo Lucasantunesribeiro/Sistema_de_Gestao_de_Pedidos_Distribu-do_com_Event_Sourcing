@@ -1,12 +1,17 @@
 package com.ordersystem.query.config;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 
 import javax.sql.DataSource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.retry.annotation.EnableRetry;
@@ -19,11 +24,13 @@ import com.zaxxer.hikari.HikariDataSource;
  * settings
  * Optimized for read-heavy workloads in the query service
  */
-// @Configuration - TEMPORARILY DISABLED FOR DEBUGGING
+@Configuration
 @EnableRetry
 @ConfigurationProperties(prefix = "app.database")
 @Profile("!local")
 public class DatabaseConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
 
     @Value("${spring.datasource.url:jdbc:postgresql://localhost:5433/order_query_db}")
     private String databaseUrl;
@@ -55,12 +62,38 @@ public class DatabaseConfig {
     @Bean
     @Primary
     public DataSource dataSource() {
+        String jdbcUrl = databaseUrl;
+        String user = username;
+        String pass = password;
+
+        try {
+            if (databaseUrl.startsWith("postgresql://")) {
+                URI uri = new URI(databaseUrl);
+                String hostPort = uri.getHost();
+                if (uri.getPort() != -1) {
+                    hostPort += ":" + uri.getPort();
+                }
+                jdbcUrl = "jdbc:postgresql://" + hostPort + uri.getPath();
+
+                if ((user == null || user.isBlank()) && uri.getUserInfo() != null) {
+                    String[] parts = uri.getUserInfo().split(":", 2);
+                    user = parts[0];
+                    if (parts.length > 1) {
+                        pass = parts[1];
+                    }
+                }
+                logger.info("🔄 Converted Render DATABASE_URL format: {} -> {}", databaseUrl, jdbcUrl);
+            }
+        } catch (URISyntaxException e) {
+            logger.error("❌ Invalid DATABASE_URL format: {}", databaseUrl, e);
+        }
+
         HikariConfig config = new HikariConfig();
 
         // Basic connection settings
-        config.setJdbcUrl(databaseUrl);
-        config.setUsername(username);
-        config.setPassword(password);
+        config.setJdbcUrl(jdbcUrl);
+        config.setUsername(user);
+        config.setPassword(pass);
         config.setDriverClassName(driverClassName);
 
         // Connection pool settings

@@ -6,17 +6,17 @@ server:
 
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
-    username: ${DATABASE_USERNAME:sa}
-    password: ${DATABASE_PASSWORD:}
-    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/orderdb}
+    username: ${DATABASE_USERNAME:order_user}
+    password: ${DATABASE_PASSWORD:password}
+    driver-class-name: ${DATABASE_DRIVER:org.postgresql.Driver}
     hikari:
       maximum-pool-size: 10
       
   jpa:
     hibernate:
       ddl-auto: update
-    database-platform: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
+    database-platform: ${HIBERNATE_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
     show-sql: false
   
   rabbitmq:
