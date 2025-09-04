@@ -175,7 +175,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 )}
               >
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="/api/placeholder/32/32" />
+                  <AvatarImage src="https://via.placeholder.com/32" />
                   <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-sm">
                     AD
                   </AvatarFallback>
