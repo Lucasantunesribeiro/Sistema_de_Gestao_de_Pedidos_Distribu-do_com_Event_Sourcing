@@ -44,7 +44,12 @@ public class OrderController {
 
         try {
             String customerId = (String) orderRequest.get("customerId");
-            Double totalAmount = Double.valueOf(orderRequest.get("totalAmount").toString());
+            Object amountObj = orderRequest.get("totalAmount");
+            if (customerId == null || amountObj == null) {
+                throw new IllegalArgumentException("customerId and totalAmount are required");
+            }
+
+            Double totalAmount = Double.valueOf(amountObj.toString());
             @SuppressWarnings("unchecked")
             List<String> productIds = (List<String>) orderRequest.getOrDefault("productIds", List.of());
 
@@ -70,14 +75,14 @@ public class OrderController {
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
-        } catch (Exception e) {
-            logger.error("❌ Order creation failed: customerId={}, error={}, correlationId={}",
-                    orderRequest.get("customerId"), e.getMessage(), correlationId, e);
+        } catch (IllegalArgumentException e) {
+            logger.warn("⚠️ Invalid order data: customerId={}, error={}, correlationId={}",
+                    orderRequest.get("customerId"), e.getMessage(), correlationId);
 
             Map<String, Object> errorResponse = Map.of(
                     "success", false,
                     "error", e.getMessage(),
-                    "message", "Failed to create order",
+                    "message", "Invalid order data",
                     "correlationId", correlationId);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         } finally {
