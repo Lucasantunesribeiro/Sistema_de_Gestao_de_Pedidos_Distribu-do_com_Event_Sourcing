@@ -86,7 +86,7 @@ export function Header({
   user = {
     name: "Admin User",
     email: "admin@orderflow.com",
-    avatar: "https://via.placeholder.com/32"
+    avatar: "https://placehold.co/32x32"
   }
 }: HeaderProps) {
   const location = useLocation()

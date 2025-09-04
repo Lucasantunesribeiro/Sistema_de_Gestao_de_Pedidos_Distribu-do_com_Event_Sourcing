@@ -472,41 +472,41 @@ export function Orders() {
 
       {/* Orders Table with Tabs */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle>Lista de Pedidos</CardTitle>
-              <CardDescription>
-                {filteredAndSortedOrders.length} de {orders.length} pedidos
-              </CardDescription>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Relatório Detalhado
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Configurar Colunas
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle>Lista de Pedidos</CardTitle>
+                <CardDescription>
+                  {filteredAndSortedOrders.length} de {orders.length} pedidos
+                </CardDescription>
+              </div>
 
-          <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Relatório Detalhado
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Configurar Colunas
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="all" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
@@ -525,20 +525,19 @@ export function Orders() {
                 Problemas ({orders.filter((o: any) => ['CANCELLED', 'FAILED'].includes(o.status)).length})
               </TabsTrigger>
             </TabsList>
-          </Tabs>
-        </CardHeader>
-        
-        <CardContent>
-          <TabsContent value={selectedTab}>
-            {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
+          </CardHeader>
+
+          <CardContent>
+            <TabsContent value={selectedTab}>
+              {isLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[100px]">
@@ -671,8 +670,9 @@ export function Orders() {
                 )}
               </div>
             )}
-          </TabsContent>
-        </CardContent>
+            </TabsContent>
+          </CardContent>
+        </Tabs>
       </Card>
 
       {/* Create Order Dialog */}
