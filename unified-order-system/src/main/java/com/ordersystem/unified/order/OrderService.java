@@ -26,7 +26,7 @@ public class OrderService {
 
     public OrderResponse createOrder(CreateOrderRequest request) {
         String orderId = "ORDER-" + System.currentTimeMillis();
-        
+
         // Convert OrderItemRequest to OrderItemResponse
         List<OrderItemResponse> itemResponses = new ArrayList<>();
         if (request.getItems() != null) {
@@ -40,7 +40,7 @@ public class OrderService {
                 itemResponses.add(itemResponse);
             }
         }
-        
+
         OrderResponse response = new OrderResponse();
         response.setOrderId(orderId);
         response.setCustomerId(request.getCustomerId());
@@ -116,7 +116,7 @@ public class OrderService {
         if (request.getItems() == null || request.getItems().isEmpty()) {
             return BigDecimal.ZERO;
         }
-        
+
         return request.getItems().stream()
                 .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
