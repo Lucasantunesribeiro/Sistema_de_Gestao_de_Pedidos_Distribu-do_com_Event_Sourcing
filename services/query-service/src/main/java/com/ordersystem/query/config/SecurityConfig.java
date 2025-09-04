@@ -25,17 +25,18 @@ public class SecurityConfig {
             
             // CSRF protection (disabled for API)
             .csrf(csrf -> csrf.disable())
-            
+            // disable basic auth to prevent browser login prompt
+            .httpBasic(http -> http.disable())
+
             // Session management
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            
+
             // Authorization rules
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/api/orders/health", "/actuator/**").permitAll()
-                .requestMatchers("/api/orders/**").permitAll() // For now, allow all API access
-                .anyRequest().authenticated()
+                .requestMatchers("/api/**", "/actuator/**").permitAll()
+                .anyRequest().permitAll()
             )
-            
+
             // Security headers
             .headers(headers -> headers
                 .frameOptions(frameOptions -> frameOptions.deny())

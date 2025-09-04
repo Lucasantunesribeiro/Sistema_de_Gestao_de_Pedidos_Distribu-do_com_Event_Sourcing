@@ -26,6 +26,7 @@ public class OrderItemRequest {
     private Integer quantity;
 
     @JsonProperty("unitPrice")
+    @com.fasterxml.jackson.annotation.JsonAlias("price")
     @NotNull(message = "Unit price cannot be null")
     @Positive(message = "Unit price must be positive")
     private BigDecimal unitPrice;

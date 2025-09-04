@@ -20,6 +20,7 @@ public class SecurityConfig {
         // Production-ready configuration with initial permitAll() approach
         http
                 .csrf(csrf -> csrf.disable())
+                .httpBasic(http -> http.disable())
                 .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()

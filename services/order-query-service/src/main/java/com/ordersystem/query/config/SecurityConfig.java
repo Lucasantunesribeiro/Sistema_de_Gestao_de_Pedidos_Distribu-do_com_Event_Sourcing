@@ -20,6 +20,7 @@ public class SecurityConfig {
         // H2-compatible configuration with explicit AntPathRequestMatcher
         http
                 .csrf(csrf -> csrf.disable())
+                .httpBasic(http -> http.disable())
                 .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(new AntPathRequestMatcher("/h2-console/**")).permitAll()

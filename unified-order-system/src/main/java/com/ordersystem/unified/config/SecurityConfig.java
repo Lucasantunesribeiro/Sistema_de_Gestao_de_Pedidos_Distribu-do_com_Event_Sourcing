@@ -2,7 +2,6 @@ package com.ordersystem.unified.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -20,12 +19,19 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            // disable HTTP basic to avoid browser login prompts
+            .httpBasic(http -> http.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/assets/**", "/actuator/**", "/api-docs/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/api/**").authenticated()
+                .requestMatchers(
+                    "/",
+                    "/assets/**",
+                    "/actuator/**",
+                    "/api-docs/**",
+                    "/swagger-ui.html",
+                    "/api/**"
+                ).permitAll()
                 .anyRequest().permitAll()
-            )
-            .httpBasic(Customizer.withDefaults());
+            );
         return http.build();
     }
 }
