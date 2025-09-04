@@ -23,7 +23,7 @@ public class SimpleSecurityConfig {
                 .requestMatchers("/api/payments/**").permitAll()
                 .anyRequest().permitAll()
             );
-            
+
         return http.build();
     }
 }
