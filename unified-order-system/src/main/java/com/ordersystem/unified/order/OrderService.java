@@ -94,10 +94,12 @@ public class OrderService {
     public Map<String, Object> getOrderStatistics() {
         Map<String, Object> statistics = new HashMap<>();
         long pending = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.PENDING).count();
-        long completed = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.CONFIRMED).count();
+        long completed = orders.values().stream()
+                .filter(o -> o.getStatus() == OrderStatus.CONFIRMED || o.getStatus() == OrderStatus.COMPLETED)
+                .count();
         long cancelled = orders.values().stream().filter(o -> o.getStatus() == OrderStatus.CANCELLED).count();
         BigDecimal revenue = orders.values().stream()
-                .filter(o -> o.getStatus() == OrderStatus.CONFIRMED)
+                .filter(o -> o.getStatus() == OrderStatus.CONFIRMED || o.getStatus() == OrderStatus.COMPLETED)
                 .map(OrderResponse::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
