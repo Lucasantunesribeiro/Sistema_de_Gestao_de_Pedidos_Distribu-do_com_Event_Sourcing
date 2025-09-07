@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
+import com.ordersystem.unified.order.dto.UpdateStatusRequest;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
 import com.ordersystem.unified.shared.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
@@ -156,5 +157,45 @@ class OrderControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$[0].status").value("CONFIRMED"));
+    }
+
+    @Test
+    void shouldUpdateStatusSuccessfully() throws Exception {
+        UpdateStatusRequest req = new UpdateStatusRequest();
+        req.setStatus(OrderStatus.CANCELLED);
+        orderResponse.setStatus(OrderStatus.CANCELLED);
+        when(orderService.updateStatus(eq("order-123"), eq(OrderStatus.CANCELLED))).thenReturn(orderResponse);
+
+        mockMvc.perform(put("/api/orders/order-123/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenUpdatingStatusOfNonExistentOrder() throws Exception {
+        UpdateStatusRequest req = new UpdateStatusRequest();
+        req.setStatus(OrderStatus.CANCELLED);
+        when(orderService.updateStatus(eq("missing"), eq(OrderStatus.CANCELLED)))
+                .thenThrow(new OrderNotFoundException("missing"));
+
+        mockMvc.perform(put("/api/orders/missing/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnUnprocessableForInvalidStatusTransition() throws Exception {
+        UpdateStatusRequest req = new UpdateStatusRequest();
+        req.setStatus(OrderStatus.COMPLETED);
+        when(orderService.updateStatus(eq("order-123"), eq(OrderStatus.COMPLETED)))
+                .thenThrow(new IllegalStateException("Invalid status transition"));
+
+        mockMvc.perform(put("/api/orders/order-123/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isUnprocessableEntity());
     }
 }

@@ -1,5 +1,6 @@
 package com.ordersystem.unified.config;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -21,6 +23,32 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleOrderNotFound(OrderNotFoundException ex,
+                                                                  HttpServletRequest request) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.NOT_FOUND.value());
+        body.put("error", "Not Found");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getRequestURI());
+        logger.warn("Order not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex,
+                                                                  HttpServletRequest request) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.UNPROCESSABLE_ENTITY.value());
+        body.put("error", "Unprocessable Entity");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getRequestURI());
+        logger.warn("Invalid state: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

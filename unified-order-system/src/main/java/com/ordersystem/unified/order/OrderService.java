@@ -4,6 +4,7 @@ import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
 import com.ordersystem.unified.order.dto.OrderItemResponse;
 import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -125,6 +126,27 @@ public class OrderService {
         statistics.put("totalRevenue", revenue);
         statistics.put("timestamp", System.currentTimeMillis());
         return statistics;
+    }
+
+    public OrderResponse updateStatus(String orderId, OrderStatus newStatus) {
+        OrderResponse order = orders.get(orderId);
+        if (order == null) {
+            throw new OrderNotFoundException(orderId);
+        }
+        OrderStatus current = order.getStatus();
+        if (!isValidTransition(current, newStatus)) {
+            throw new IllegalStateException(
+                    String.format("Invalid status transition: %s -> %s", current, newStatus));
+        }
+        order.setStatus(newStatus);
+        order.setUpdatedAt(LocalDateTime.now());
+        return order;
+    }
+
+    private boolean isValidTransition(OrderStatus current, OrderStatus target) {
+        if (current == target) return true;
+        if (current.isTerminal()) return false;
+        return true;
     }
 
     private BigDecimal calculateTotal(CreateOrderRequest request) {

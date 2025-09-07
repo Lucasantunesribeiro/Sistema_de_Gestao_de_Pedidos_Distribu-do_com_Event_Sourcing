@@ -2,7 +2,10 @@ package com.ordersystem.unified.order;
 
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
+import com.ordersystem.unified.order.dto.UpdateStatusRequest;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +25,8 @@ public class OrderController {
 
     @Autowired
     private OrderService orderService;
+
+    private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -94,5 +99,13 @@ public class OrderController {
     public ResponseEntity<Map<String, Object>> getOrderStatistics() {
         Map<String, Object> statistics = orderService.getOrderStatistics();
         return ResponseEntity.ok(statistics);
+    }
+
+    @PutMapping("/{id}/status")
+    public ResponseEntity<OrderResponse> updateStatus(@PathVariable String id,
+                                                      @RequestBody UpdateStatusRequest body) {
+        logger.info("Updating order status: id={}, status={}", id, body.getStatus());
+        OrderResponse response = orderService.updateStatus(id, body.getStatus());
+        return ResponseEntity.ok(response);
     }
 }
