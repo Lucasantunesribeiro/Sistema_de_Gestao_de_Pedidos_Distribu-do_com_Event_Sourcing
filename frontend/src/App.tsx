@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { ThemeProvider } from '@/lib/theme'
-import { Toaster } from '@/components/ui/toaster'
-import { Layout } from '@/components/layout/layout'
+import { ThemeProvider } from '@/components/theme-provider'
+import { ToastProvider } from '@/components/toast-provider'
+import { AppShell } from '@/components/app-shell'
 import { Dashboard } from '@/pages/dashboard'
 import { Orders } from '@/pages/orders'
 import { Payments } from '@/pages/payments'
@@ -24,11 +24,11 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="orderflow-ui-theme">
+      <ThemeProvider attribute="class" defaultTheme="system" storageKey="orderflow-ui-theme">
         <Router>
           <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 font-inter antialiased">
             <Routes>
-              <Route path="/" element={<Layout />}>
+              <Route path="/" element={<AppShell />}>
                 <Route index element={<Dashboard />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="payments" element={<Payments />} />
@@ -38,7 +38,7 @@ function App() {
                 <Route path="settings" element={<div className="p-6">Configurações em desenvolvimento...</div>} />
               </Route>
             </Routes>
-            <Toaster />
+            <ToastProvider />
           </div>
         </Router>
         <ReactQueryDevtools initialIsOpen={false} />
