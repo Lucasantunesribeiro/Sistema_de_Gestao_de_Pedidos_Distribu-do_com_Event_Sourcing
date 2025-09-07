@@ -132,3 +132,33 @@ curl -X PATCH http://localhost:8081/api/orders/ID/status \
   -H 'Content-Type: application/json' \
   -d '{"status":"PAID"}'
 ```
+
+## API Endpoints
+
+Todas as rotas REST são expostas com o prefixo `/api`:
+
+| Método | Caminho | Descrição |
+|-------|--------|-----------|
+| `GET` | `/api/orders` | Lista pedidos |
+| `POST` | `/api/orders` | Cria pedido |
+| `PUT` | `/api/orders/{id}/status` | Atualiza status |
+
+## Health check
+
+O estado da aplicação pode ser verificado em:
+
+```bash
+curl -i http://localhost:8080/actuator/health
+```
+
+## Smoke tests
+
+Execute uma verificação rápida com:
+
+```bash
+scripts/smoke.sh
+```
+
+## Deploy no Render
+
+O Render define a porta através da variável `PORT`. O container já usa `java -Dserver.port=$PORT -Dserver.address=0.0.0.0` e expõe o Actuator em `/actuator/health`.

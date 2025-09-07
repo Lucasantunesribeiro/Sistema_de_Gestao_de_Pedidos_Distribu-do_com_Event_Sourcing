@@ -118,7 +118,6 @@ test-*.sh
 setup-*.sh
 quick-*.sh
 monitor-*.sh
-scripts/
 
 # Frontend build artifacts
 frontend/dist/
