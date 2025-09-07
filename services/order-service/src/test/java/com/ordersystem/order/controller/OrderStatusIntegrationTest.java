@@ -11,8 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.ActiveProfiles;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -36,6 +36,18 @@ class OrderStatusIntegrationTest {
         order = orderRepository.save(order);
 
         mockMvc.perform(put("/api/orders/" + order.getId() + "/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"PAID\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.newStatus").value("PAID"));
+    }
+
+    @Test
+    void patchStatusReturns200() throws Exception {
+        Order order = new Order("customer-1", 100.0);
+        order = orderRepository.save(order);
+
+        mockMvc.perform(patch("/api/orders/" + order.getId() + "/status")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"PAID\"}"))
                 .andExpect(status().isOk())

@@ -29,7 +29,7 @@ Sistema de gestão de pedidos com arquitetura de microsserviços, Event Sourcing
 | `POST` | `/api/orders` | Criar pedido |
 | `GET` | `/api/orders` | Listar pedidos |
 | `GET` | `/api/orders/{id}` | Obter pedido por ID |
-| `PUT` | `/api/orders/{id}/status` | Atualizar status do pedido |
+| `PUT`/`PATCH` | `/api/orders/{id}/status` | Atualizar status do pedido |
 | `GET` | `/api/orders/customer/{customerId}` | Pedidos de um cliente |
 | `GET` | `/api/orders/{id}/events` | Eventos de um pedido (Event Sourcing) |
 | `GET` | `/api/orders/{id}/rebuild` | Reconstruir pedido a partir dos eventos |
@@ -113,7 +113,7 @@ mvn -pl services/order-service test
 | Erro de build Maven | verifique dependências e versão do JDK |
 | Frontend não inicia | execute `npm install` e cheque `.env` |
 | Container não sobe | `docker-compose logs` para detalhes |
-| 404 em `PUT /api/orders/{id}/status` | verifique se o `orderId` existe e se o serviço Order Service está acessível |
+| 404 em `PUT`/`PATCH` `/api/orders/{id}/status` | use o `orderId` retornado na criação do pedido e verifique se o Order Service está acessível |
 
 ## Exemplos de uso (curl)
 
@@ -123,8 +123,12 @@ curl -X POST http://localhost:8081/api/orders \
   -H 'Content-Type: application/json' \
   -d '{"customerId":"C1","totalAmount":100}'
 
-# atualizar status
+# atualizar status (PUT ou PATCH)
 curl -X PUT http://localhost:8081/api/orders/ID/status \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"PAID"}'
+
+curl -X PATCH http://localhost:8081/api/orders/ID/status \
   -H 'Content-Type: application/json' \
   -d '{"status":"PAID"}'
 ```
