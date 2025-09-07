@@ -15,14 +15,15 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ordersystem.order.model.Order;
 import com.ordersystem.order.model.OrderEvent;
 import com.ordersystem.order.service.OrderService;
+import com.ordersystem.order.exception.OrderNotFoundException;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -198,7 +199,7 @@ public class OrderController {
         }
     }
 
-    @PutMapping("/{id}/status")
+    @RequestMapping(path = "/{id}/status", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ResponseEntity<Map<String, Object>> updateOrderStatus(
             @PathVariable String id,
             @RequestBody Map<String, String> statusRequest) {
@@ -233,6 +234,15 @@ public class OrderController {
                     "correlationId", correlationId);
 
             return ResponseEntity.ok(response);
+        } catch (OrderNotFoundException e) {
+            logger.warn("⚠️ Order not found for status update: orderId={}, correlationId={}", id, correlationId);
+
+            Map<String, Object> response = Map.of(
+                    "success", false,
+                    "message", e.getMessage(),
+                    "orderId", id,
+                    "correlationId", correlationId);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
 
         } catch (RuntimeException e) {
             logger.error(
