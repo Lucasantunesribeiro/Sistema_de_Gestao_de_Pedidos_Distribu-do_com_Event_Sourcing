@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ToastProvider } from '@/components/toast-provider'
-import { Layout } from '@/components/layout/layout'
+import { AppShell } from '@/components/app-shell'
 import { Dashboard } from '@/pages/dashboard'
 import { Orders } from '@/pages/orders'
 import { Payments } from '@/pages/payments'
@@ -28,7 +28,7 @@ function App() {
         <Router>
           <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 font-inter antialiased">
             <Routes>
-              <Route path="/" element={<Layout />}>
+              <Route path="/" element={<AppShell />}>
                 <Route index element={<Dashboard />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="payments" element={<Payments />} />

@@ -19,6 +19,19 @@ export { Label } from './label'
 
 export { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
 
+export {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from './tooltip'
+
+export { Sheet, SheetTrigger, SheetContent, SheetClose } from './sheet'
+
+export { ScrollArea, ScrollBar } from './scroll-area'
+
+export { Skeleton } from './skeleton'
+
 export { 
   Table, 
   TableHeader, 
