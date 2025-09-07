@@ -6,6 +6,7 @@ PORT=${PORT:-8080}
 
 # Start backend on fixed port 8080
 java -Dserver.port=8080 -Dserver.address=0.0.0.0 ${JAVA_OPTS:-} -jar /app/app.jar &
+BACK_PID=$!
 
 # Wait for backend to be healthy (up to 60s)
 ATTEMPTS=30
