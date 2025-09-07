@@ -204,4 +204,25 @@ class OrderServiceTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).getStatus()).isEqualTo(OrderStatus.CONFIRMED);
     }
+
+    @Test
+    void shouldUpdateStatusSuccessfully() {
+        OrderResponse order = orderService.createBasicOrder("cust", 10.0);
+        OrderResponse updated = orderService.updateStatus(order.getOrderId(), OrderStatus.CANCELLED);
+        assertThat(updated.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void shouldThrowNotFoundWhenUpdatingMissingOrder() {
+        assertThatThrownBy(() -> orderService.updateStatus("missing", OrderStatus.CANCELLED))
+                .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    void shouldRejectInvalidStatusTransition() {
+        OrderResponse order = orderService.createBasicOrder("cust", 10.0);
+        orderService.updateStatus(order.getOrderId(), OrderStatus.CANCELLED);
+        assertThatThrownBy(() -> orderService.updateStatus(order.getOrderId(), OrderStatus.PENDING))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }
