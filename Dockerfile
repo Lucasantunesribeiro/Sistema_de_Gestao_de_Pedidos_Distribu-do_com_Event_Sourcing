@@ -2,7 +2,9 @@
 FROM node:20-alpine AS frontend
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm ci
+# `npm ci` fails when package-lock.json is out of sync; use `npm install`
+# to regenerate dependencies during the image build.
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
