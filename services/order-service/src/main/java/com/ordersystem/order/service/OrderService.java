@@ -20,6 +20,7 @@ import com.ordersystem.order.model.OrderEvent;
 import com.ordersystem.order.model.OrderStatus;
 import com.ordersystem.order.repository.OrderEventRepository;
 import com.ordersystem.order.repository.OrderRepository;
+import com.ordersystem.order.exception.OrderNotFoundException;
 import com.ordersystem.shared.events.OrderCreatedEvent;
 import com.ordersystem.shared.events.OrderStatusUpdatedEvent;
 
@@ -146,7 +147,7 @@ public class OrderService {
 
                         logger.error("❌ Order not found for status update: orderId={}, correlationId={}",
                                         orderId, correlationId);
-                        throw new RuntimeException("Order not found: " + orderId);
+                        throw new OrderNotFoundException(orderId);
 
                 } catch (Exception e) {
                         logger.error("❌ Order status update failed: orderId={}, status={}, error={}, correlationId={}",

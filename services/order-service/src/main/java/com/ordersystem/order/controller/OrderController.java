@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ordersystem.order.model.Order;
 import com.ordersystem.order.model.OrderEvent;
 import com.ordersystem.order.service.OrderService;
+import com.ordersystem.order.exception.OrderNotFoundException;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -233,6 +234,15 @@ public class OrderController {
                     "correlationId", correlationId);
 
             return ResponseEntity.ok(response);
+        } catch (OrderNotFoundException e) {
+            logger.warn("⚠️ Order not found for status update: orderId={}, correlationId={}", id, correlationId);
+
+            Map<String, Object> response = Map.of(
+                    "success", false,
+                    "message", e.getMessage(),
+                    "orderId", id,
+                    "correlationId", correlationId);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
 
         } catch (RuntimeException e) {
             logger.error(
