@@ -1,8 +1,11 @@
 package com.ordersystem.unified.inventory.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * Result of individual item reservation
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ItemReservationResult {
     
     private String productId;

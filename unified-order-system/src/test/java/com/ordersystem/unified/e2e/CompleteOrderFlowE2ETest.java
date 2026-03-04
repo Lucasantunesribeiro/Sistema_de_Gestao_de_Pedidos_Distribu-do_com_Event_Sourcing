@@ -246,8 +246,8 @@ public class CompleteOrderFlowE2ETest {
 
         for (PaymentMethod method : methods) {
             CreateOrderRequest request = createOrderRequest(
-                "E2E-PAYMENT-" + method,
-                "E2E-PAYMENT-PRODUCT-" + method,
+                "E2E-PAYMENT-" + method.name(),
+                "E2E-PAYMENT-PRODUCT-" + method.name(),
                 1
             );
             request.setPaymentMethod(method);

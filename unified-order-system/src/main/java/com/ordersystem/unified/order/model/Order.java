@@ -29,6 +29,10 @@ public class Order {
     @Column(name = "id", length = 255)
     private String id;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @NotBlank(message = "Customer ID cannot be blank")
     @Column(name = "customer_id", nullable = false)
     private String customerId;

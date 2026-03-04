@@ -1,5 +1,6 @@
 package com.ordersystem.unified.payment.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
@@ -8,6 +9,7 @@ import java.time.LocalDateTime;
 /**
  * Response DTO for payment processing results
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class PaymentResponse {
 
     @JsonProperty("paymentId")
@@ -33,6 +35,12 @@ public class PaymentResponse {
 
     @JsonProperty("errorMessage")
     private String errorMessage;
+
+    @JsonProperty("message")
+    private String message;
+
+    @JsonProperty("currency")
+    private String currency;
 
     // Default constructor
     public PaymentResponse() {}
@@ -128,6 +136,22 @@ public class PaymentResponse {
 
     public boolean isSuccess() {
         return status == PaymentStatus.COMPLETED;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     @Override
