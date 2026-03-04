@@ -1,132 +1,32 @@
-name: 🚀 Deploy to Render
+name: Build & Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
-
-env:
-  RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-  SERVICE_ID: srv-d2kbhnruibrs73emmc8g
+    branches: [main]
 
 jobs:
   test:
-    name: 🧪 Build & Test
+    name: Build & Test
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: ☕ Set up JDK 21
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
 
-    - name: 📦 Cache Maven dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
 
-    - name: 🔨 Run Tests (Backend)
-      run: mvn clean test -B
+      - name: Install shared libraries
+        run: mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability,shared-events -am -DskipTests install -q
 
-    - name: 🔧 Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-        cache: 'npm'
-        cache-dependency-path: 'frontend/package-lock.json'
-
-    - name: 📦 Install Frontend Dependencies
-      run: |
-        cd frontend
-        npm ci
-
-    - name: 🧪 Run Tests (Frontend) 
-      run: |
-        cd frontend
-        npm run test --passWithNoTests || echo "⚠️ Frontend tests skipped"
-
-    - name: 🏗️ Build Frontend
-      run: |
-        cd frontend
-        npm run build
-
-  deploy:
-    name: 🚀 Deploy to Render
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
-    steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-
-    - name: 🚀 Deploy to Render
-      run: |
-        curl -X POST "https://api.render.com/v1/services/$SERVICE_ID/deploys" \
-          -H "Authorization: Bearer $RENDER_API_KEY" \
-          -H "Content-Type: application/json" \
-          -d '{}'
-
-    - name: ⏳ Wait for deployment
-      run: |
-        echo "Deploy iniciado! Monitorando status..."
-        for i in {1..30}; do
-          STATUS=$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
-            "https://api.render.com/v1/services/$SERVICE_ID" | \
-            jq -r '.service.serviceDetails.status // "unknown"')
-          
-          echo "Status: $STATUS (tentativa $i/30)"
-          
-          if [ "$STATUS" = "available" ]; then
-            echo "✅ Deploy concluído com sucesso!"
-            exit 0
-          elif [ "$STATUS" = "deploy_failed" ]; then
-            echo "❌ Deploy falhou!"
-            exit 1
-          fi
-          
-          sleep 10
-        done
-        
-        echo "⏰ Timeout aguardando deploy"
-        exit 1
-
-    - name: 🏥 Health Check
-      run: |
-        echo "Verificando saúde do serviço..."
-        for i in {1..10}; do
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://gestao-de-pedidos.onrender.com/health || echo "000")
-          echo "Health check: HTTP $HTTP_STATUS (tentativa $i/10)"
-          
-          if [ "$HTTP_STATUS" = "200" ]; then
-            echo "✅ Serviço funcionando corretamente!"
-            exit 0
-          fi
-          
-          sleep 15
-        done
-        
-        echo "❌ Health check falhou"
-        exit 1
-
-  notify:
-    name: 📢 Notification
-    needs: [test, deploy]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-    - name: 📢 Deploy Success
-      if: needs.deploy.result == 'success'
-      run: echo "🎉 Deploy realizado com sucesso! https://gestao-de-pedidos.onrender.com"
-
-    - name: 📢 Deploy Failure
-      if: needs.deploy.result == 'failure'
-      run: echo "❌ Falha no deploy. Verifique os logs."
+      - name: Run tests
+        run: mvn -f unified-order-system/pom.xml clean test -B

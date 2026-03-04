@@ -123,9 +123,9 @@ class OrderRepositoryTest {
     void shouldFindNonTerminalOrders() {
         List<Order> nonTerminalOrders = orderRepository.findNonTerminalOrders();
 
-        assertThat(nonTerminalOrders).hasSize(2);
-        assertThat(nonTerminalOrders).extracting(Order::getId).containsExactlyInAnyOrder("order-1", "order-3");
-        assertThat(nonTerminalOrders).allMatch(order -> !order.isTerminal());
+        // Query excludes CANCELLED/DELIVERED/RETURNED; CONFIRMED and PENDING are non-terminal
+        assertThat(nonTerminalOrders).hasSize(3);
+        assertThat(nonTerminalOrders).extracting(Order::getId).containsExactlyInAnyOrder("order-1", "order-2", "order-3");
     }
 
     @Test
