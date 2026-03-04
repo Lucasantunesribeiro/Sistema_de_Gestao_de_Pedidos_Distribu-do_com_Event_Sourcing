@@ -1,7 +1,6 @@
 package com.ordersystem.unified.order.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -19,7 +18,6 @@ public class OrderItemEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Product ID cannot be blank")
     @Column(name = "product_id", nullable = false)
     private String productId;
 
