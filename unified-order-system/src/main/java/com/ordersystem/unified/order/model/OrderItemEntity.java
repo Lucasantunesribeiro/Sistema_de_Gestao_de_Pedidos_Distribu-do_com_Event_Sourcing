@@ -3,6 +3,7 @@ package com.ordersystem.unified.order.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
@@ -49,7 +50,7 @@ public class OrderItemEntity {
     protected OrderItemEntity() {}
 
     public OrderItemEntity(String productId, String productName, Integer quantity, BigDecimal unitPrice) {
-        this.productId = productId;
+        this.productId = (productId != null && !productId.isBlank()) ? productId : UUID.randomUUID().toString();
         this.productName = productName;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
