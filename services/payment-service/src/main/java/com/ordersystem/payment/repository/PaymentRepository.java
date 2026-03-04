@@ -4,9 +4,9 @@ import com.ordersystem.payment.model.Payment;
 import com.ordersystem.shared.events.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -63,12 +63,21 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
     /**
      * Encontra pagamentos pendentes mais antigos que X minutos
      */
-    @Query("SELECT p FROM Payment p WHERE p.status = 'PENDING' AND p.createdAt < CURRENT_TIMESTAMP - INTERVAL :minutes MINUTE")
-    List<Payment> findPendingPaymentsOlderThan(@Param("minutes") int minutes);
+    default List<Payment> findPendingPaymentsOlderThan(int minutes) {
+        return findByStatusAndCreatedAtBefore(PaymentStatus.PENDING, LocalDateTime.now().minusMinutes(minutes));
+    }
 
     /**
-     * Encontra pagamentos em processamento há mais de X minutos
+     * Encontra pagamentos em processamento ha mais de X minutos
      */
-    @Query("SELECT p FROM Payment p WHERE p.status = 'PROCESSING' AND p.updatedAt < CURRENT_TIMESTAMP - INTERVAL :minutes MINUTE")
-    List<Payment> findStuckProcessingPayments(@Param("minutes") int minutes);
+    default List<Payment> findStuckProcessingPayments(int minutes) {
+        return findByStatusAndUpdatedAtBefore(PaymentStatus.PROCESSING, LocalDateTime.now().minusMinutes(minutes));
+    }
+
+    /**
+     * Derived queries used by the default methods above
+     */
+    List<Payment> findByStatusAndCreatedAtBefore(PaymentStatus status, LocalDateTime createdAt);
+
+    List<Payment> findByStatusAndUpdatedAtBefore(PaymentStatus status, LocalDateTime updatedAt);
 }

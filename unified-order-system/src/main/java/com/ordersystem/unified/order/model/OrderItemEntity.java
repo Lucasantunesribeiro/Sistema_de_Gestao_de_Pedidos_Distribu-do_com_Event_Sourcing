@@ -34,8 +34,13 @@ public class OrderItemEntity {
 
     @NotNull(message = "Unit price cannot be null")
     @Positive(message = "Unit price must be positive")
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
+    @Column(name = "unit_price", nullable = false, precision = 19, scale = 2)
+    private BigDecimal unitPrice;
+
+    @NotNull(message = "Total price cannot be null")
+    @Positive(message = "Total price must be positive")
+    @Column(name = "total_price", nullable = false, precision = 19, scale = 2)
+    private BigDecimal totalPrice;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
@@ -44,17 +49,18 @@ public class OrderItemEntity {
     // Default constructor for JPA
     protected OrderItemEntity() {}
 
-    public OrderItemEntity(String productId, String productName, Integer quantity, BigDecimal price) {
+    public OrderItemEntity(String productId, String productName, Integer quantity, BigDecimal unitPrice) {
         this.productId = productId;
         this.productName = productName;
         this.quantity = quantity;
-        this.price = price;
+        this.unitPrice = unitPrice;
+        this.totalPrice = unitPrice.multiply(BigDecimal.valueOf(quantity));
     }
 
     // Business methods
-    public BigDecimal getTotalPrice() {
-        if (quantity != null && price != null) {
-            return price.multiply(BigDecimal.valueOf(quantity));
+    public BigDecimal getCalculatedTotalPrice() {
+        if (quantity != null && unitPrice != null) {
+            return unitPrice.multiply(BigDecimal.valueOf(quantity));
         }
         return BigDecimal.ZERO;
     }
@@ -72,8 +78,11 @@ public class OrderItemEntity {
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
 
-    public BigDecimal getPrice() { return price; }
-    public void setPrice(BigDecimal price) { this.price = price; }
+    public BigDecimal getUnitPrice() { return unitPrice; }
+    public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+
+    public BigDecimal getTotalPrice() { return totalPrice; }
+    public void setTotalPrice(BigDecimal totalPrice) { this.totalPrice = totalPrice; }
 
     public Order getOrder() { return order; }
     public void setOrder(Order order) { this.order = order; }
@@ -93,7 +102,7 @@ public class OrderItemEntity {
 
     @Override
     public String toString() {
-        return String.format("OrderItemEntity{id=%d, productId='%s', productName='%s', quantity=%d, price=%s}",
-                id, productId, productName, quantity, price);
+        return String.format("OrderItemEntity{id=%d, productId='%s', productName='%s', quantity=%d, unitPrice=%s, totalPrice=%s}",
+                id, productId, productName, quantity, unitPrice, totalPrice);
     }
 }

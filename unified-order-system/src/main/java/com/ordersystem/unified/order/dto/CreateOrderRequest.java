@@ -1,34 +1,45 @@
 package com.ordersystem.unified.order.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.ordersystem.unified.shared.validation.ValidationConstants;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
  * Request DTO for creating a new order
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CreateOrderRequest {
 
+    @Size(max = ValidationConstants.MAX_ID_LENGTH, message = ValidationConstants.MSG_ID_TOO_LONG)
     private String customerId;
 
     @NotBlank(message = "Customer name is required")
+    @Size(min = 1, max = ValidationConstants.MAX_NAME_LENGTH, message = "Customer name must be between 1 and " + ValidationConstants.MAX_NAME_LENGTH + " characters")
     private String customerName;
 
     @NotBlank(message = "Customer email is required")
     @Email(message = "Customer email must be valid")
+    @Size(max = ValidationConstants.MAX_EMAIL_LENGTH, message = ValidationConstants.MSG_EMAIL_TOO_LONG)
     private String customerEmail;
 
-    @NotNull(message = "Payment method is required")
     private PaymentMethod paymentMethod;
 
-    @NotEmpty(message = "Order must contain at least one item")
+    @NotNull(message = "Order items are required")
+    @Size(min = 1, max = ValidationConstants.MAX_ORDER_ITEMS, message = ValidationConstants.MSG_TOO_MANY_ITEMS)
     @Valid
     private List<OrderItemRequest> items;
+
+    private BigDecimal totalAmount;
+
+    private List<String> productIds;
 
     private String correlationId;
 
@@ -99,6 +110,22 @@ public class CreateOrderRequest {
 
     public void setItems(List<OrderItemRequest> items) {
         this.items = items;
+    }
+
+    public BigDecimal getTotalAmount() {
+        return totalAmount;
+    }
+
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
+    }
+
+    public List<String> getProductIds() {
+        return productIds;
+    }
+
+    public void setProductIds(List<String> productIds) {
+        this.productIds = productIds;
     }
 
     public String getCorrelationId() {

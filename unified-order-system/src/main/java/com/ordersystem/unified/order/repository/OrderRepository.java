@@ -2,94 +2,42 @@ package com.ordersystem.unified.order.repository;
 
 import com.ordersystem.unified.order.model.Order;
 import com.ordersystem.unified.shared.events.OrderStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Repository interface for Order entity operations.
- */
 @Repository
 public interface OrderRepository extends JpaRepository<Order, String> {
-
-    /**
-     * Find orders by customer ID.
-     */
+    
     List<Order> findByCustomerId(String customerId);
-
-    /**
-     * Find orders by status.
-     */
+    
     List<Order> findByStatus(OrderStatus status);
-
-    /**
-     * Find orders by customer ID and status.
-     */
+    
+    Page<Order> findByCustomerIdAndStatus(String customerId, OrderStatus status, Pageable pageable);
+    
+    // List variants for tests/simpler use cases
     List<Order> findByCustomerIdAndStatus(String customerId, OrderStatus status);
+    
+    Page<Order> findByCustomerId(String customerId, Pageable pageable);
 
-    /**
-     * Find orders created within a date range.
-     */
-    @Query("SELECT o FROM Order o WHERE o.createdAt BETWEEN :startDate AND :endDate ORDER BY o.createdAt DESC")
-    List<Order> findOrdersCreatedBetween(@Param("startDate") LocalDateTime startDate, 
-                                       @Param("endDate") LocalDateTime endDate);
-
-    /**
-     * Find orders by correlation ID for tracing.
-     */
-    Optional<Order> findByCorrelationId(String correlationId);
-
-    /**
-     * Count orders by status.
-     */
+    
+    Page<Order> findByStatus(OrderStatus status, Pageable pageable);
+    
     long countByStatus(OrderStatus status);
 
-    /**
-     * Find recent orders (last N orders).
-     */
-    @Query("SELECT o FROM Order o ORDER BY o.createdAt DESC")
-    List<Order> findRecentOrders(org.springframework.data.domain.Pageable pageable);
+    Optional<Order> findByCorrelationId(String correlationId);
 
-    /**
-     * Find orders that are not in terminal status (for monitoring).
-     */
-    @Query("SELECT o FROM Order o WHERE o.status NOT IN ('CONFIRMED', 'CANCELLED', 'FAILED')")
+    @org.springframework.data.jpa.repository.Query("SELECT o FROM Order o WHERE o.status NOT IN ('CANCELLED', 'DELIVERED', 'RETURNED')")
     List<Order> findNonTerminalOrders();
 
-    /**
-     * Check if an order exists by ID.
-     */
-    boolean existsById(String id);
-
-    /**
-     * Get total revenue by status.
-     */
-    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status = :status")
-    java.math.BigDecimal getTotalRevenueByStatus(@Param("status") OrderStatus status);
-
-    /**
-     * Find orders by reservation ID.
-     */
-    Optional<Order> findByReservationId(String reservationId);
-
-    /**
-     * Find orders by payment ID.
-     */
-    Optional<Order> findByPaymentId(String paymentId);
-
-    /**
-     * Find orders by transaction ID.
-     */
-    Optional<Order> findByTransactionId(String transactionId);
-
-    /**
-     * Find orders that need cleanup (old pending orders).
-     */
-    @Query("SELECT o FROM Order o WHERE o.status = 'PENDING' AND o.createdAt < :cutoffTime")
-    List<Order> findOrdersNeedingCleanup(@Param("cutoffTime") LocalDateTime cutoffTime);
+    @org.springframework.data.jpa.repository.Query("SELECT o FROM Order o WHERE o.createdAt BETWEEN :start AND :end")
+    List<Order> findOrdersCreatedBetween(@org.springframework.data.repository.query.Param("start") java.time.LocalDateTime start, 
+                                         @org.springframework.data.repository.query.Param("end") java.time.LocalDateTime end);
+                                         
+    @org.springframework.data.jpa.repository.Query("SELECT o FROM Order o ORDER BY o.createdAt DESC")
+    List<Order> findRecentOrders(Pageable pageable);
 }

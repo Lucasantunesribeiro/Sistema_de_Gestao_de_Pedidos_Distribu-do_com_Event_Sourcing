@@ -1,22 +1,23 @@
-# Ignorar arquivos desnecessarios no build
 .git
+.github
 .gitignore
-README.md
-*.md
-.env*
-node_modules
+.claude
+.kiro
 .idea
 .vscode
+
+*.md
 *.log
-.DS_Store
-Thumbs.db
+*.txt
+.env*
+!.env.example
 
-# Manter apenas o essencial para build
-!shared-events/
-!services/
-!pom.xml
-!start-all-services.sh
-!supervisord.conf
-
-# Ignorar target apenas durante build, mas permitir copia no estágio final
 target
+**/target
+
+node_modules
+frontend
+services
+scripts
+observability
+docker-compose*.yml

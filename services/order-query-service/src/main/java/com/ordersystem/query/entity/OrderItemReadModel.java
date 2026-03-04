@@ -1,5 +1,6 @@
 package com.ordersystem.query.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
@@ -21,6 +22,7 @@ public class OrderItemReadModel {
     @Column(nullable = false)
     private double price;
     
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id")
     private OrderReadModel order;

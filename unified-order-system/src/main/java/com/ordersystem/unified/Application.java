@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  * into a single modular monolith for simplified deployment and operation.
  */
 @SpringBootApplication
+@org.springframework.context.annotation.ComponentScan("com.ordersystem")
 @EnableCaching
 @EnableAsync
 @EnableTransactionManagement

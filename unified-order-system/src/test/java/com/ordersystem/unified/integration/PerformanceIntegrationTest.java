@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @AutoConfigureWebMvc
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@org.springframework.context.annotation.Import(com.ordersystem.unified.config.TestConfig.class)
 @Transactional
 public class PerformanceIntegrationTest {
 

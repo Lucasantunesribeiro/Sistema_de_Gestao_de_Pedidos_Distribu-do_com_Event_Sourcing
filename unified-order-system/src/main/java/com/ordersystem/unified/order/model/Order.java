@@ -1,6 +1,8 @@
 package com.ordersystem.unified.order.model;
 
 import com.ordersystem.unified.shared.events.OrderStatus;
+import lombok.Builder;
+import lombok.AllArgsConstructor;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -17,8 +19,10 @@ import java.util.Objects;
 /**
  * Order entity representing a customer order in the system.
  */
-@Entity
-@Table(name = "orders")
+@Entity(name = "Order")
+@Table(name = "system_orders")
+@Builder
+@AllArgsConstructor
 public class Order {
 
     @Id
@@ -43,6 +47,7 @@ public class Order {
     private OrderStatus status;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @Builder.Default
     private List<OrderItemEntity> items = new ArrayList<>();
 
     @CreationTimestamp
@@ -69,7 +74,9 @@ public class Order {
     private String cancellationReason;
 
     // Default constructor for JPA
-    protected Order() {}
+    protected Order() {
+        this.items = new ArrayList<>();
+    }
 
     public Order(String id, String customerId, String customerName, BigDecimal totalAmount) {
         this.id = id;
@@ -77,6 +84,7 @@ public class Order {
         this.customerName = customerName;
         this.totalAmount = totalAmount;
         this.status = OrderStatus.PENDING;
+        this.items = new ArrayList<>();
     }
 
     // Business methods

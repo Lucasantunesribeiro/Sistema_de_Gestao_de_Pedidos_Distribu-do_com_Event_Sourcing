@@ -89,6 +89,14 @@ public class ReservationItem {
         }
         this.releasedQuantity += quantity;
     }
+
+    public String getProductId() {
+        return product != null ? product.getId() : null;
+    }
+
+    public Integer getQuantity() {
+        return reservedQuantity;
+    }
     
     // Getters and Setters
     public String getId() {

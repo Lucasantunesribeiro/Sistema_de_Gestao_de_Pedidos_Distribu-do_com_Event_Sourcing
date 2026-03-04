@@ -39,6 +39,19 @@ public class InventoryService {
     // New method signatures expected by tests
     public ReservationResponse reserveItems(List<OrderItem> items) {
         String reservationId = "RES-" + System.currentTimeMillis();
+
+        // Check available stock for each item
+        for (OrderItem item : items) {
+            int available = getAvailableQuantity(item.getProductId());
+            if (item.getQuantity() > available) {
+                ReservationResponse response = new ReservationResponse();
+                response.setReservationId(reservationId);
+                response.setStatus(ReservationStatus.INSUFFICIENT_STOCK);
+                response.setMessage("insufficient inventory for product: " + item.getProductId());
+                return response;
+            }
+        }
+
         ReservationResponse response = new ReservationResponse();
         response.setReservationId(reservationId);
         response.setStatus(ReservationStatus.RESERVED);

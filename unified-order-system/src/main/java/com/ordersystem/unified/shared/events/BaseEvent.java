@@ -28,6 +28,19 @@ public abstract class BaseEvent {
     @JsonProperty("version")
     private final int version;
 
+    protected BaseEvent() {
+        this.eventId = null;
+        this.timestamp = null;
+        this.correlationId = null;
+        this.causationId = null;
+        this.eventType = null;
+        this.version = 0;
+    }
+
+    protected BaseEvent(String correlationId) {
+        this(correlationId, null, null);
+    }
+
     protected BaseEvent(String correlationId, String causationId, String eventType) {
         this.eventId = UUID.randomUUID().toString();
         this.timestamp = LocalDateTime.now();

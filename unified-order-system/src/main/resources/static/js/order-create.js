@@ -271,7 +271,7 @@ class OrderCreator {
     }
 
     try {
-      const response = await fetch(`/api/products/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/inventory/products/search?q=${encodeURIComponent(query)}`);
       const products = await response.json();
       this.displayProductResults(products);
     } catch (error) {

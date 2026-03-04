@@ -1,7 +1,11 @@
 spring:
   application:
     name: unified-order-system
-  
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   
@@ -13,7 +17,7 @@ spring:
   
   jpa:
     hibernate:
-      ddl-auto: ${DDL_AUTO:update}
+      ddl-auto: ${DDL_AUTO:none}
     show-sql: ${SHOW_SQL:false}
     properties:
       hibernate:
@@ -36,7 +40,7 @@ spring:
     type: ${CACHE_TYPE:simple}
     redis:
       time-to-live: ${CACHE_TTL:3600000}
-
+  
 server:
   port: ${PORT:8080}
   servlet:
@@ -82,3 +86,49 @@ app:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:8080}
     allowed-methods: GET,POST,PUT,DELETE,OPTIONS
     allowed-headers: "*"
+
+security:
+  secret: ${SECURITY_SECRET:${JWT_SECRET_KEY:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}}
+  enforce-authentication: ${SECURITY_ENFORCE_AUTH:false}
+  content-security-policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self'"
+  public-paths:
+    - /
+    - /dashboard
+    - /dashboard/**
+    - /orders
+    - /orders/**
+    - /payments
+    - /payments/**
+    - /inventory
+    - /inventory/**
+    - /customers
+    - /customers/**
+    - /analytics
+    - /analytics/**
+    - /settings
+    - /settings/**
+    - /favicon.ico
+    - /error
+    - /health
+    - /health/**
+    - /actuator/health
+    - /api/auth/**
+    - /api/dashboard
+    - /api/dashboard/**
+    - /api/orders/**
+    - /api/payments/**
+    - /api/inventory/**
+    - /api/test/**
+    - /api/health/**
+    - /swagger-ui/**
+    - /swagger-ui.html
+    - /v3/api-docs/**
+    - /css/**
+    - /js/**
+    - /images/**
+  h2-console-enabled: ${SECURITY_H2_CONSOLE_ENABLED:false}
+  cors:
+    allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    allowed-methods: ${SECURITY_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+    allowed-headers: ${SECURITY_CORS_ALLOWED_HEADERS:*}
+    allow-credentials: ${SECURITY_CORS_ALLOW_CREDENTIALS:false}

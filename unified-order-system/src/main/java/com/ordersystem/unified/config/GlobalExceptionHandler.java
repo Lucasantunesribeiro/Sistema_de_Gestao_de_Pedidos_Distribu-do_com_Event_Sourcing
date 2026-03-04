@@ -57,6 +57,33 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
+    @ExceptionHandler(com.ordersystem.unified.shared.exceptions.OrderNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ResponseEntity<ErrorResponse> handleOrderNotFoundException(com.ordersystem.unified.shared.exceptions.OrderNotFoundException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                "ORDER_NOT_FOUND",
+                ex.getMessage(),
+                null,
+                LocalDateTime.now()
+        );
+
+        logger.warn("Order not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    @ExceptionHandler(com.ordersystem.unified.shared.exceptions.OrderSystemException.class)
+    public ResponseEntity<ErrorResponse> handleOrderSystemException(com.ordersystem.unified.shared.exceptions.OrderSystemException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                ex.getErrorCode(),
+                ex.getMessage(),
+                null,
+                LocalDateTime.now()
+        );
+
+        logger.warn("Business error [{}]: {}", ex.getErrorCode(), ex.getMessage());
+        return ResponseEntity.status(ex.getHttpStatus()).body(errorResponse);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
