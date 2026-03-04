@@ -32,25 +32,62 @@ public class PaymentService {
     @Autowired
     private PaymentRepository paymentRepository;
 
+    private static final BigDecimal MAX_PAYMENT_AMOUNT = new BigDecimal("100000.00");
+
     /**
      * Processes a payment using PaymentRequest DTO.
      */
     public PaymentResponse processPayment(PaymentRequest request) {
-        logger.info("Processing payment request for order: {}, amount: {}, method: {}", 
+        logger.info("Processing payment request for order: {}, amount: {}, method: {}",
                    request.getOrderId(), request.getAmount(), request.getPaymentMethod());
 
+        if (request.getAmount() != null && request.getAmount().compareTo(MAX_PAYMENT_AMOUNT) > 0) {
+            throw new IllegalArgumentException(
+                "Payment amount exceeds maximum limit of " + MAX_PAYMENT_AMOUNT);
+        }
+
+        com.ordersystem.unified.payment.dto.PaymentMethod method = request.getPaymentMethod();
         String paymentId = UUID.randomUUID().toString();
-        
-        String transactionId = "txn_" + UUID.randomUUID().toString().substring(0, 8);
-        return new PaymentResponse(
+        String shortId = UUID.randomUUID().toString().substring(0, 8);
+
+        String transactionId;
+        PaymentStatus status;
+        String message;
+
+        if (method == com.ordersystem.unified.payment.dto.PaymentMethod.PIX) {
+            transactionId = "PIX-" + shortId;
+            status = PaymentStatus.COMPLETED;
+            message = "Payment processed successfully";
+        } else if (method == com.ordersystem.unified.payment.dto.PaymentMethod.BOLETO) {
+            transactionId = "BOL-" + shortId;
+            status = PaymentStatus.PENDING;
+            message = "Boleto generated successfully. Pay by the due date.";
+        } else {
+            transactionId = "CC-" + shortId;
+            status = PaymentStatus.COMPLETED;
+            message = "Payment processed successfully";
+        }
+
+        // Persist payment
+        String methodName = method != null ? method.name() : "CREDIT_CARD";
+        Payment payment = new Payment(paymentId, request.getOrderId(), request.getAmount(), methodName);
+        payment.setCorrelationId(request.getCorrelationId());
+        if (status == PaymentStatus.COMPLETED) {
+            payment.markAsCompleted(transactionId);
+        }
+        paymentRepository.save(payment);
+
+        PaymentResponse response = new PaymentResponse(
             paymentId,
             request.getOrderId(),
-            PaymentStatus.COMPLETED,
+            status,
             request.getAmount(),
             transactionId,
             LocalDateTime.now(),
             request.getCorrelationId()
         );
+        response.setMessage(message);
+        return response;
     }
 
     /**

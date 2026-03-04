@@ -143,11 +143,14 @@ public class OrderService {
     public OrderResponse cancelOrder(String orderId, String reason) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found with id: " + orderId));
-        
-        // TODO: Validate state transitions
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Order " + orderId + " is already cancelled");
+        }
+
         order.updateStatus(OrderStatus.CANCELLED);
         order.setCancellationReason(reason);
-        
+
         Order savedOrder = orderRepository.save(order);
         return mapToResponse(savedOrder);
     }

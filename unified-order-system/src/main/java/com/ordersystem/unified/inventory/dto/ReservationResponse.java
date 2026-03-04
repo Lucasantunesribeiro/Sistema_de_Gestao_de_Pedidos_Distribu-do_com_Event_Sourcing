@@ -1,11 +1,14 @@
 package com.ordersystem.unified.inventory.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Inventory reservation response DTO
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ReservationResponse {
     
     private String reservationId;
