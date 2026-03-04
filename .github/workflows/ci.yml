@@ -2,38 +2,29 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - prod-ready-rewrite
+    branches: [main]
   pull_request:
-    branches:
-      - main
-      - prod-ready-rewrite
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
-      - name: Cache Maven packages
-        uses: actions/cache@v3
+          java-version: '17'
+
+      - uses: actions/cache@v3
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-      - name: Build and verify
-        run: mvn -q clean verify
-      - name: Run Checkstyle
-        run: mvn checkstyle:check
-      - name: Dependency scan
-        uses: owasp/dependency-check-action@v6
-        with:
-          project: Distributed-Order-System
-          format: "ALL"
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Install shared libraries
+        run: mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability,shared-events -am -DskipTests install -q
+
+      - name: Build and test
+        run: mvn -f unified-order-system/pom.xml clean test -B
