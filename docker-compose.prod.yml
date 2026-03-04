@@ -24,10 +24,7 @@ services:
           memory: 256m
 
   unified-order-system:
-    image: ${APP_IMAGE:-ghcr.io/lucasantunesribeiro/unified-order-system:latest}
-    build:
-      context: .
-      dockerfile: unified-order-system/Dockerfile
+    image: ${APP_IMAGE:-246599827442.dkr.ecr.us-east-1.amazonaws.com/unified-order-system:latest}
     ports:
       - "80:8080"
     environment:
