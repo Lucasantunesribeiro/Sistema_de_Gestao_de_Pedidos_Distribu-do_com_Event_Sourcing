@@ -78,8 +78,11 @@ public class OrderService {
                     throw new IllegalArgumentException("Unit price must be positive");
                 }
                 
+                String productId = (itemReq.getProductId() != null && !itemReq.getProductId().isBlank())
+                    ? itemReq.getProductId()
+                    : UUID.randomUUID().toString();
                 OrderItemEntity item = new OrderItemEntity(
-                    itemReq.getProductId(),
+                    productId,
                     itemReq.getProductName(),
                     itemReq.getQuantity(),
                     itemReq.getUnitPrice()

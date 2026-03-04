@@ -230,7 +230,7 @@ class OrderCreator {
     // Calculate subtotal from all items
     const items = document.querySelectorAll('.order-item');
     items.forEach(item => {
-      const quantity = parseFloat(item.querySelector('[name*="quantity"]').value) || 0;
+      const quantity = parseInt(item.querySelector('[name*="quantity"]').value, 10) || 0;
       const unitPrice = parseFloat(item.querySelector('[name*="unitPrice"]').value) || 0;
       this.subtotal += quantity * unitPrice;
     });
@@ -453,7 +453,7 @@ class OrderCreator {
     let hasValidItems = false;
     items.forEach(item => {
       const productName = item.querySelector('[name*="productName"]').value.trim();
-      const quantity = parseFloat(item.querySelector('[name*="quantity"]').value) || 0;
+      const quantity = parseInt(item.querySelector('[name*="quantity"]').value, 10) || 0;
       const unitPrice = parseFloat(item.querySelector('[name*="unitPrice"]').value) || 0;
 
       if (productName && quantity > 0 && unitPrice > 0) {
@@ -490,7 +490,7 @@ class OrderCreator {
     items.forEach(item => {
       const productId = item.querySelector('[name*="productId"]').value;
       const productName = item.querySelector('[name*="productName"]').value.trim();
-      const quantity = parseFloat(item.querySelector('[name*="quantity"]').value) || 0;
+      const quantity = parseInt(item.querySelector('[name*="quantity"]').value, 10) || 0;
       const unitPrice = parseFloat(item.querySelector('[name*="unitPrice"]').value) || 0;
 
       if (productName && quantity > 0 && unitPrice > 0) {

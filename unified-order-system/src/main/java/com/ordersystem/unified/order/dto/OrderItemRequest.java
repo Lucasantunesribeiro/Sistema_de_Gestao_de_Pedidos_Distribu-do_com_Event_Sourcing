@@ -3,7 +3,6 @@ package com.ordersystem.unified.order.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ordersystem.unified.shared.validation.ValidationConstants;
 import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -16,7 +15,6 @@ import java.math.BigDecimal;
 public class OrderItemRequest {
 
     @JsonProperty("productId")
-    @NotBlank(message = "Product ID cannot be blank")
     @Size(max = ValidationConstants.MAX_ID_LENGTH, message = ValidationConstants.MSG_ID_TOO_LONG)
     private String productId;
 
