@@ -37,8 +37,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       DB_DRIVER: org.postgresql.Driver
       HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
-      DDL_AUTO: update
-      SPRING_FLYWAY_ENABLED: "false"
+      SPRING_FLYWAY_ENABLED: "true"
       SECURITY_SECRET: ${SECURITY_SECRET:?SECURITY_SECRET is required}
       SECURITY_ENFORCE_AUTH: ${SECURITY_ENFORCE_AUTH:-true}
       SECURITY_CORS_ALLOWED_ORIGINS: ${SECURITY_CORS_ALLOWED_ORIGINS:-*}
