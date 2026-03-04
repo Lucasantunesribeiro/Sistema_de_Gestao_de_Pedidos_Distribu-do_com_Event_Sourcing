@@ -1,44 +1,34 @@
 # Multi-stage build for unified order system
 FROM maven:3.9-eclipse-temurin-17 AS build
 
-# Set working directory
 WORKDIR /app
 
-# Copy pom.xml and download dependencies
+# Copy build files
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+COPY libs ./libs
+COPY shared-events ./shared-events
+COPY unified-order-system ./unified-order-system
 
-# Copy source code and build
-COPY src ./src
-RUN mvn clean package -DskipTests
+# Install shared libs, then package the application
+RUN mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability,shared-events -am -DskipTests install && \
+    mvn -f unified-order-system/pom.xml -DskipTests package
 
 # Runtime stage
 FROM eclipse-temurin:17-jre-alpine
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl && \
+    addgroup -g 1001 -S appuser && adduser -u 1001 -S appuser -G appuser
 
-# Create app user
-RUN addgroup -g 1001 -S appuser && adduser -u 1001 -S appuser -G appuser
-
-# Set working directory
 WORKDIR /app
 
-# Copy jar from build stage
-COPY --from=build /app/target/unified-order-system-1.0.0.jar app.jar
+COPY --from=build /app/unified-order-system/target/unified-order-system-1.0.0.jar app.jar
 
-# Change ownership
 RUN chown -R appuser:appuser /app
-
-# Switch to app user
 USER appuser
 
-# Expose port
 EXPOSE 8080
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
-# Run application
-ENTRYPOINT ["java", "-Dspring.profiles.active=render", "-Xms256m", "-Xmx512m", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:+UseContainerSupport", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xms256m", "-Xmx512m", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:+UseContainerSupport", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
