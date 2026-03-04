@@ -1,24 +1,31 @@
 package com.ordersystem.unified.payment.dto;
 
+import com.ordersystem.unified.shared.validation.ValidationConstants;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * DTO for customer information in payment requests
  */
 public class CustomerInfo {
 
+    @Size(max = ValidationConstants.MAX_ID_LENGTH, message = ValidationConstants.MSG_ID_TOO_LONG)
     private String customerId;
 
     @NotBlank(message = "Customer name is required")
+    @Size(max = ValidationConstants.MAX_NAME_LENGTH, message = ValidationConstants.MSG_NAME_TOO_LONG)
     private String customerName;
 
     @NotBlank(message = "Customer email is required")
     @Email(message = "Customer email must be valid")
+    @Size(max = ValidationConstants.MAX_EMAIL_LENGTH, message = ValidationConstants.MSG_EMAIL_TOO_LONG)
     private String customerEmail;
 
+    @Size(max = ValidationConstants.MAX_PHONE_LENGTH, message = "Phone number exceeds maximum length")
     private String customerPhone;
 
+    @Size(max = ValidationConstants.MAX_ADDRESS_LENGTH, message = ValidationConstants.MSG_ADDRESS_TOO_LONG)
     private String billingAddress;
 
     // Default constructor

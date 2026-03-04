@@ -7,6 +7,7 @@ import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 
 import javax.sql.DataSource;
 import java.net.URI;
@@ -18,12 +19,19 @@ import java.net.URISyntaxException;
  * To JDBC format: jdbc:postgresql://host:port/db
  */
 @Configuration
+@Profile("!test & !docker")
 public class DatabaseConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
 
     @Value("${DATABASE_URL:jdbc:h2:mem:devdb}")
     private String databaseUrl;
+
+    @Value("${spring.datasource.username}")
+    private String username;
+
+    @Value("${spring.datasource.password}")
+    private String password;
 
     @Bean
     @Primary
@@ -34,15 +42,17 @@ public class DatabaseConfig {
         if (databaseUrl.startsWith("postgresql://") || databaseUrl.startsWith("postgres://")) {
             return createPostgreSQLDataSource(databaseUrl);
         } else if (databaseUrl.startsWith("jdbc:postgresql://")) {
-            // Already in JDBC format, use as-is
+            // Already in JDBC format, use as-is but add credentials
             return DataSourceBuilder.create()
                 .url(databaseUrl)
+                .username(username)
+                .password(password)
                 .driverClassName("org.postgresql.Driver")
                 .build();
         } else {
             // Default H2 for development
             return DataSourceBuilder.create()
-                .url("jdbc:h2:mem:devdb")
+                .url(databaseUrl)
                 .username("sa")
                 .password("")
                 .driverClassName("org.h2.Driver")
@@ -85,8 +95,12 @@ public class DatabaseConfig {
                 throw new IllegalArgumentException("Database username is required in DATABASE_URL");
             }
             
-            // Build JDBC URL with proper formatting
+            // Build JDBC URL with proper formatting (preserve query params if present)
             String jdbcUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
+            String query = dbUri.getQuery();
+            if (query != null && !query.isBlank()) {
+                jdbcUrl = jdbcUrl + "?" + query;
+            }
             
             logger.info("PostgreSQL Connection Details:");
             logger.info("  Host: {}", host);

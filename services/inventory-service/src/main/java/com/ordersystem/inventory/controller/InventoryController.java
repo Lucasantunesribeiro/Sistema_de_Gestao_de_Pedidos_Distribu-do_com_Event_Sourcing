@@ -16,7 +16,7 @@ public class InventoryController {
     @Autowired
     private InventoryService inventoryService;
 
-    @GetMapping("/")
+    @GetMapping({ "", "/" })
     public Map<String, String> home() {
         return Map.of(
             "message", "Inventory Service is running!",

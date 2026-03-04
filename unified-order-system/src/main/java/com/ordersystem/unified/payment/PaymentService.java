@@ -41,40 +41,16 @@ public class PaymentService {
 
         String paymentId = UUID.randomUUID().toString();
         
-        try {
-            // Simulate payment processing
-            boolean success = Math.random() < 0.95; // 95% success rate
-            
-            if (success) {
-                String transactionId = "txn_" + UUID.randomUUID().toString().substring(0, 8);
-                return new PaymentResponse(
-                    paymentId,
-                    request.getOrderId(),
-                    PaymentStatus.COMPLETED,
-                    request.getAmount(),
-                    transactionId,
-                    LocalDateTime.now(),
-                    request.getCorrelationId()
-                );
-            } else {
-                return new PaymentResponse(
-                    paymentId,
-                    request.getOrderId(),
-                    PaymentStatus.FAILED,
-                    "Insufficient funds",
-                    request.getCorrelationId()
-                );
-            }
-        } catch (Exception e) {
-            logger.error("Payment processing failed for order: {}", request.getOrderId(), e);
-            return new PaymentResponse(
-                paymentId,
-                request.getOrderId(),
-                PaymentStatus.FAILED,
-                "Payment processing error: " + e.getMessage(),
-                request.getCorrelationId()
-            );
-        }
+        String transactionId = "txn_" + UUID.randomUUID().toString().substring(0, 8);
+        return new PaymentResponse(
+            paymentId,
+            request.getOrderId(),
+            PaymentStatus.COMPLETED,
+            request.getAmount(),
+            transactionId,
+            LocalDateTime.now(),
+            request.getCorrelationId()
+        );
     }
 
     /**
@@ -182,21 +158,8 @@ public class PaymentService {
     // Private helper methods
 
     private PaymentResult simulatePaymentProcessing(Payment payment) {
-        try {
-            // Simulate processing time
-            Thread.sleep(100);
-            
-            // For demo purposes, simulate 95% success rate
-            if (Math.random() < 0.95) {
-                String transactionId = "txn_" + UUID.randomUUID().toString().substring(0, 8);
-                return PaymentResult.success(transactionId);
-            } else {
-                return PaymentResult.failure("Insufficient funds", "INSUFFICIENT_FUNDS");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return PaymentResult.failure("Payment processing interrupted", "PROCESSING_ERROR");
-        }
+        String transactionId = "txn_" + UUID.randomUUID().toString().substring(0, 8);
+        return PaymentResult.success(transactionId);
     }
 
     private void publishPaymentProcessedEvent(Payment payment, String correlationId) {

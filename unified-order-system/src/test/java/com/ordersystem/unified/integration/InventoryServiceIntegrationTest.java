@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional
+@org.springframework.context.annotation.Import(com.ordersystem.unified.config.TestConfig.class)
 public class InventoryServiceIntegrationTest {
 
     @Autowired

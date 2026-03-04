@@ -90,13 +90,29 @@ class Dashboard {
 
   async loadSystemHealth() {
     try {
-      const response = await fetch('/health');
+      const response = await fetch('/api/dashboard/health');
+      if (!response.ok) throw new Error('Health check failed');
       const health = await response.json();
       this.updateHealthStatus(health);
     } catch (error) {
       console.error('Failed to load system health:', error);
-      this.showError('Failed to load system health');
+      // Set all service cards to error state instead of infinite loading
+      this.setAllServicesError();
     }
+  }
+
+  setAllServicesError() {
+    const serviceCards = document.querySelectorAll('.service-card');
+    serviceCards.forEach(card => {
+      const statusDot = card.querySelector('.status-dot');
+      const statusText = card.querySelector('.status-text');
+      if (statusDot) {
+        statusDot.className = 'status-dot status-down';
+      }
+      if (statusText) {
+        statusText.textContent = 'Unavailable';
+      }
+    });
   }
 
   updateHealthStatus(health) {
@@ -172,11 +188,13 @@ class Dashboard {
   async loadQuickStats() {
     try {
       const response = await fetch('/api/orders/statistics');
+      if (!response.ok) throw new Error('Failed to fetch statistics');
       const stats = await response.json();
       this.updateMetrics(stats);
     } catch (error) {
       console.error('Failed to load statistics:', error);
-      this.showError('Failed to load statistics');
+      // Set zero values instead of leaving --
+      this.updateMetrics({ totalOrders: 0, totalRevenue: 0, pendingOrders: 0, confirmationRate: 0 });
     }
   }
 
@@ -304,12 +322,21 @@ class Dashboard {
 
   async loadRecentOrders() {
     try {
-      const response = await fetch('/api/orders?limit=5&sort=createdAt,desc');
+      const response = await fetch('/api/dashboard/recent-orders');
+      if (!response.ok) throw new Error('Failed to fetch recent orders');
       const orders = await response.json();
       this.updateRecentOrders(orders);
     } catch (error) {
       console.error('Failed to load recent orders:', error);
-      this.showError('Failed to load recent orders');
+      // Show empty state instead of infinite loading
+      const container = document.getElementById('recent-orders-list');
+      if (container) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-secondary-500">
+            <div class="text-4xl mb-2">📦</div>
+            <div class="text-sm">Could not load recent orders</div>
+          </div>`;
+      }
     }
   }
 

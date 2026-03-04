@@ -24,7 +24,7 @@ class OrderItemEntityTest {
         assertThat(orderItem.getProductId()).isEqualTo("product-123");
         assertThat(orderItem.getProductName()).isEqualTo("Test Product");
         assertThat(orderItem.getQuantity()).isEqualTo(3);
-        assertThat(orderItem.getPrice()).isEqualTo(new BigDecimal("25.50"));
+        assertThat(orderItem.getUnitPrice()).isEqualTo(new BigDecimal("25.50"));
     }
 
     @Test
@@ -45,7 +45,7 @@ class OrderItemEntityTest {
 
     @Test
     void shouldReturnZeroTotalPriceWhenPriceIsNull() {
-        orderItem.setPrice(null);
+        orderItem.setUnitPrice(null);
 
         BigDecimal totalPrice = orderItem.getTotalPrice();
 
@@ -63,7 +63,7 @@ class OrderItemEntityTest {
 
     @Test
     void shouldHandleZeroPrice() {
-        orderItem.setPrice(BigDecimal.ZERO);
+        orderItem.setUnitPrice(BigDecimal.ZERO);
 
         BigDecimal totalPrice = orderItem.getTotalPrice();
 

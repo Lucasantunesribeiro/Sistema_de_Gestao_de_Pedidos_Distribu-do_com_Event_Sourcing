@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for PaymentRepository.
  */
 @DataJpaTest
+@org.springframework.test.context.ActiveProfiles("test")
 class PaymentRepositoryTest {
 
     @Autowired

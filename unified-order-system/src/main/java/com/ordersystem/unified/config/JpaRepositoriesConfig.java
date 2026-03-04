@@ -20,15 +20,17 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableJpaRepositories(
     basePackages = {
         "com.ordersystem.unified.order.repository",
-        "com.ordersystem.unified.payment.repository", 
-        "com.ordersystem.unified.inventory.repository"
+        "com.ordersystem.unified.inventory.repository",
+        "com.ordersystem.unified.payment.repository",
+        "com.ordersystem.unified.infrastructure.events"
     }
 )
 @EntityScan(
     basePackages = {
         "com.ordersystem.unified.order.model",
         "com.ordersystem.unified.payment.model",
-        "com.ordersystem.unified.inventory.model"
+        "com.ordersystem.unified.inventory.model",
+        "com.ordersystem.unified.infrastructure.events"
     }
 )
 @EnableTransactionManagement

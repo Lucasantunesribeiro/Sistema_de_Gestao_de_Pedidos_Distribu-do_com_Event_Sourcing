@@ -105,80 +105,31 @@ class OrdersManager {
   createOrderRow(order) {
     const statusClass = this.getStatusClass(order.status);
     const statusIcon = this.getStatusIcon(order.status);
+    const amount = typeof order.totalAmount === 'number' ? order.totalAmount.toFixed(2) : order.totalAmount;
+    const shortId = order.orderId.length > 8 ? order.orderId.substring(0, 8) + '...' : order.orderId;
 
     return `
-            <tr class="hover:bg-gray-50 transition-colors">
+            <tr>
                 <td>
-                    <input type="checkbox" 
-                           class="form-control order-checkbox" 
-                           value="${order.orderId}"
-                           onchange="ordersManager.toggleOrderSelection('${order.orderId}')">
-                </td>
-                <td>
-                    <button class="text-primary-600 hover:text-primary-700 font-medium" 
-                            onclick="ordersManager.viewOrder('${order.orderId}')">
-                        #${order.orderId}
+                    <button class="link" onclick="ordersManager.viewOrder('${order.orderId}')">
+                        #${shortId}
                     </button>
                 </td>
-                <td>
-                    <div>
-                        <div class="font-medium">${order.customerName}</div>
-                        <div class="text-xs text-secondary">${order.customerEmail || ''}</div>
-                    </div>
-                </td>
+                <td>${order.customerName || 'N/A'}</td>
                 <td>
                     <span class="badge badge-${statusClass}">
                         <i class="${statusIcon}"></i>
                         ${order.status}
                     </span>
                 </td>
-                <td class="font-semibold">$${order.totalAmount.toFixed(2)}</td>
+                <td class="font-semibold">$${amount}</td>
+                <td>${this.formatDate(order.createdAt)}</td>
                 <td>
-                    <span class="text-sm">${order.paymentMethod || 'N/A'}</span>
-                </td>
-                <td>
-                    <div class="text-sm">
-                        <div>${this.formatDate(order.createdAt)}</div>
-                        <div class="text-xs text-secondary">${this.formatTime(order.createdAt)}</div>
-                    </div>
-                </td>
-                <td>
-                    <div class="flex gap-1">
-                        <button class="btn btn-ghost btn-sm" 
-                                onclick="ordersManager.viewOrder('${order.orderId}')"
-                                title="View Details">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn btn-ghost btn-sm" 
-                                onclick="ordersManager.editOrder('${order.orderId}')"
-                                title="Edit Order">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <div class="relative">
-                            <button class="btn btn-ghost btn-sm" 
-                                    onclick="ordersManager.toggleOrderActions('${order.orderId}')"
-                                    title="More Actions">
-                                <i class="fas fa-ellipsis-v"></i>
-                            </button>
-                            <div id="actions-${order.orderId}" class="hidden absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                                <div class="p-1">
-                                    <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded" 
-                                            onclick="ordersManager.duplicateOrder('${order.orderId}')">
-                                        <i class="fas fa-copy mr-2"></i>Duplicate
-                                    </button>
-                                    <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded" 
-                                            onclick="ordersManager.printOrder('${order.orderId}')">
-                                        <i class="fas fa-print mr-2"></i>Print
-                                    </button>
-                                    <hr class="my-1">
-                                    <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded text-error-600" 
-                                            onclick="ordersManager.cancelOrder('${order.orderId}')">
-                                        <i class="fas fa-times mr-2"></i>Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <button class="btn btn-ghost btn-sm"
+                            onclick="ordersManager.viewOrder('${order.orderId}')"
+                            title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
                 </td>
             </tr>
         `;
@@ -470,7 +421,14 @@ class OrdersManager {
   }
 
   formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString();
+    if (!dateString) return 'N/A';
+    // Handle array format [year, month, day, hour, minute, second] from Jackson
+    if (Array.isArray(dateString)) {
+      const [y, m, d, h = 0, min = 0, s = 0] = dateString;
+      return new Date(y, m - 1, d, h, min, s).toLocaleDateString();
+    }
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString();
   }
 
   formatTime(dateString) {
@@ -481,7 +439,13 @@ class OrdersManager {
   }
 
   formatDateTime(dateString) {
-    return new Date(dateString).toLocaleString();
+    if (!dateString) return 'N/A';
+    if (Array.isArray(dateString)) {
+      const [y, m, d, h = 0, min = 0, s = 0] = dateString;
+      return new Date(y, m - 1, d, h, min, s).toLocaleString();
+    }
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
   }
 }
 
@@ -492,27 +456,15 @@ function refreshOrders() {
   }
 }
 
-function toggleBulkActions() {
-  const menu = document.getElementById('bulk-actions-menu');
-  if (menu) {
-    menu.classList.toggle('hidden');
-  }
-}
-
 function closeOrderModal() {
   if (window.ordersManager) {
     window.ordersManager.closeOrderModal();
   }
 }
 
-function exportOrders() {
-  // Implementation for exporting orders
-  console.log('Exporting orders...');
-}
-
-function toggleSelectAll() {
+function clearFilters() {
   if (window.ordersManager) {
-    window.ordersManager.toggleSelectAll();
+    window.ordersManager.clearFilters();
   }
 }
 

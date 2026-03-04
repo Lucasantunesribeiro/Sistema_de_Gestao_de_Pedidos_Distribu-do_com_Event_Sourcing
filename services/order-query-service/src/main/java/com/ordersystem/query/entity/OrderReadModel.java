@@ -1,5 +1,6 @@
 package com.ordersystem.query.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ public class OrderReadModel {
     @Column
     private String paymentStatus;
     
+    @JsonIgnore
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<OrderItemReadModel> items = new ArrayList<>();
 

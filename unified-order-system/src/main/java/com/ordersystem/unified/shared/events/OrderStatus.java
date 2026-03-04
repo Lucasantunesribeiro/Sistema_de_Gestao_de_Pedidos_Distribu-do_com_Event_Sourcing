@@ -22,7 +22,7 @@ public enum OrderStatus {
     }
 
     public boolean isTerminal() {
-        return this == CONFIRMED || this == CANCELLED || this == FAILED;
+        return this == CANCELLED || this == FAILED;
     }
 
     public boolean isSuccessful() {

@@ -1,9 +1,12 @@
 package com.ordersystem.unified.order.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.ordersystem.unified.shared.validation.ValidationConstants;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -14,15 +17,18 @@ public class OrderItemRequest {
 
     @JsonProperty("productId")
     @NotBlank(message = "Product ID cannot be blank")
+    @Size(max = ValidationConstants.MAX_ID_LENGTH, message = ValidationConstants.MSG_ID_TOO_LONG)
     private String productId;
 
     @JsonProperty("productName")
     @NotBlank(message = "Product name cannot be blank")
+    @Size(max = ValidationConstants.MAX_PRODUCT_NAME_LENGTH, message = "Product name exceeds maximum length")
     private String productName;
 
     @JsonProperty("quantity")
     @NotNull(message = "Quantity cannot be null")
     @Positive(message = "Quantity must be positive")
+    @Max(value = ValidationConstants.MAX_QUANTITY, message = ValidationConstants.MSG_INVALID_QUANTITY)
     private Integer quantity;
 
     @JsonProperty("unitPrice")
@@ -53,6 +59,7 @@ public class OrderItemRequest {
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public BigDecimal getTotalPrice() {
         if (quantity != null && unitPrice != null) {
             return unitPrice.multiply(BigDecimal.valueOf(quantity));
