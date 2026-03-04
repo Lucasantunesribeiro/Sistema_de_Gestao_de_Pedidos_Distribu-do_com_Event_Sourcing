@@ -1,0 +1,271 @@
+# Alert Rules for Unified Order System
+groups:
+  # Application Health Alerts
+  - name: application_health
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="unified-order-system"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Service {{ $labels.instance }} is down"
+          description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute."
+          runbook: "Check application logs and container status. Verify database and RabbitMQ connectivity."
+
+      - alert: HighErrorRate
+        expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) / rate(http_server_requests_seconds_count[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High error rate detected on {{ $labels.instance }}"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook: "1. Check application logs for exceptions\n2. Verify database connectivity\n3. Check external service dependencies\n4. Review recent deployments"
+
+      - alert: CriticalErrorRate
+        expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) / rate(http_server_requests_seconds_count[5m]) > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "CRITICAL: Very high error rate on {{ $labels.instance }}"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+          runbook: "IMMEDIATE ACTION REQUIRED:\n1. Check if rollback is needed\n2. Verify all dependencies are up\n3. Check for cascading failures\n4. Consider scaling down traffic"
+
+  # Performance Alerts
+  - name: application_performance
+    interval: 30s
+    rules:
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High P95 latency on {{ $labels.instance }}"
+          description: "P95 latency is {{ $value }}s (threshold: 1s)"
+          runbook: "1. Check database query performance\n2. Review slow endpoints in logs\n3. Check connection pool saturation\n4. Monitor memory usage"
+
+      - alert: HighLatencyP99
+        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[5m])) > 3
+        for: 3m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "Very high P99 latency on {{ $labels.instance }}"
+          description: "P99 latency is {{ $value }}s (threshold: 3s)"
+          runbook: "IMMEDIATE ACTION:\n1. Identify slow queries/operations\n2. Check for resource contention\n3. Review GC metrics\n4. Consider circuit breaker activation"
+
+      - alert: HighRequestRate
+        expr: rate(http_server_requests_seconds_count[1m]) > 1000
+        for: 5m
+        labels:
+          severity: info
+          component: performance
+        annotations:
+          summary: "High request rate on {{ $labels.instance }}"
+          description: "Request rate is {{ $value }} req/s (threshold: 1000)"
+          runbook: "Monitor system resources and consider scaling if needed."
+
+  # JVM Alerts
+  - name: jvm_health
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: jvm
+        annotations:
+          summary: "High heap memory usage on {{ $labels.instance }}"
+          description: "Heap memory usage is {{ $value | humanizePercentage }} (threshold: 85%)"
+          runbook: "1. Check for memory leaks\n2. Review GC logs\n3. Analyze heap dump if needed\n4. Consider increasing heap size"
+
+      - alert: CriticalMemoryUsage
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          component: jvm
+        annotations:
+          summary: "CRITICAL: Very high heap memory usage on {{ $labels.instance }}"
+          description: "Heap memory usage is {{ $value | humanizePercentage }} (threshold: 95%)"
+          runbook: "IMMEDIATE ACTION:\n1. Prepare for OOM kill\n2. Capture heap dump\n3. Consider restarting service\n4. Investigate memory leak"
+
+      - alert: HighGCTime
+        expr: rate(jvm_gc_pause_seconds_sum[5m]) / rate(jvm_gc_pause_seconds_count[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: jvm
+        annotations:
+          summary: "High GC time on {{ $labels.instance }}"
+          description: "Average GC pause time is {{ $value }}s (threshold: 0.5s)"
+          runbook: "1. Review GC configuration\n2. Check heap size\n3. Analyze GC logs\n4. Consider tuning GC parameters"
+
+      - alert: FrequentGC
+        expr: rate(jvm_gc_pause_seconds_count[1m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: jvm
+        annotations:
+          summary: "Frequent GC pauses on {{ $labels.instance }}"
+          description: "GC frequency is {{ $value }} pauses/sec (threshold: 5)"
+          runbook: "1. Check memory allocation rate\n2. Review heap size\n3. Analyze object creation patterns\n4. Consider heap tuning"
+
+  # Database Alerts
+  - name: database_health
+    interval: 30s
+    rules:
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "Database has been down for more than 1 minute"
+          runbook: "1. Check database container status\n2. Verify database logs\n3. Check disk space\n4. Verify network connectivity"
+
+      - alert: HighDatabaseConnections
+        expr: pg_stat_database_numbackends > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High number of database connections"
+          description: "Database has {{ $value }} active connections (threshold: 80)"
+          runbook: "1. Check for connection leaks\n2. Review connection pool settings\n3. Identify long-running queries\n4. Consider increasing max_connections"
+
+      - alert: SlowQueries
+        expr: rate(pg_stat_statements_mean_exec_time[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query execution time is {{ $value }}ms (threshold: 1000ms)"
+          runbook: "1. Identify slow queries in pg_stat_statements\n2. Check for missing indexes\n3. Review query execution plans\n4. Consider query optimization"
+
+      - alert: DatabaseLockWait
+        expr: pg_stat_activity_max_tx_duration > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Long-running transaction detected"
+          description: "Transaction has been running for {{ $value }}s (threshold: 300s)"
+          runbook: "1. Identify blocking queries\n2. Check for deadlocks\n3. Review transaction isolation levels\n4. Consider terminating long transactions"
+
+  # System Resource Alerts
+  - name: system_resources
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% (threshold: 80%)"
+          runbook: "1. Identify CPU-intensive processes\n2. Check application threads\n3. Review resource limits\n4. Consider horizontal scaling"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Available disk space is {{ $value | humanizePercentage }} (threshold: 15%)"
+          runbook: "1. Clean up old logs\n2. Remove unused Docker images\n3. Check for large files\n4. Consider volume expansion"
+
+      - alert: CriticalDiskUsage
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.05
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "CRITICAL: Very low disk space on {{ $labels.instance }}"
+          description: "Available disk space is {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook: "IMMEDIATE ACTION:\n1. Free up space immediately\n2. Clean logs and temp files\n3. Remove Docker containers/images\n4. Prepare for service degradation"
+
+  # Business Metrics Alerts
+  - name: business_metrics
+    interval: 1m
+    rules:
+      - alert: HighOrderFailureRate
+        expr: rate(order_creation_failed_total[5m]) / rate(order_creation_total[5m]) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "High order creation failure rate"
+          description: "Order failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+          runbook: "1. Check order service logs\n2. Verify inventory service\n3. Check payment service\n4. Review validation errors"
+
+      - alert: HighPaymentFailureRate
+        expr: rate(payment_failed_total[5m]) / rate(payment_attempts_total[5m]) > 0.15
+        for: 5m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "High payment failure rate"
+          description: "Payment failure rate is {{ $value | humanizePercentage }} (threshold: 15%)"
+          runbook: "1. Check payment service logs\n2. Verify payment gateway\n3. Review fraud detection\n4. Check for API rate limits"
+
+      - alert: NoOrdersProcessed
+        expr: rate(order_creation_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: info
+          component: business
+        annotations:
+          summary: "No orders processed in last 10 minutes"
+          description: "Zero order creation rate detected"
+          runbook: "1. Verify if this is expected (off-peak hours)\n2. Check frontend availability\n3. Verify API endpoints\n4. Check for blocking issues"
+
+  # RabbitMQ Alerts
+  - name: rabbitmq_health
+    interval: 30s
+    rules:
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: messaging
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "RabbitMQ has been down for more than 1 minute"
+          runbook: "1. Check RabbitMQ container status\n2. Verify logs\n3. Check disk space\n4. Verify network connectivity"
+
+      - alert: HighQueueLength
+        expr: rabbitmq_queue_messages > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: messaging
+        annotations:
+          summary: "High message queue length"
+          description: "Queue {{ $labels.queue }} has {{ $value }} messages (threshold: 1000)"
+          runbook: "1. Check consumer availability\n2. Verify consumer performance\n3. Check for processing errors\n4. Consider scaling consumers"

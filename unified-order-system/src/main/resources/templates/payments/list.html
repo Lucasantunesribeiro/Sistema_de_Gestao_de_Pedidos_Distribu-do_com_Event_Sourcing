@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payments - Unified Order System</title>
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="app">
+  <div th:replace="~{layout/base :: layout(~{::main})}">
+    <main>
+      <!-- Page Actions -->
+      <div class="section">
+        <div class="page-actions">
+          <button class="btn btn-outline" onclick="refreshPayments()">
+            <i class="fas fa-sync-alt"></i> Refresh
+          </button>
+          <button class="btn btn-outline" onclick="exportPayments()">
+            <i class="fas fa-download"></i> Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Payment Stats -->
+      <div class="section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-content">
+              <div>
+                <div class="stat-value" id="total-payments">--</div>
+                <div class="stat-label">Total Payments</div>
+              </div>
+              <div class="stat-icon stat-icon-primary">
+                <i class="fas fa-receipt"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-content">
+              <div>
+                <div class="stat-value" id="completed-payments">--</div>
+                <div class="stat-label">Completed</div>
+              </div>
+              <div class="stat-icon stat-icon-success">
+                <i class="fas fa-check-circle"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-content">
+              <div>
+                <div class="stat-value" id="pending-payments">--</div>
+                <div class="stat-label">Pending</div>
+              </div>
+              <div class="stat-icon stat-icon-warning">
+                <i class="fas fa-hourglass-half"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-content">
+              <div>
+                <div class="stat-value" id="total-amount">--</div>
+                <div class="stat-label">Total Amount</div>
+              </div>
+              <div class="stat-icon stat-icon-info">
+                <i class="fas fa-dollar-sign"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payments Table -->
+      <div class="section">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Payment Transactions</h3>
+              <p class="card-subtitle" id="payments-count">Loading payments...</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Loading State -->
+            <div id="payments-loading" class="loading-state">
+              <div class="spinner"></div>
+              <span>Loading payments...</span>
+            </div>
+
+            <!-- Payments Table -->
+            <div id="payments-table-wrapper" class="hidden">
+              <div class="table-responsive">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Payment ID</th>
+                      <th>Order ID</th>
+                      <th>Amount</th>
+                      <th>Method</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody id="payments-tbody">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="payments-empty" class="hidden empty-state">
+              <div class="empty-icon"><i class="fas fa-credit-card"></i></div>
+              <h3>No payments found</h3>
+              <p>Payment transactions will appear here once orders are processed.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script th:src="@{/js/app.js}"></script>
+  <script>
+    // Payments page JavaScript
+    class PaymentsManager {
+      constructor() { this.init(); }
+
+      async init() {
+        await this.loadPayments();
+      }
+
+      async loadPayments() {
+        try {
+          const response = await fetch('/api/payments');
+          const payments = await response.json();
+          this.displayPayments(payments);
+          this.updateStats(payments);
+        } catch (error) {
+          console.error('Error loading payments:', error);
+          this.showEmpty();
+        }
+      }
+
+      displayPayments(payments) {
+        const loading = document.getElementById('payments-loading');
+        const wrapper = document.getElementById('payments-table-wrapper');
+        const empty = document.getElementById('payments-empty');
+        const tbody = document.getElementById('payments-tbody');
+
+        loading.classList.add('hidden');
+
+        if (!payments || payments.length === 0) {
+          empty.classList.remove('hidden');
+          wrapper.classList.add('hidden');
+          document.getElementById('payments-count').textContent = '0 payments found';
+          return;
+        }
+
+        empty.classList.add('hidden');
+        wrapper.classList.remove('hidden');
+        document.getElementById('payments-count').textContent = payments.length + ' payments found';
+
+        tbody.innerHTML = payments.map(p => `
+          <tr>
+            <td><span class="font-medium">${p.paymentId || p.id || '-'}</span></td>
+            <td><a href="/orders" class="text-primary">${p.orderId || '-'}</a></td>
+            <td class="font-semibold">$${(p.amount || 0).toFixed(2)}</td>
+            <td>${p.paymentMethod || p.method || '-'}</td>
+            <td><span class="badge badge-${this.getStatusClass(p.status)}">${p.status || 'UNKNOWN'}</span></td>
+            <td>${p.createdAt ? new Date(p.createdAt).toLocaleString() : '-'}</td>
+          </tr>
+        `).join('');
+      }
+
+      updateStats(payments) {
+        const total = payments.length;
+        const completed = payments.filter(p => p.status === 'COMPLETED' || p.status === 'APPROVED').length;
+        const pending = payments.filter(p => p.status === 'PENDING' || p.status === 'PROCESSING').length;
+        const amount = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+        document.getElementById('total-payments').textContent = total;
+        document.getElementById('completed-payments').textContent = completed;
+        document.getElementById('pending-payments').textContent = pending;
+        document.getElementById('total-amount').textContent = '$' + amount.toFixed(2);
+      }
+
+      getStatusClass(status) {
+        const map = { 'COMPLETED': 'success', 'APPROVED': 'success', 'PENDING': 'warning', 'PROCESSING': 'info', 'FAILED': 'danger', 'REFUNDED': 'secondary' };
+        return map[status] || 'secondary';
+      }
+
+      showEmpty() {
+        document.getElementById('payments-loading').classList.add('hidden');
+        document.getElementById('payments-empty').classList.remove('hidden');
+        document.getElementById('payments-count').textContent = '0 payments found';
+      }
+    }
+
+    function refreshPayments() { new PaymentsManager(); }
+    function exportPayments() { showToast('Export feature coming soon', 'info'); }
+
+    document.addEventListener('DOMContentLoaded', () => { new PaymentsManager(); });
+  </script>
+</body>
+
+</html>

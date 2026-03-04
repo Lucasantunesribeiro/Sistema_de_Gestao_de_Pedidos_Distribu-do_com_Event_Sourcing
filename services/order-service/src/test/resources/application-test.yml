@@ -1,0 +1,28 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    url: jdbc:h2:mem:order_service;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE SCHEMA IF NOT EXISTS order_service\;SET SCHEMA order_service
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: false
+  security:
+    filter:
+      dispatcher-types: async,error,request
+security:
+  secret: test-secret-32-bytes-long-1234567890
+  token-validity: 30m
+  rate-limit-capacity: 30
+  rate-limit-interval: 60s
+
+jwt:
+  secret: test-secret
+  expiration-seconds: 300

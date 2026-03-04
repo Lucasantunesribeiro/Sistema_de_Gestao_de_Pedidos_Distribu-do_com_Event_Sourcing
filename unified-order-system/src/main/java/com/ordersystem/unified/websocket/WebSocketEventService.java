@@ -1,5 +1,8 @@
 package com.ordersystem.unified.websocket;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Map;
 import java.util.HashMap;
 
@@ -9,19 +12,18 @@ import java.util.HashMap;
  */
 public class WebSocketEventService {
 
+    private static final Logger logger = LoggerFactory.getLogger(WebSocketEventService.class);
+
     public void sendOrderUpdate(String orderId, String status) {
-        // Simplified implementation - just log the event
-        System.out.println("Order update: " + orderId + " -> " + status);
+        logger.info("Order update: {} -> {}", orderId, status);
     }
 
     public void sendInventoryUpdate(String productId, int quantity) {
-        // Simplified implementation - just log the event
-        System.out.println("Inventory update: " + productId + " -> " + quantity);
+        logger.info("Inventory update: {} -> {}", productId, quantity);
     }
 
     public void sendPaymentUpdate(String paymentId, String status) {
-        // Simplified implementation - just log the event
-        System.out.println("Payment update: " + paymentId + " -> " + status);
+        logger.info("Payment update: {} -> {}", paymentId, status);
     }
 
     public Map<String, Object> getConnectionStatus() {
