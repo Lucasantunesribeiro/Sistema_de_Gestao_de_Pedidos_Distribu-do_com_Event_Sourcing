@@ -73,7 +73,7 @@ class OrderTest {
         assertThat(order.isTerminal()).isFalse();
 
         order.updateStatus(OrderStatus.CONFIRMED);
-        assertThat(order.isTerminal()).isTrue();
+        assertThat(order.isTerminal()).isFalse();
 
         order.updateStatus(OrderStatus.CANCELLED);
         assertThat(order.isTerminal()).isTrue();

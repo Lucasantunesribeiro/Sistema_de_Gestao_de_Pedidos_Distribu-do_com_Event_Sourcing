@@ -1,6 +1,8 @@
 package com.ordersystem.unified.order;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ordersystem.unified.order.application.CancelOrderUseCase;
+import com.ordersystem.unified.order.application.CreateOrderUseCase;
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
@@ -47,6 +49,12 @@ public class OrderControllerTest {
     @MockBean
     private OrderService orderService;
 
+    @MockBean
+    private CreateOrderUseCase createOrderUseCase;
+
+    @MockBean
+    private CancelOrderUseCase cancelOrderUseCase;
+
     private CreateOrderRequest validOrderRequest;
     private OrderResponse orderResponse;
 
@@ -86,6 +94,7 @@ public class OrderControllerTest {
 
     @Test
     void shouldCreateOrderSuccessfully() throws Exception {
+        when(createOrderUseCase.execute(any(CreateOrderRequest.class))).thenReturn(orderResponse);
         when(orderService.createOrder(any(CreateOrderRequest.class))).thenReturn(orderResponse);
 
         mockMvc.perform(post("/api/orders")
