@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory - Unified Order System</title>
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="app">
+  <div th:replace="~{layout/base :: layout(~{::main})}">
+    <main>
+      <!-- Page Actions -->
+      <div class="section">
+        <div class="page-actions" style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="openCreateProductModal()">
+            <i class="fas fa-plus"></i> New Product
+          </button>
+          <button class="btn btn-outline" onclick="refreshInventory()">
+            <i class="fas fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Inventory Stats -->
+      <div class="section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-content">
+              <div>
+                <div class="stat-value" id="total-products">--</div>
+                <div class="stat-label">Total Products</div>
+              </div>
+              <div class="stat-icon stat-icon-primary">
+                <i class="fas fa-cubes"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-content">
+              <div>
+                <div class="stat-value" id="in-stock-count">--</div>
+                <div class="stat-label">In Stock</div>
+              </div>
+              <div class="stat-icon stat-icon-success">
+                <i class="fas fa-check"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-content">
+              <div>
+                <div class="stat-value" id="low-stock-count">--</div>
+                <div class="stat-label">Low Stock</div>
+              </div>
+              <div class="stat-icon stat-icon-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-content">
+              <div>
+                <div class="stat-value" id="total-reserved">--</div>
+                <div class="stat-label">Reserved Items</div>
+              </div>
+              <div class="stat-icon stat-icon-info">
+                <i class="fas fa-lock"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inventory Table -->
+      <div class="section">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Product Inventory</h3>
+              <p class="card-subtitle" id="inventory-count">Loading inventory...</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Loading State -->
+            <div id="inventory-loading" class="loading-state">
+              <div class="spinner"></div>
+              <span>Loading inventory...</span>
+            </div>
+
+            <!-- Error State -->
+            <div id="inventory-error" class="hidden" style="text-align:center;padding:2rem;">
+              <div style="font-size:2rem;margin-bottom:0.5rem;"><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i></div>
+              <h3 style="margin-bottom:0.5rem;">Failed to load inventory</h3>
+              <p style="color:#6b7280;margin-bottom:1rem;" id="inventory-error-msg"></p>
+              <button class="btn btn-outline btn-sm" onclick="refreshInventory()">
+                <i class="fas fa-sync-alt"></i> Retry
+              </button>
+            </div>
+
+            <!-- Inventory Table -->
+            <div id="inventory-table-wrapper" class="hidden">
+              <div class="table-responsive">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Product ID</th>
+                      <th>Name</th>
+                      <th>Stock</th>
+                      <th>Reserved</th>
+                      <th>Available</th>
+                      <th>Price</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventory-tbody">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="inventory-empty" class="hidden empty-state">
+              <div class="empty-icon"><i class="fas fa-boxes-stacked"></i></div>
+              <h3>No products yet</h3>
+              <p>Click "New Product" to add your first product to inventory.</p>
+              <button class="btn btn-primary btn-sm" onclick="openCreateProductModal()" style="margin-top:1rem;">
+                <i class="fas fa-plus"></i> Create First Product
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create Product Modal -->
+  <div id="create-product-modal" class="modal-overlay hidden" onclick="if(event.target===this) closeCreateProductModal()">
+    <div class="modal" style="max-width:500px;">
+      <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid #e5e7eb;">
+        <h3 style="margin:0;font-size:1.125rem;font-weight:600;">Create New Product</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeCreateProductModal()" style="background:none;border:none;cursor:pointer;font-size:1.25rem;">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <form id="create-product-form" onsubmit="submitCreateProduct(event)" style="padding:1.5rem;">
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label class="form-label required" style="display:block;margin-bottom:0.25rem;font-weight:500;">Product Name</label>
+          <input type="text" class="form-control" name="name" placeholder="e.g. Wireless Mouse" required>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label class="form-label" style="display:block;margin-bottom:0.25rem;font-weight:500;">Description</label>
+          <input type="text" class="form-control" name="description" placeholder="Brief product description">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <div class="form-group">
+            <label class="form-label required" style="display:block;margin-bottom:0.25rem;font-weight:500;">Price ($)</label>
+            <input type="number" class="form-control" name="price" min="0" step="0.01" placeholder="0.00" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label required" style="display:block;margin-bottom:0.25rem;font-weight:500;">Initial Stock</label>
+            <input type="number" class="form-control" name="quantity" min="0" placeholder="0" required>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label class="form-label" style="display:block;margin-bottom:0.25rem;font-weight:500;">Category</label>
+          <input type="text" class="form-control" name="category" placeholder="e.g. Electronics">
+        </div>
+        <div class="form-group" style="margin-bottom:1.5rem;">
+          <label class="form-label" style="display:block;margin-bottom:0.25rem;font-weight:500;">SKU</label>
+          <input type="text" class="form-control" name="sku" placeholder="Auto-generated if empty">
+        </div>
+        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+          <button type="button" class="btn btn-outline" onclick="closeCreateProductModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="create-product-btn">
+            <i class="fas fa-plus"></i> Create Product
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2" style="position:fixed;top:1rem;right:1rem;z-index:9999;"></div>
+
+  <script th:src="@{/js/app.js}"></script>
+  <script>
+    // Inventory page JavaScript
+    let inventoryManager;
+
+    class InventoryManager {
+      constructor() { this.init(); }
+
+      async init() {
+        await this.loadInventory();
+      }
+
+      async loadInventory() {
+        const loading = document.getElementById('inventory-loading');
+        const errorEl = document.getElementById('inventory-error');
+        loading.classList.remove('hidden');
+        errorEl.classList.add('hidden');
+
+        try {
+          const response = await fetch('/api/inventory');
+          if (!response.ok) throw new Error('Server returned ' + response.status);
+          const inventory = await response.json();
+          this.displayInventory(inventory);
+          this.updateStats(inventory);
+        } catch (error) {
+          console.error('Error loading inventory:', error);
+          loading.classList.add('hidden');
+          errorEl.classList.remove('hidden');
+          document.getElementById('inventory-error-msg').textContent = error.message;
+          document.getElementById('inventory-count').textContent = 'Error loading inventory';
+        }
+      }
+
+      displayInventory(items) {
+        const loading = document.getElementById('inventory-loading');
+        const wrapper = document.getElementById('inventory-table-wrapper');
+        const empty = document.getElementById('inventory-empty');
+        const tbody = document.getElementById('inventory-tbody');
+
+        loading.classList.add('hidden');
+
+        if (!items || items.length === 0) {
+          empty.classList.remove('hidden');
+          wrapper.classList.add('hidden');
+          document.getElementById('inventory-count').textContent = '0 products found';
+          return;
+        }
+
+        empty.classList.add('hidden');
+        wrapper.classList.remove('hidden');
+        document.getElementById('inventory-count').textContent = items.length + ' products found';
+
+        tbody.innerHTML = items.map(item => `
+          <tr>
+            <td><span class="font-medium">${item.productId}</span></td>
+            <td>${item.name}</td>
+            <td class="font-semibold">${item.stock}</td>
+            <td>${item.reserved || 0}</td>
+            <td class="font-semibold">${item.available || item.stock}</td>
+            <td>$${(item.price || 0).toFixed(2)}</td>
+            <td><span class="badge badge-${item.status === 'IN_STOCK' ? 'success' : item.status === 'LOW_STOCK' ? 'warning' : 'error'}">${item.status}</span></td>
+          </tr>
+        `).join('');
+      }
+
+      updateStats(items) {
+        const total = items.length;
+        const inStock = items.filter(i => i.status === 'IN_STOCK').length;
+        const lowStock = items.filter(i => i.status === 'LOW_STOCK').length;
+        const outOfStock = items.filter(i => i.status === 'OUT_OF_STOCK').length;
+        const reserved = items.reduce((sum, i) => sum + (i.reserved || 0), 0);
+
+        document.getElementById('total-products').textContent = total;
+        document.getElementById('in-stock-count').textContent = inStock;
+        document.getElementById('low-stock-count').textContent = lowStock + outOfStock;
+        document.getElementById('total-reserved').textContent = reserved;
+      }
+    }
+
+    function refreshInventory() {
+      inventoryManager = new InventoryManager();
+    }
+
+    function openCreateProductModal() {
+      document.getElementById('create-product-modal').classList.remove('hidden');
+      document.querySelector('#create-product-form [name="name"]').focus();
+    }
+
+    function closeCreateProductModal() {
+      document.getElementById('create-product-modal').classList.add('hidden');
+      document.getElementById('create-product-form').reset();
+    }
+
+    async function submitCreateProduct(event) {
+      event.preventDefault();
+      const form = document.getElementById('create-product-form');
+      const btn = document.getElementById('create-product-btn');
+      const originalHTML = btn.innerHTML;
+
+      const formData = new FormData(form);
+      const data = {
+        name: formData.get('name'),
+        description: formData.get('description'),
+        price: parseFloat(formData.get('price')) || 0,
+        quantity: parseInt(formData.get('quantity')) || 0,
+        category: formData.get('category'),
+        sku: formData.get('sku') || undefined
+      };
+
+      try {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+        const response = await fetch('/api/inventory/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || err.message || 'Failed to create product');
+        }
+
+        const product = await response.json();
+        showToast('Product "' + product.name + '" created successfully!', 'success');
+        closeCreateProductModal();
+        refreshInventory();
+      } catch (error) {
+        showToast(error.message || 'Failed to create product', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      inventoryManager = new InventoryManager();
+    });
+  </script>
+</body>
+
+</html>
