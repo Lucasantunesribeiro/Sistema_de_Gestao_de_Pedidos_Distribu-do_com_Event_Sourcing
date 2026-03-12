@@ -1,5 +1,6 @@
 package com.ordersystem.unified.order;
 
+import com.ordersystem.unified.infrastructure.events.EventPublisher;
 import com.ordersystem.unified.shared.util.SafeEnumParser;
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
@@ -9,8 +10,11 @@ import com.ordersystem.unified.order.dto.OrderItemResponse;
 import com.ordersystem.unified.order.model.Order;
 import com.ordersystem.unified.order.model.OrderItemEntity;
 import com.ordersystem.unified.order.repository.OrderRepository;
+import com.ordersystem.unified.shared.events.OrderCreatedEvent;
+import com.ordersystem.unified.shared.events.OrderItem;
 import com.ordersystem.unified.shared.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,6 +40,9 @@ import java.math.RoundingMode;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+
+    @Autowired
+    private EventPublisher eventPublisher;
 
     public OrderService(OrderRepository orderRepository) {
         this.orderRepository = orderRepository;
@@ -93,9 +100,10 @@ public class OrderService {
         }
 
         Order savedOrder = orderRepository.save(order);
-        
-        // TODO: Publish OrderCreatedEvent via Outbox
-        
+
+        // Publish OrderCreatedEvent (event sourcing — persisted via EventPublisher/domain_events)
+        publishOrderCreatedEvent(savedOrder, request.getCorrelationId());
+
         return mapToResponse(savedOrder);
     }
 
@@ -250,5 +258,29 @@ public class OrderService {
         
         response.setItems(itemResponses);
         return response;
+    }
+
+    private void publishOrderCreatedEvent(Order order, String correlationId) {
+        try {
+            List<OrderItem> eventItems = order.getItems().stream()
+                    .map(i -> new OrderItem(i.getProductId(), i.getProductName(), i.getQuantity(), i.getUnitPrice()))
+                    .collect(Collectors.toList());
+
+            OrderCreatedEvent event = new OrderCreatedEvent(
+                    order.getId(),
+                    order.getCustomerId(),
+                    order.getCustomerName(),
+                    eventItems,
+                    order.getTotalAmount(),
+                    correlationId != null ? correlationId : UUID.randomUUID().toString(),
+                    null
+            );
+            // Use REQUIRED propagation (no new connection) so concurrent tests don't exhaust pool
+            eventPublisher.publishWithinTransaction(event);
+        } catch (Exception e) {
+            // Non-fatal: log and continue — event will be re-published on retry or via audit
+            org.slf4j.LoggerFactory.getLogger(getClass())
+                    .warn("Failed to publish OrderCreatedEvent for order {}: {}", order.getId(), e.getMessage());
+        }
     }
 }

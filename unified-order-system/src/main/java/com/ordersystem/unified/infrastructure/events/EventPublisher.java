@@ -69,6 +69,31 @@ public class EventPublisher {
     }
 
     /**
+     * Publishes an event within the caller's existing transaction (no new connection needed).
+     * Use this from service methods that are already transactional and don't need
+     * the event to survive a rollback of the parent transaction.
+     *
+     * @param event Domain event to publish
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void publishWithinTransaction(BaseEvent event) {
+        try {
+            String eventData = objectMapper.writeValueAsString(event);
+            DomainEventEntity eventEntity = DomainEventEntity.builder()
+                .aggregateId(getAggregateId(event))
+                .aggregateType(getAggregateType(event))
+                .eventType(event.getClass().getSimpleName())
+                .eventData(eventData)
+                .correlationId(event.getCorrelationId())
+                .build();
+            eventRepository.save(eventEntity);
+            logger.debug("Event published within current tx: type={}", eventEntity.getEventType());
+        } catch (Exception e) {
+            logger.warn("Failed to publish event within transaction: {} — {}", event.getClass().getSimpleName(), e.getMessage());
+        }
+    }
+
+    /**
      * Publishes multiple events in a single transaction.
      *
      * @param events List of events to publish
