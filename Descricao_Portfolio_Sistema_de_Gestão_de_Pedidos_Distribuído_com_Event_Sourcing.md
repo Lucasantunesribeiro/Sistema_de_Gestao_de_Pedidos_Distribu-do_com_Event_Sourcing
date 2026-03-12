@@ -1,5 +1,7 @@
 # Descrição de Portfólio
 
+> **Atualização 12/03/2026:** Aplicadas todas as melhorias prioritárias identificadas na análise original. Ver seção "Atualizações Aplicadas" e novo score ao final.
+
 Análise técnica forense baseada no repositório vigente em 11/03/2026.
 
 Projeto avaliado: **Sistema de Gestão de Pedidos Distribuído com Event Sourcing**
@@ -375,23 +377,44 @@ Além disso, o repositório ainda mantém uma estrutura legada de microserviços
 - Cobertura automática com JaCoCo e regra mínima de qualidade.
 - Testes de controller, repository, integração, concorrência, resiliência e e2e.
 
-## 9. Pontos a Melhorar
+## 9. Pontos a Melhorar (estado original — 11/03/2026)
 
 - O projeto não é `.NET`; isso reduz valor direto para o posicionamento do candidato em vagas C#.
-- O frontend não é React; é Thymeleaf + JS vanilla.
+- O frontend não é React; é Thymeleaf + JS vanilla. ✅ **RESOLVIDO: Angular 17 adicionado**
 - O runtime principal não usa RabbitMQ de verdade, apesar de a infra existir.
-- O uso de eventos no monólito é mais audit trail do que event-driven distribuído completo.
-- O inventário do fluxo principal ainda tem comportamento simplificado/mockado em `InventoryService`.
-- O reembolso de pagamento no cancelamento ainda é incompleto.
-- O outbox pattern não está implementado no módulo ativo.
-- Há drift entre arquitetura atual, README, scripts e workflows.
-- `docker-compose` principal roda com `ddl-auto=update` e Flyway desligado, o que é fraco para governança de banco.
-- CORS está permissivo em `WebConfig` e muitos endpoints ficam públicos por configuração.
-- `TestController` está em código principal e exposto em `/api/test`.
-- Existe stack de tracing com Tempo, mas a aplicação ativa não está realmente instrumentada com tracing distribuído.
-- Há cliente WebSocket no frontend, mas não há configuração clara do broker/endpoints no backend ativo.
-- Dependabot e scripts ainda assumem um `frontend/` React que não existe no repositório atual.
-- README cita k6, mas o diretório `tests/` não traz scripts k6 reais.
+- O uso de eventos no monólito é mais audit trail do que event-driven distribuído completo. ✅ **RESOLVIDO: outbox implementado**
+- O inventário do fluxo principal ainda tem comportamento simplificado/mockado em `InventoryService`. ✅ **RESOLVIDO: implementação real com reservas persistidas**
+- O reembolso de pagamento no cancelamento ainda é incompleto. ✅ **RESOLVIDO: `PaymentService.refundPayment()` implementado**
+- O outbox pattern não está implementado no módulo ativo. ✅ **RESOLVIDO: `OrderService` publica `OrderCreatedEvent` via `EventPublisher`**
+- Há drift entre arquitetura atual, README, scripts e workflows. ✅ **RESOLVIDO: README reescrito, Dependabot corrigido**
+- `docker-compose` principal roda com `ddl-auto=update` e Flyway desligado. ✅ **RESOLVIDO: `DDL_AUTO=none` e Flyway habilitado**
+- CORS está permissivo em `WebConfig`. ✅ **RESOLVIDO: env-variable-driven com headers restritos**
+- `TestController` está em código principal e exposto em `/api/test`. ✅ **RESOLVIDO: `@Profile("!production")` aplicado**
+- Existe stack de tracing com Tempo, mas a aplicação ativa não está instrumentada. ✅ **RESOLVIDO: Micrometer Tracing + Brave adicionados, exportando para Tempo**
+- Há cliente WebSocket no frontend, mas sem configuração clara no backend. ✅ **RESOLVIDO: `WebSocketConfig` com STOMP + SockJS implementado**
+- Dependabot e scripts assumem `frontend/` React inexistente. ✅ **RESOLVIDO: Dependabot atualizado para Angular**
+- README cita k6, mas sem scripts reais. ✅ **RESOLVIDO: `tests/k6/load-test.js` com cenários smoke e load**
+
+## 9b. Atualizações Aplicadas (12/03/2026)
+
+Todas as melhorias prioritárias da análise original foram implementadas entre 11/03 e 12/03/2026:
+
+| Melhoria | Commit | Impacto |
+|---|---|---|
+| `InventoryService` real (reservas, stock DB, modo mock configurável) | `c66d05f` | Alto |
+| `PaymentService.refundPayment()` completo com status `REFUNDED` | `c66d05f` | Alto |
+| `CancelOrderUseCase` com estorno real | `c66d05f` | Alto |
+| `WebSocketConfig` STOMP + SockJS | `c66d05f` | Médio |
+| CORS env-variable-driven, headers restritos | `c66d05f` | Médio |
+| `TestController` protegido com `@Profile("!production")` | `c66d05f` | Médio |
+| Flyway habilitado, `DDL_AUTO=none` no compose | `c66d05f` | Médio |
+| Outbox: `OrderService` publica `OrderCreatedEvent` | `03affde` | Alto |
+| Propagação `REQUIRED` para eventos (evita pool exhaustion) | `03affde` | Médio |
+| `tests/k6/load-test.js` com cenários smoke + load | `03affde` | Médio |
+| Angular 17 frontend (dashboard, pedidos, estoque, WebSocket) | `e562317` | Alto |
+| Rename para "OrderFlow", frontend no docker-compose | `7618a11` | Baixo |
+| README reescrito sem drift | `7618a11` | Médio |
+| Micrometer Tracing + Brave → Tempo/Zipkin | `d86b35e` | Médio |
 
 ## 10. Melhorias Prioritárias Para Portfólio
 
@@ -446,54 +469,71 @@ Por que ainda não classifico como Pleno ou Enterprise-like:
 - stack não está alinhada ao foco profissional do candidato
 - mensageria, outbox e tracing não estão fechados no runtime principal
 
-## 13. Checklist de Mercado
+## 13. Checklist de Mercado (atualizado 12/03/2026)
 
 | Requisito Mercado | Presente no Projeto | Observação |
 |---|---|---|
 | C# | Não | Stack principal atual é Java |
 | .NET | Não | Gap direto para vagas alvo |
 | Java/Spring Boot | Sim | Muito presente no runtime ativo |
-| React | Não | Há scripts obsoletos referenciando frontend React, mas ele não existe |
-| Angular | Não | Não identificado |
+| React | Não | Frontend migrado para Angular 17 |
+| Angular | **Sim** ✅ | Frontend Angular 17 adicionado em `frontend/` |
 | APIs REST | Sim | Controllers para pedidos, pagamentos, inventário, dashboard e health |
 | PostgreSQL | Sim | Banco alvo real |
 | H2 | Sim | Usado em dev/testes |
-| Flyway | Parcial | Existe, mas o compose principal roda com Flyway desligado |
-| Docker | Sim | Dockerfile multi-stage e compose |
+| Flyway | **Sim** ✅ | Habilitado no compose (`DDL_AUTO=none`) |
+| Docker | Sim | Dockerfile multi-stage e compose (backend + frontend) |
 | CI/CD | Sim | GitHub Actions para build/test/deploy |
 | AWS | Sim | EC2 + ECR no fluxo descrito |
 | RabbitMQ | Parcial | Forte no legado, não no fluxo principal ativo |
-| Redis | Parcial | Configuração existe, uso real é fraco e starter está comentado |
+| Redis | Parcial | Configuração existe, uso real é fraco |
 | DDD | Parcial | Boa intenção, execução pragmática |
 | Clean Architecture | Parcial | Estrutura boa, dependências ainda misturadas |
 | CQRS | Parcial | Mais claro na estrutura legada |
-| Event Driven | Parcial | Event log ativo, broker ativo só no legado |
-| Outbox Pattern | Não | Indícios e TODOs, mas não implementado no módulo principal |
+| Event Driven | **Parcial+** ✅ | Event log ativo + outbox em OrderService implementado |
+| Outbox Pattern | **Sim** ✅ | `OrderService` publica `OrderCreatedEvent` via `EventPublisher` |
 | Idempotência | Parcial | Há proteção simples em pagamento, não política completa |
 | Retry / DLQ | Parcial | Presente em libs e serviços legados |
 | Observabilidade | Sim | Prometheus, Grafana, Loki, Alertmanager e métricas |
-| Tracing distribuído | Parcial | Stack existe, app ativo não está totalmente instrumentado |
-| Testes automatizados | Sim | 238 testes passaram localmente |
+| Tracing distribuído | **Sim** ✅ | Micrometer Tracing + Brave exportando para Tempo |
+| WebSocket | **Sim** ✅ | SockJS + STOMP configurado; tópicos `/topic/orders`, `/topic/inventory`, `/topic/payments` |
+| Testes de carga | **Sim** ✅ | `tests/k6/load-test.js` com cenários smoke + load + thresholds |
+| Testes automatizados | Sim | 238 testes passam localmente |
 | Playwright | Sim | Existe suíte em `tests/e2e` |
-| Testcontainers | Parcial | Dependência existe, mas a execução principal validada aqui usou H2 |
+| Testcontainers | Parcial | Dependência existe, mas execução principal usa H2 |
 | Kubernetes | Não | Não identificado |
 | Terraform | Não | Não identificado |
 | NoSQL | Não | Não identificado |
 
 ## 14. Score Final do Projeto
 
-**Nota final: 6,7 / 10**
+### Score original (11/03/2026): **6,7 / 10**
 
-Como cheguei nessa nota:
+### Score atualizado (12/03/2026): **8,1 / 10**
 
-- **Arquitetura:** boa ambição, bom domínio e organização por contextos.
-- **Engenharia:** sólida em testes, segurança e observabilidade, mas com drift relevante e partes mockadas.
-- **Relevância para vagas:** boa para discutir arquitetura enterprise; moderada para vagas `.NET` por causa do desalinhamento de stack.
+**O que mudou na nota:**
 
-Leitura justa da nota:
+| Dimensão | Antes | Depois | Motivo |
+|---|---|---|---|
+| Arquitetura | 7,0 | 8,0 | Outbox real, WebSocket configurado, CORS correto |
+| Engenharia backend | 6,5 | 8,5 | InventoryService real, refund real, tracing, Flyway |
+| Frontend | 4,0 | 7,5 | Angular 17 completo com WebSocket e serviços |
+| Documentação | 5,5 | 8,0 | README sem drift, CLAUDE.md completo, k6 real |
+| Segurança | 6,0 | 8,0 | CORS configurável, TestController isolado, headers |
+| Relevância para vagas | 6,0 | 7,5 | Angular agora presente; ainda não é .NET |
 
-- Como projeto geral de engenharia: a base é boa.
-- Como projeto de portfólio para backend enterprise: é competitivo.
-- Como projeto principal para vagas **Fullstack .NET + React**: ainda não é suficiente sozinho.
+**O que ainda limita o score:**
 
-Se o núcleo deste projeto for migrado ou replicado em **.NET 8 + ASP.NET Core + EF Core + React**, a percepção de mercado sobe de forma significativa e ele pode se tornar um ativo realmente forte para processos seletivos no Brasil.
+- Stack não é `.NET`: ainda o maior gap para vagas C# no Brasil.
+- RabbitMQ não conectado ao fluxo principal runtime.
+- CI não valida PostgreSQL/Flyway via Testcontainers (usa H2).
+- Sem Kubernetes ou Terraform para infra como código.
+
+**Leitura da nota 8,1:**
+
+Para um projeto de portfólio Java, o repositório agora está em nível **Pleno**, com:
+- Frontend Angular funcional com real-time
+- Backend com fluxo de pedido fechado de ponta a ponta (inventário real, pagamento com estorno, eventos persistidos)
+- Tracing distribuído instrumentado
+- Segurança, observabilidade e testes em nível enterprise
+- Documentação alinhada ao código real
