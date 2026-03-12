@@ -1,4 +1,4 @@
-name: ordersystem
+name: orderflow
 
 services:
   postgres:
@@ -104,6 +104,26 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    environment:
+      API_URL: http://unified-order-system:8080
+    depends_on:
+      unified-order-system:
+        condition: service_healthy
+    networks:
+      - order-network
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:

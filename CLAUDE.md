@@ -61,8 +61,8 @@ tests/                 # E2E (Playwright) and load tests (k6)
 | `shared/events/` | Domain event types (OrderCreatedEvent, etc.) |
 | `shared/exceptions/` | Exception hierarchy rooted at `OrderSystemException` |
 | `config/` | Spring config, `GlobalExceptionHandler`, security setup |
-| `web/` | Thymeleaf dashboard |
-| `websocket/` | Real-time event streaming |
+| `web/` | Thymeleaf legacy views (superseded by Angular frontend) |
+| `websocket/` | Real-time event streaming via SockJS + STOMP |
 
 ### Key Patterns
 
@@ -101,6 +101,51 @@ tests/                 # E2E (Playwright) and load tests (k6)
 - `OrderBusinessRules` defines `MAX_QUANTITY` and `MAXIMUM_ORDER_VALUE` constants — tests must align with these.
 
 ### Infrastructure
-- Docker Compose services: PostgreSQL 15, RabbitMQ 3.11, Redis Alpine, unified-order-system.
+- Docker Compose services: PostgreSQL 15, RabbitMQ 3.11 (infra only—not used at runtime), Redis Alpine, `unified-order-system`, `frontend` (Angular/Nginx on port 4200).
 - Production environment variables come from a `.env` file (see `.env.example`).
 - JVM in Docker: `-Xms256m -Xmx512m`, G1GC, Alpine JRE 17.
+- Frontend: Angular 17 at `frontend/`. Dev server: `cd frontend && npm start` (proxies `/api` → `localhost:8080`). Docker: `frontend/Dockerfile` (multi-stage node build → nginx).
+- WebSocket: `/ws` endpoint (SockJS + STOMP). Topics: `/topic/orders`, `/topic/inventory`, `/topic/payments`. Config: `WebSocketConfig.java`.
+- CORS: driven by `CORS_ALLOWED_ORIGINS` env var (default: `http://localhost:4200,http://localhost:8080`).
+
+## Available MCP Servers
+
+This workspace has the following MCP servers configured. Use them for their specific capabilities:
+
+| MCP Server | When to Use |
+|---|---|
+| `context7` | Fetch up-to-date library documentation (Spring Boot, Angular, Hibernate, etc.) |
+| `Ref` | Read/search documentation URLs for APIs and frameworks |
+| `awslabs-cfn` | Create/update/delete AWS CloudFormation resources |
+| `awslabs-iam` | Manage IAM users, roles, policies, access keys |
+| `awslabs-dynamodb` | Design, model, and validate DynamoDB schemas |
+| `awslabs-lambda` | Invoke AWS Lambda functions |
+| `awslabs-docs` | Search and read AWS official documentation |
+| `supabase` | Manage Supabase projects, run SQL, deploy edge functions |
+| `notebooklm-mcp` | Create Google NotebookLM notebooks, add sources, generate audio |
+| `playwright` | Browser automation for E2E testing and UI interaction |
+| `chrome-devtools` | Browser DevTools: screenshots, performance, console, network |
+| `firecrawl-mcp` | Web scraping, crawling, search |
+| `shadcn-ui` | Get shadcn/ui component code |
+| `magic-mcp` | Generate UI components via 21st.dev |
+| `netlify` | Deploy and manage Netlify projects |
+| `sequential-thinking` | Break complex problems into sequential reasoning steps |
+
+## Specialized Agents
+
+Use the `Agent` tool with these `subagent_type` values for specialized tasks:
+
+| Agent | When to Use |
+|---|---|
+| `lucas-frontend-engineer` | Build/review Angular/React components, pages, services, UX patterns |
+| `backend-architect` | Implement/review REST endpoints, use cases, JPA entities, Clean Architecture |
+| `postgres-architect` | Design/optimize PostgreSQL schemas, Flyway migrations, query performance |
+| `qa-engineer` | Create test plans, write unit/integration tests, review test coverage |
+| `security-hardening-validator` | Review auth, CORS, input validation, JWT, API security |
+| `devops-deploy-architect` | Design CI/CD pipelines, Docker configs, production readiness checklists |
+| `sre-observability` | Add logging, metrics, tracing, health checks, alerts |
+| `architecture-advisor` | Architectural decisions, refactoring strategy, trade-off analysis |
+| `code-quality-reviewer` | Code review before merge: patterns, production readiness |
+| `llm-integration-architect` | Integrate LLM/AI features with guardrails and cost optimization |
+| `Explore` | Explore codebase: find files by pattern, search for keywords |
+| `Plan` | Design implementation plans for complex tasks |
