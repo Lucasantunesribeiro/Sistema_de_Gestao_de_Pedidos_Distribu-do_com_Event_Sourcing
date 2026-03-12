@@ -99,6 +99,13 @@ public class Payment {
         this.errorCode = null;
     }
 
+    public void markAsRefunded(String refundTransactionId) {
+        this.status = PaymentStatus.REFUNDED;
+        this.transactionId = refundTransactionId;
+        this.failureReason = null;
+        this.errorCode = null;
+    }
+
     public boolean isCompleted() {
         return PaymentStatus.COMPLETED.equals(status);
     }

@@ -1,5 +1,6 @@
 package com.ordersystem.unified.test;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -9,8 +10,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Simple test controller to verify Spring Boot is working correctly.
+ * Development/test utility controller — NOT loaded in the production profile.
+ * Exposes simple smoke-test endpoints at /api/test.
  */
+@Profile("!production")
 @RestController
 @RequestMapping("/api/test")
 public class TestController {

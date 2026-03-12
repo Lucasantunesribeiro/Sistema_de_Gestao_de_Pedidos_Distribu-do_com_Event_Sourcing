@@ -3,6 +3,7 @@ package com.ordersystem.unified.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -24,13 +25,22 @@ public class WebConfig implements WebMvcConfigurer {
     @Autowired
     private MetricsInterceptor metricsInterceptor;
 
+    /**
+     * Comma-separated list of allowed CORS origins.
+     * Defaults to localhost:4200 (Angular dev server) and localhost:8080.
+     * Override via CORS_ALLOWED_ORIGINS env var in production.
+     */
+    @Value("${app.cors.allowed-origins:http://localhost:4200,http://localhost:8080}")
+    private String[] allowedOrigins;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins("*")
+                .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(false);
+                .allowedHeaders("Authorization", "Content-Type", "X-Correlation-ID")
+                .allowCredentials(true)
+                .maxAge(3600);
     }
 
     @Override

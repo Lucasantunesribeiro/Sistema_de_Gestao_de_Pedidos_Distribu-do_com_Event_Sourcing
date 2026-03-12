@@ -37,6 +37,11 @@ logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
+# Inventory mock mode – avoids needing seeded Stock rows in H2
+inventory:
+  mock-mode: true
+  default-stock: 1000
+
 # Test-specific configurations
 test:
   performance:
