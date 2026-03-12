@@ -1,0 +1,134 @@
+.dashboard {
+  max-width: 1100px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.last-updated {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+// Stat card color variants
+.stat-card {
+  border-top: 3px solid #e2e8f0;
+
+  &--green { border-top-color: #10b981; }
+  &--yellow { border-top-color: #f59e0b; }
+  &--red { border-top-color: #ef4444; }
+  &--blue { border-top-color: #3b82f6; }
+}
+
+.stat-value {
+  &.confirmed { color: #065f46; }
+  &.pending   { color: #92400e; }
+  &.cancelled { color: #991b1b; }
+  &.revenue   { font-size: 1.5rem; }
+}
+
+// Events
+.events-card {
+  margin-bottom: 1.5rem;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-bottom: 1rem;
+}
+
+.events-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem;
+  background: #f8fafc;
+  border-radius: 0.5rem;
+}
+
+.event-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &.dot-pending           { background: #f59e0b; }
+  &.dot-inventory_reserved { background: #3b82f6; }
+  &.dot-payment_processing { background: #8b5cf6; }
+  &.dot-confirmed          { background: #10b981; }
+  &.dot-cancelled          { background: #ef4444; }
+  &.dot-failed             { background: #ec4899; }
+}
+
+.event-content {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  font-size: 0.8rem;
+
+  .event-order   { font-weight: 600; color: #1e3a5f; }
+  .event-customer { color: #64748b; }
+  .event-status  { font-weight: 500; color: #374151; margin-left: auto; }
+}
+
+.event-time {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+// Quick links
+.quick-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.quick-link-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 2px 8px rgba(59,130,246,0.1);
+  }
+}
+
+.ql-icon {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+}
+
+.ql-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #1e3a5f;
+}
+
+.ql-sub {
+  font-size: 0.775rem;
+  color: #94a3b8;
+  margin-top: 0.125rem;
+}

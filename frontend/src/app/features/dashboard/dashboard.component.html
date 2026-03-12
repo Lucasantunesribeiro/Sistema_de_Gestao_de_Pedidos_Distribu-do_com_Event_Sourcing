@@ -1,0 +1,104 @@
+<div class="dashboard">
+  <div class="page-header">
+    <h2 class="page-heading">Dashboard</h2>
+    <div class="header-actions">
+      <span class="last-updated" *ngIf="lastUpdated">
+        Last updated: {{ lastUpdated | date:'HH:mm:ss' }}
+      </span>
+      <button class="btn btn-secondary btn-sm" (click)="loadStats()" [disabled]="state === 'loading'">
+        Refresh
+      </button>
+      <a routerLink="/orders/new" class="btn btn-primary btn-sm">
+        + New Order
+      </a>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <app-loading-spinner *ngIf="state === 'loading'" message="Loading statistics..."></app-loading-spinner>
+
+  <!-- Error -->
+  <div class="alert alert-error" *ngIf="state === 'error'">
+    <span>{{ errorMessage }}</span>
+    <button class="btn btn-sm btn-secondary" style="margin-left: auto" (click)="loadStats()">
+      Retry
+    </button>
+  </div>
+
+  <!-- Success -->
+  <ng-container *ngIf="state === 'success' && stats">
+    <!-- Stat cards -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Orders</div>
+        <div class="stat-value">{{ stats.totalOrders }}</div>
+        <div class="stat-sub">All time</div>
+      </div>
+
+      <div class="stat-card stat-card--green">
+        <div class="stat-label">Confirmed</div>
+        <div class="stat-value confirmed">{{ stats.confirmedOrders }}</div>
+        <div class="stat-sub">{{ confirmationRate }}% confirmation rate</div>
+      </div>
+
+      <div class="stat-card stat-card--yellow">
+        <div class="stat-label">Pending</div>
+        <div class="stat-value pending">{{ stats.pendingOrders }}</div>
+        <div class="stat-sub">Awaiting processing</div>
+      </div>
+
+      <div class="stat-card stat-card--red">
+        <div class="stat-label">Cancelled</div>
+        <div class="stat-value cancelled">{{ stats.cancelledOrders }}</div>
+        <div class="stat-sub">{{ cancellationRate }}% cancellation rate</div>
+      </div>
+
+      <div class="stat-card stat-card--blue">
+        <div class="stat-label">Total Revenue</div>
+        <div class="stat-value revenue">{{ formatCurrency(stats.totalRevenue) }}</div>
+        <div class="stat-sub">From confirmed orders</div>
+      </div>
+    </div>
+
+    <!-- Recent real-time events -->
+    <div class="card events-card" *ngIf="recentEvents.length > 0">
+      <h3 class="section-title">Live Order Updates</h3>
+      <ul class="events-list" aria-label="Recent order events">
+        <li class="event-item" *ngFor="let event of recentEvents">
+          <div class="event-dot" [ngClass]="'dot-' + event.status.toLowerCase()"></div>
+          <div class="event-content">
+            <span class="event-order">Order {{ event.orderId | slice:0:8 }}...</span>
+            <span class="event-customer">{{ event.customerName }}</span>
+            <span class="event-status">{{ event.status }}</span>
+          </div>
+          <span class="event-time">{{ event.timestamp | date:'HH:mm:ss' }}</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Quick links -->
+    <div class="quick-links">
+      <a routerLink="/orders" class="quick-link-card">
+        <span class="ql-icon">&#128203;</span>
+        <div>
+          <div class="ql-title">View All Orders</div>
+          <div class="ql-sub">Browse and filter orders</div>
+        </div>
+      </a>
+      <a routerLink="/orders/new" class="quick-link-card">
+        <span class="ql-icon">&#43;</span>
+        <div>
+          <div class="ql-title">Create New Order</div>
+          <div class="ql-sub">Submit a new customer order</div>
+        </div>
+      </a>
+      <a routerLink="/inventory" class="quick-link-card">
+        <span class="ql-icon">&#128230;</span>
+        <div>
+          <div class="ql-title">Inventory Status</div>
+          <div class="ql-sub">Check stock availability</div>
+        </div>
+      </a>
+    </div>
+  </ng-container>
+</div>

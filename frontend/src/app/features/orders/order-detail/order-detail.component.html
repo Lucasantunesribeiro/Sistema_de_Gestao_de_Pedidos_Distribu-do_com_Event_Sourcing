@@ -1,0 +1,135 @@
+<div class="order-detail">
+  <div class="page-header">
+    <div class="breadcrumb">
+      <a routerLink="/orders" class="breadcrumb-link">Orders</a>
+      <span class="breadcrumb-sep">/</span>
+      <span>Order Detail</span>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <app-loading-spinner *ngIf="state === 'loading'" message="Loading order..."></app-loading-spinner>
+
+  <!-- Error -->
+  <div class="alert alert-error" *ngIf="state === 'error'">
+    <span>{{ errorMessage }}</span>
+    <a routerLink="/orders" class="btn btn-sm btn-secondary" style="margin-left: auto">Back to Orders</a>
+  </div>
+
+  <!-- Order data -->
+  <ng-container *ngIf="state === 'success' && order">
+
+    <!-- Cancel confirmation dialog -->
+    <div class="modal-overlay" *ngIf="showCancelConfirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div class="modal">
+        <h3 id="confirm-title" class="modal-title">Cancel Order?</h3>
+        <p class="modal-body">
+          Are you sure you want to cancel order
+          <strong>{{ order.orderId | slice:0:8 }}...</strong>?
+          This action cannot be undone.
+        </p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" (click)="dismissCancel()">Keep Order</button>
+          <button class="btn btn-danger" (click)="confirmCancel()">Yes, Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="detail-header card">
+      <div class="detail-title-row">
+        <div>
+          <h2 class="detail-order-id">Order {{ order.orderId | slice:0:8 }}...</h2>
+          <p class="detail-subtitle" title="{{ order.orderId }}">
+            Full ID: <code>{{ order.orderId }}</code>
+          </p>
+        </div>
+        <div class="detail-actions">
+          <app-status-badge [status]="order.status"></app-status-badge>
+          <button
+            *ngIf="canCancel"
+            class="btn btn-danger"
+            (click)="requestCancel()"
+            [disabled]="cancelLoading"
+          >
+            {{ cancelLoading ? 'Cancelling...' : 'Cancel Order' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Cancellation reason -->
+      <div class="cancellation-reason alert alert-error" *ngIf="order.cancellationReason">
+        <strong>Cancellation reason:</strong> {{ order.cancellationReason }}
+      </div>
+    </div>
+
+    <!-- Order info grid -->
+    <div class="info-grid">
+      <div class="card info-card">
+        <h3 class="info-title">Customer</h3>
+        <dl class="info-list">
+          <dt>Name</dt><dd>{{ order.customerName }}</dd>
+          <dt>Customer ID</dt><dd><code>{{ order.customerId }}</code></dd>
+        </dl>
+      </div>
+
+      <div class="card info-card">
+        <h3 class="info-title">Payment</h3>
+        <dl class="info-list">
+          <dt>Method</dt><dd>{{ order.paymentMethod | titlecase }}</dd>
+          <dt>Total</dt><dd class="amount">{{ formatCurrency(order.totalAmount) }}</dd>
+          <dt *ngIf="order.transactionId">Transaction ID</dt>
+          <dd *ngIf="order.transactionId"><code>{{ order.transactionId }}</code></dd>
+        </dl>
+      </div>
+
+      <div class="card info-card">
+        <h3 class="info-title">Tracking</h3>
+        <dl class="info-list">
+          <dt>Created</dt><dd>{{ formatDate(order.createdAt) }}</dd>
+          <dt>Updated</dt><dd>{{ formatDate(order.updatedAt) }}</dd>
+          <dt *ngIf="order.correlationId">Correlation ID</dt>
+          <dd *ngIf="order.correlationId"><code>{{ order.correlationId | slice:0:12 }}...</code></dd>
+          <dt *ngIf="order.reservationId">Reservation ID</dt>
+          <dd *ngIf="order.reservationId"><code>{{ order.reservationId }}</code></dd>
+          <dt *ngIf="order.paymentId">Payment ID</dt>
+          <dd *ngIf="order.paymentId"><code>{{ order.paymentId }}</code></dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Items table -->
+    <div class="card items-card">
+      <h3 class="info-title">Order Items</h3>
+      <div class="table-wrapper">
+        <table aria-label="Order items">
+          <thead>
+            <tr>
+              <th scope="col">Product</th>
+              <th scope="col">Product ID</th>
+              <th scope="col" class="text-right">Qty</th>
+              <th scope="col" class="text-right">Unit Price</th>
+              <th scope="col" class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of order.items">
+              <td>{{ item.productName }}</td>
+              <td><code class="product-id">{{ item.productId }}</code></td>
+              <td class="text-right">{{ item.quantity }}</td>
+              <td class="text-right">{{ formatCurrency(item.unitPrice) }}</td>
+              <td class="text-right amount">{{ formatCurrency(item.totalPrice) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="4" class="text-right total-label">Order Total</td>
+              <td class="text-right amount">{{ formatCurrency(order.totalAmount) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+  </ng-container>
+</div>

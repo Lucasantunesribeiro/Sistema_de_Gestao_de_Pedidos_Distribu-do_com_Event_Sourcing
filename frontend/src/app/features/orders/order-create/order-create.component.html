@@ -1,0 +1,208 @@
+<div class="order-create">
+  <div class="page-header">
+    <div class="breadcrumb">
+      <a routerLink="/orders" class="breadcrumb-link">Orders</a>
+      <span class="breadcrumb-sep">/</span>
+      <span>New Order</span>
+    </div>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate aria-label="Create order form">
+    <div class="form-layout">
+
+      <!-- Customer section -->
+      <div class="card form-section">
+        <h3 class="section-heading">Customer Information</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="customerId">Customer ID <span class="required">*</span></label>
+            <input
+              id="customerId"
+              type="text"
+              class="form-control"
+              [class.error]="isFieldInvalid(form.get('customerId'))"
+              formControlName="customerId"
+              placeholder="e.g. CUST-001"
+              autocomplete="off"
+              aria-required="true"
+            />
+            <span class="form-error" *ngIf="isFieldInvalid(form.get('customerId'))">
+              Customer ID is required (min 3 characters).
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="customerName">Customer Name <span class="required">*</span></label>
+            <input
+              id="customerName"
+              type="text"
+              class="form-control"
+              [class.error]="isFieldInvalid(form.get('customerName'))"
+              formControlName="customerName"
+              placeholder="e.g. John Doe"
+              autocomplete="name"
+              aria-required="true"
+            />
+            <span class="form-error" *ngIf="isFieldInvalid(form.get('customerName'))">
+              Customer name is required.
+            </span>
+          </div>
+        </div>
+
+        <div class="form-group" style="max-width: 280px">
+          <label class="form-label" for="paymentMethod">Payment Method <span class="required">*</span></label>
+          <select
+            id="paymentMethod"
+            class="form-control"
+            [class.error]="isFieldInvalid(form.get('paymentMethod'))"
+            formControlName="paymentMethod"
+            aria-required="true"
+          >
+            <option value="">Select a payment method</option>
+            <option *ngFor="let method of paymentMethods" [value]="method.value">
+              {{ method.label }}
+            </option>
+          </select>
+          <span class="form-error" *ngIf="isFieldInvalid(form.get('paymentMethod'))">
+            Please select a payment method.
+          </span>
+        </div>
+      </div>
+
+      <!-- Items section -->
+      <div class="card form-section">
+        <div class="items-header">
+          <h3 class="section-heading">Order Items</h3>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="addItem()"
+            [disabled]="!canAddItem"
+          >
+            + Add Item
+          </button>
+        </div>
+        <p class="items-hint" *ngIf="!canAddItem">Maximum 3 items per order.</p>
+
+        <div class="items-list" formArrayName="items">
+          <div
+            class="item-card"
+            *ngFor="let item of items.controls; let i = index"
+            [formGroupName]="i"
+          >
+            <div class="item-header">
+              <span class="item-number">Item {{ i + 1 }}</span>
+              <button
+                *ngIf="items.length > 1"
+                type="button"
+                class="remove-item"
+                (click)="removeItem(i)"
+                [attr.aria-label]="'Remove item ' + (i + 1)"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" [for]="'productId-' + i">Product ID <span class="required">*</span></label>
+                <input
+                  [id]="'productId-' + i"
+                  type="text"
+                  class="form-control"
+                  [class.error]="isFieldInvalid(getItemControl(i, 'productId'))"
+                  formControlName="productId"
+                  placeholder="e.g. PROD-001"
+                  autocomplete="off"
+                />
+                <span class="form-error" *ngIf="isFieldInvalid(getItemControl(i, 'productId'))">
+                  Product ID is required.
+                </span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" [for]="'productName-' + i">Product Name <span class="required">*</span></label>
+                <input
+                  [id]="'productName-' + i"
+                  type="text"
+                  class="form-control"
+                  [class.error]="isFieldInvalid(getItemControl(i, 'productName'))"
+                  formControlName="productName"
+                  placeholder="e.g. Laptop Pro"
+                />
+                <span class="form-error" *ngIf="isFieldInvalid(getItemControl(i, 'productName'))">
+                  Product name is required.
+                </span>
+              </div>
+            </div>
+
+            <div class="form-row form-row--narrow">
+              <div class="form-group">
+                <label class="form-label" [for]="'quantity-' + i">Quantity <span class="required">*</span></label>
+                <input
+                  [id]="'quantity-' + i"
+                  type="number"
+                  class="form-control"
+                  [class.error]="isFieldInvalid(getItemControl(i, 'quantity'))"
+                  formControlName="quantity"
+                  min="1"
+                  max="100"
+                />
+                <span class="form-error" *ngIf="isFieldInvalid(getItemControl(i, 'quantity'))">
+                  Quantity must be between 1 and 100.
+                </span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" [for]="'unitPrice-' + i">Unit Price (R$) <span class="required">*</span></label>
+                <input
+                  [id]="'unitPrice-' + i"
+                  type="number"
+                  class="form-control"
+                  [class.error]="isFieldInvalid(getItemControl(i, 'unitPrice'))"
+                  formControlName="unitPrice"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                />
+                <span class="form-error" *ngIf="isFieldInvalid(getItemControl(i, 'unitPrice'))">
+                  Unit price must be greater than 0.
+                </span>
+              </div>
+
+              <div class="form-group item-total">
+                <span class="form-label">Item Total</span>
+                <span class="total-value">{{ formatCurrency(itemTotal(i)) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary & submit -->
+      <div class="card form-section summary-section">
+        <div class="order-summary">
+          <span class="summary-label">Order Total</span>
+          <span class="summary-total">{{ formatCurrency(orderTotal) }}</span>
+        </div>
+
+        <div class="alert alert-error" *ngIf="submitError">
+          {{ submitError }}
+        </div>
+
+        <div class="form-actions">
+          <a routerLink="/orders" class="btn btn-secondary">Cancel</a>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="submitting"
+          >
+            {{ submitting ? 'Creating Order...' : 'Create Order' }}
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>

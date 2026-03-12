@@ -1,0 +1,125 @@
+.inventory-page {
+  max-width: 1100px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.last-updated {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+// Stat card colors (inherit from global)
+.stat-card {
+  border-top: 3px solid #e2e8f0;
+  &--green { border-top-color: #10b981; }
+  &--blue  { border-top-color: #3b82f6; }
+  &--red   { border-top-color: #ef4444; }
+}
+
+.low-stock-value {
+  color: #dc2626;
+}
+
+// Filter bar
+.filter-bar {
+  padding: 0.875rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+}
+
+.low-stock-badge {
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 9999px;
+}
+
+// Table
+.text-right { text-align: right; }
+
+.product-name {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.product-id {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.qty-available { color: #065f46; font-weight: 600; }
+.qty-reserved  { color: #5b21b6; }
+.qty-total     { color: #374151; }
+
+// Stock bar
+.stock-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 120px;
+}
+
+.stock-bar-wrapper {
+  flex: 1;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.stock-bar {
+  height: 100%;
+  border-radius: 9999px;
+  background: #10b981;
+  transition: width 0.3s ease;
+
+  &.bar-low      { background: #f59e0b; }
+  &.bar-critical { background: #ef4444; }
+}
+
+.stock-pct {
+  font-size: 0.75rem;
+  color: #64748b;
+  min-width: 34px;
+  text-align: right;
+}
+
+// Status chip
+.status-chip {
+  display: inline-flex;
+  padding: 0.2rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &.chip-ok       { background: #d1fae5; color: #065f46; }
+  &.chip-low      { background: #fef3c7; color: #92400e; }
+  &.chip-critical { background: #fee2e2; color: #991b1b; }
+}
+
+// Row highlights
+.row-critical td { background: #fff5f5; }
+.row-low td      { background: #fffbeb; }

@@ -1,0 +1,71 @@
+<div class="app-shell" [class.sidebar-collapsed]="!sidebarOpen">
+  <!-- Sidebar -->
+  <aside class="sidebar" [class.open]="sidebarOpen">
+    <div class="sidebar-header">
+      <div class="logo" *ngIf="sidebarOpen">
+        <span class="logo-icon">OF</span>
+        <span class="logo-text">OrderFlow</span>
+      </div>
+      <button class="sidebar-toggle" (click)="toggleSidebar()" aria-label="Toggle sidebar">
+        <span class="hamburger"></span>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+      <a
+        routerLink="/dashboard"
+        routerLinkActive="active"
+        class="nav-item"
+        [title]="!sidebarOpen ? 'Dashboard' : ''"
+      >
+        <span class="nav-icon" aria-hidden="true">&#9781;</span>
+        <span class="nav-label" *ngIf="sidebarOpen">Dashboard</span>
+      </a>
+
+      <a
+        routerLink="/orders"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: false }"
+        class="nav-item"
+        [title]="!sidebarOpen ? 'Orders' : ''"
+      >
+        <span class="nav-icon" aria-hidden="true">&#128203;</span>
+        <span class="nav-label" *ngIf="sidebarOpen">Orders</span>
+      </a>
+
+      <a
+        routerLink="/inventory"
+        routerLinkActive="active"
+        class="nav-item"
+        [title]="!sidebarOpen ? 'Inventory' : ''"
+      >
+        <span class="nav-icon" aria-hidden="true">&#128230;</span>
+        <span class="nav-label" *ngIf="sidebarOpen">Inventory</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer" *ngIf="sidebarOpen">
+      <span class="version">v1.0.0</span>
+    </div>
+  </aside>
+
+  <!-- Main area -->
+  <div class="main-area">
+    <header class="topbar">
+      <h1 class="page-title">Order Management System</h1>
+      <div class="topbar-right">
+        <span class="ws-indicator" title="WebSocket connected">
+          <span class="ws-dot"></span>
+          Live
+        </span>
+      </div>
+    </header>
+
+    <main class="content" role="main">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+
+  <!-- Toast notifications -->
+  <app-toast></app-toast>
+</div>

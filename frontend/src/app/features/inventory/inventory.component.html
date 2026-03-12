@@ -1,0 +1,122 @@
+<div class="inventory-page">
+  <div class="page-header">
+    <h2 class="page-heading">Inventory</h2>
+    <div class="header-actions">
+      <span class="last-updated" *ngIf="lastUpdated">
+        Updated: {{ lastUpdated | date:'HH:mm:ss' }}
+      </span>
+      <button class="btn btn-secondary btn-sm" (click)="loadInventory()" [disabled]="state === 'loading'">
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <app-loading-spinner *ngIf="state === 'loading'" message="Loading inventory..."></app-loading-spinner>
+
+  <!-- Error -->
+  <div class="alert alert-error" *ngIf="state === 'error'">
+    <span>{{ errorMessage }}</span>
+    <button class="btn btn-sm btn-secondary" style="margin-left: auto" (click)="loadInventory()">Retry</button>
+  </div>
+
+  <ng-container *ngIf="inventory && (state === 'success' || state === 'empty')">
+    <!-- Summary stats -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Products</div>
+        <div class="stat-value">{{ inventory.totalProducts }}</div>
+      </div>
+      <div class="stat-card stat-card--green">
+        <div class="stat-label">Available Units</div>
+        <div class="stat-value">{{ inventory.totalAvailable }}</div>
+      </div>
+      <div class="stat-card stat-card--blue">
+        <div class="stat-label">Reserved Units</div>
+        <div class="stat-value">{{ inventory.totalReserved }}</div>
+      </div>
+      <div class="stat-card" [class.stat-card--red]="inventory.lowStockItems > 0">
+        <div class="stat-label">Low Stock Items</div>
+        <div class="stat-value" [class.low-stock-value]="inventory.lowStockItems > 0">
+          {{ inventory.lowStockItems }}
+        </div>
+        <div class="stat-sub" *ngIf="inventory.lowStockItems > 0">Needs attention</div>
+      </div>
+    </div>
+
+    <!-- Filter toggle -->
+    <div class="filter-bar card" *ngIf="state === 'success'">
+      <label class="toggle-label">
+        <input
+          type="checkbox"
+          [checked]="filterLowStock"
+          (change)="filterLowStock = !filterLowStock"
+        />
+        Show low stock items only
+        <span class="low-stock-badge" *ngIf="inventory.lowStockItems > 0">
+          {{ inventory.lowStockItems }}
+        </span>
+      </label>
+    </div>
+
+    <!-- Empty -->
+    <div class="empty-state" *ngIf="state === 'empty' || filteredItems.length === 0">
+      <div class="empty-icon">&#128230;</div>
+      <div class="empty-title">
+        {{ state === 'empty' ? 'No inventory data available' : 'No items match the filter' }}
+      </div>
+      <div class="empty-sub">
+        {{ state === 'empty' ? 'The inventory system has no products loaded yet.' : 'All products have sufficient stock.' }}
+      </div>
+    </div>
+
+    <!-- Items table -->
+    <div class="card" style="padding: 0; overflow: hidden" *ngIf="filteredItems.length > 0">
+      <div class="table-wrapper">
+        <table aria-label="Inventory items">
+          <thead>
+            <tr>
+              <th scope="col">Product</th>
+              <th scope="col">Product ID</th>
+              <th scope="col" class="text-right">Available</th>
+              <th scope="col" class="text-right">Reserved</th>
+              <th scope="col" class="text-right">Total</th>
+              <th scope="col">Stock Level</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of filteredItems" [class.row-critical]="getStockStatus(item) === 'critical'" [class.row-low]="getStockStatus(item) === 'low'">
+              <td class="product-name">{{ item.productName }}</td>
+              <td><code class="product-id">{{ item.productId }}</code></td>
+              <td class="text-right qty-available">{{ item.availableQuantity }}</td>
+              <td class="text-right qty-reserved">{{ item.reservedQuantity }}</td>
+              <td class="text-right qty-total">{{ item.totalQuantity }}</td>
+              <td class="stock-bar-cell">
+                <div class="stock-bar-wrapper" role="progressbar"
+                  [attr.aria-valuenow]="getStockPercent(item)"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  [attr.aria-label]="item.productName + ' stock level'"
+                >
+                  <div
+                    class="stock-bar"
+                    [class.bar-critical]="getStockStatus(item) === 'critical'"
+                    [class.bar-low]="getStockStatus(item) === 'low'"
+                    [style.width.%]="getStockPercent(item)"
+                  ></div>
+                </div>
+                <span class="stock-pct">{{ getStockPercent(item) }}%</span>
+              </td>
+              <td>
+                <span class="status-chip" [ngClass]="'chip-' + getStockStatus(item)">
+                  {{ getStockStatus(item) === 'critical' ? 'Out of Stock' : getStockStatus(item) === 'low' ? 'Low Stock' : 'In Stock' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+</div>
