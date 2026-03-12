@@ -1,6 +1,6 @@
 spring:
   application:
-    name: unified-order-system
+    name: orderflow
 
   jackson:
     serialization:
