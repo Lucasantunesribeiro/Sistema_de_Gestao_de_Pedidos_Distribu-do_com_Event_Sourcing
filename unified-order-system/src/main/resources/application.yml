@@ -61,6 +61,14 @@ management:
     export:
       prometheus:
         enabled: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLE_RATE:1.0}
+
+# Distributed tracing — exports spans to Tempo (via Zipkin-compatible endpoint)
+spring.zipkin:
+  base-url: ${ZIPKIN_BASE_URL:http://localhost:9411}
+  enabled: ${TRACING_ENABLED:false}
 
 logging:
   level:

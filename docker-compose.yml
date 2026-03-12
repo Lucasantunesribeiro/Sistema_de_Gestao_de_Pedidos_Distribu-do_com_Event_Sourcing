@@ -92,6 +92,9 @@ services:
       CACHE_TYPE: simple
       LOG_LEVEL: INFO
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:8080}
+      TRACING_ENABLED: "true"
+      TRACING_SAMPLE_RATE: "1.0"
+      ZIPKIN_BASE_URL: http://tempo:9411
     depends_on:
       postgres:
         condition: service_healthy
