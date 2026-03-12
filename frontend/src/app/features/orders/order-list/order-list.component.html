@@ -1,0 +1,136 @@
+<div class="orders-page">
+  <div class="page-header">
+    <h2 class="page-heading">Orders</h2>
+    <a routerLink="/orders/new" class="btn btn-primary">+ New Order</a>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters card">
+    <div class="filter-row">
+      <div class="form-group">
+        <label class="form-label" for="statusFilter">Filter by Status</label>
+        <select
+          id="statusFilter"
+          class="form-control"
+          [(ngModel)]="selectedStatus"
+          (ngModelChange)="onStatusChange()"
+          style="max-width: 220px"
+        >
+          <option *ngFor="let opt of statusOptions" [value]="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+      <div class="results-count" *ngIf="state === 'success'">
+        {{ totalElements }} order{{ totalElements !== 1 ? 's' : '' }} found
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <app-loading-spinner *ngIf="state === 'loading'" message="Loading orders..."></app-loading-spinner>
+
+  <!-- Error -->
+  <div class="alert alert-error" *ngIf="state === 'error'">
+    <span>{{ errorMessage }}</span>
+    <button class="btn btn-sm btn-secondary" style="margin-left: auto" (click)="loadOrders()">Retry</button>
+  </div>
+
+  <!-- Empty -->
+  <div class="empty-state" *ngIf="state === 'empty'">
+    <div class="empty-icon">&#128203;</div>
+    <div class="empty-title">No orders found</div>
+    <div class="empty-sub">
+      {{ selectedStatus ? 'Try a different status filter.' : 'Create your first order to get started.' }}
+    </div>
+    <a routerLink="/orders/new" class="btn btn-primary" style="margin-top: 1rem">
+      Create Order
+    </a>
+  </div>
+
+  <!-- Table -->
+  <ng-container *ngIf="state === 'success'">
+    <div class="card" style="padding: 0; overflow: hidden">
+      <div class="table-wrapper">
+        <table aria-label="Orders table">
+          <thead>
+            <tr>
+              <th scope="col">Order ID</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Status</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Date</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let order of orders">
+              <td>
+                <span class="order-id" title="{{ order.orderId }}">
+                  {{ order.orderId | slice:0:8 }}...
+                </span>
+              </td>
+              <td>
+                <div class="customer-name">{{ order.customerName }}</div>
+                <div class="customer-id">{{ order.customerId }}</div>
+              </td>
+              <td>
+                <app-status-badge [status]="order.status"></app-status-badge>
+              </td>
+              <td class="amount">{{ formatCurrency(order.totalAmount) }}</td>
+              <td class="date">{{ formatDate(order.createdAt) }}</td>
+              <td>
+                <a
+                  [routerLink]="['/orders', order.orderId]"
+                  class="btn btn-sm btn-secondary"
+                >
+                  View
+                </a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination" *ngIf="totalPages > 1">
+        <button
+          class="page-btn"
+          (click)="goToPage(0)"
+          [disabled]="currentPage === 0"
+          aria-label="First page"
+        >&laquo;</button>
+        <button
+          class="page-btn"
+          (click)="goToPage(currentPage - 1)"
+          [disabled]="currentPage === 0"
+          aria-label="Previous page"
+        >&lsaquo;</button>
+
+        <button
+          class="page-btn"
+          *ngFor="let p of pageNumbers"
+          [class.active]="p === currentPage"
+          (click)="goToPage(p)"
+          [attr.aria-label]="'Page ' + (p + 1)"
+          [attr.aria-current]="p === currentPage ? 'page' : null"
+        >
+          {{ p + 1 }}
+        </button>
+
+        <button
+          class="page-btn"
+          (click)="goToPage(currentPage + 1)"
+          [disabled]="currentPage === totalPages - 1"
+          aria-label="Next page"
+        >&rsaquo;</button>
+        <button
+          class="page-btn"
+          (click)="goToPage(totalPages - 1)"
+          [disabled]="currentPage === totalPages - 1"
+          aria-label="Last page"
+        >&raquo;</button>
+      </div>
+    </div>
+  </ng-container>
+</div>
