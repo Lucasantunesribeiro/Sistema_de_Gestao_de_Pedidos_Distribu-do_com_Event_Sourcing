@@ -15,18 +15,18 @@ updates:
       prefix: "chore(deps)"
       include: "scope"
 
-  # NPM dependencies for frontend
+  # NPM dependencies for Angular frontend
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-      day: "monday"  
+      day: "monday"
       time: "10:00"
     open-pull-requests-limit: 5
     reviewers:
       - "@dependabot[bot]"
     commit-message:
-      prefix: "chore(deps)"
+      prefix: "chore(deps-frontend)"
       include: "scope"
 
   # GitHub Actions updates

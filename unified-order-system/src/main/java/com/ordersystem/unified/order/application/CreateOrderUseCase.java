@@ -229,7 +229,7 @@ public class CreateOrderUseCase {
             ))
             .collect(Collectors.toList());
 
-        ReservationResponse reservationResponse = inventoryService.reserveItems(items);
+        ReservationResponse reservationResponse = inventoryService.reserveItems(order.getId(), items);
 
         if (reservationResponse.getStatus() != com.ordersystem.unified.inventory.dto.ReservationStatus.RESERVED) {
             throw new InsufficientInventoryException(

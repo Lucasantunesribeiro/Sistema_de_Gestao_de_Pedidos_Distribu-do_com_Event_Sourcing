@@ -185,6 +185,32 @@ public class PaymentService {
     }
 
     /**
+     * Processes a refund for a completed payment.
+     * Marks the payment as REFUNDED and returns the refund transaction ID.
+     *
+     * @param paymentId ID of the payment to refund
+     * @param reason    Human-readable refund reason
+     * @return refund transaction ID if successful, empty otherwise
+     */
+    public Optional<String> refundPayment(String paymentId, String reason) {
+        logger.info("Processing refund for payment: {}, reason: {}", paymentId, reason);
+
+        return paymentRepository.findById(paymentId).map(payment -> {
+            if (!payment.isCompleted()) {
+                logger.warn("Cannot refund payment in status {}: paymentId={}", payment.getStatus(), paymentId);
+                return null;
+            }
+
+            String refundTransactionId = "REF-" + UUID.randomUUID().toString().substring(0, 8);
+            payment.markAsRefunded(refundTransactionId);
+            paymentRepository.save(payment);
+
+            logger.info("Payment refunded: paymentId={}, refundTxId={}", paymentId, refundTransactionId);
+            return refundTransactionId;
+        });
+    }
+
+    /**
      * Checks if a successful payment exists for an order.
      */
     public boolean hasSuccessfulPayment(String orderId) {

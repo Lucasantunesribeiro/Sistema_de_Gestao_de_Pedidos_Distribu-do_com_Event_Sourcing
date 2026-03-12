@@ -185,16 +185,15 @@ public class CancelOrderUseCase {
                 return true; // No refund needed, so consider it success
             }
 
-            // TODO: Implement actual refund logic
-            // For now, we'll just log it
-            logger.info("Payment refund processed: paymentId={}, amount={}, reason={}",
-                       payment.getId(), payment.getAmount(), refundReason);
-
-            // In production, call payment gateway refund API
-            // payment.markAsRefunded(refundTransactionId);
-            // paymentRepository.save(payment);
-
-            return true;
+            Optional<String> refundTxId = paymentService.refundPayment(payment.getId(), refundReason);
+            if (refundTxId.isPresent()) {
+                logger.info("Payment refunded: paymentId={}, amount={}, refundTxId={}, reason={}",
+                        payment.getId(), payment.getAmount(), refundTxId.get(), refundReason);
+                return true;
+            } else {
+                logger.warn("Refund skipped for payment {} (status={})", payment.getId(), payment.getStatus());
+                return true; // not completed, no refund needed
+            }
 
         } catch (Exception e) {
             logger.error("Failed to refund payment: paymentId={}", order.getPaymentId(), e);

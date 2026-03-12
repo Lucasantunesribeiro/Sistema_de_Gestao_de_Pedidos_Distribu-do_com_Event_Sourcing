@@ -152,6 +152,10 @@ public class EventPublisher {
             return ((com.ordersystem.unified.shared.events.OrderStatusUpdatedEvent) event).getOrderId();
         } else if (event instanceof com.ordersystem.unified.shared.events.OrderCancelledEvent) {
             return ((com.ordersystem.unified.shared.events.OrderCancelledEvent) event).getOrderId();
+        } else if (event instanceof com.ordersystem.unified.shared.events.PaymentRefundedEvent) {
+            return ((com.ordersystem.unified.shared.events.PaymentRefundedEvent) event).getOrderId();
+        } else if (event instanceof com.ordersystem.unified.shared.events.InventoryReleasedEvent) {
+            return ((com.ordersystem.unified.shared.events.InventoryReleasedEvent) event).getOrderId();
         }
 
         logger.warn("Unknown event type for aggregate ID extraction: {}",
