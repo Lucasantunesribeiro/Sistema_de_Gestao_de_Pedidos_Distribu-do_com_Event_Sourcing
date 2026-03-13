@@ -1,13 +1,21 @@
 import { Routes } from '@angular/router';
+import { authGuard, guestGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'dashboard',
     pathMatch: 'full',
+    redirectTo: 'dashboard',
+  },
+  {
+    path: 'login',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/login.component').then((m) => m.LoginComponent),
   },
   {
     path: 'dashboard',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/dashboard/dashboard.component').then(
         (m) => m.DashboardComponent
@@ -15,6 +23,7 @@ export const routes: Routes = [
   },
   {
     path: 'orders',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/orders/order-list/order-list.component').then(
         (m) => m.OrderListComponent
@@ -22,6 +31,7 @@ export const routes: Routes = [
   },
   {
     path: 'orders/new',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/orders/order-create/order-create.component').then(
         (m) => m.OrderCreateComponent
@@ -29,6 +39,7 @@ export const routes: Routes = [
   },
   {
     path: 'orders/:id',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/orders/order-detail/order-detail.component').then(
         (m) => m.OrderDetailComponent
@@ -36,6 +47,7 @@ export const routes: Routes = [
   },
   {
     path: 'inventory',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/inventory/inventory.component').then(
         (m) => m.InventoryComponent
@@ -43,6 +55,7 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: 'dashboard',
+    pathMatch: 'full',
+    redirectTo: 'login',
   },
 ];

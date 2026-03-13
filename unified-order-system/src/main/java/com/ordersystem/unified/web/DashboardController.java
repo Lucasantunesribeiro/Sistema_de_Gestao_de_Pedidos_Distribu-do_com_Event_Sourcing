@@ -7,6 +7,7 @@ import com.ordersystem.unified.payment.repository.PaymentRepository;
 import com.ordersystem.unified.shared.events.OrderStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
  * Reads real data from repositories.
  */
 @RestController
+@PreAuthorize("hasAnyRole('ADMIN','OPERATOR','VIEWER')")
 public class DashboardController {
 
     private static final Logger logger = LoggerFactory.getLogger(DashboardController.class);

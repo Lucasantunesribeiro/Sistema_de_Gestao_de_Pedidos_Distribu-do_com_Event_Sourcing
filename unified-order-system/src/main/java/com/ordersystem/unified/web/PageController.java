@@ -1,5 +1,6 @@
 package com.ordersystem.unified.web;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  * Handles all page navigation routes.
  */
 @Controller
+@Profile("legacy-ui")
 public class PageController {
 
     @GetMapping("/")

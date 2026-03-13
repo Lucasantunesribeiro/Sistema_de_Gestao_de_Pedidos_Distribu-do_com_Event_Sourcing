@@ -1,3 +1,4 @@
+<ng-container *ngIf="authService.isAuthenticated(); else guestLayout">
 <div class="app-shell" [class.sidebar-collapsed]="!sidebarOpen">
   <!-- Sidebar -->
   <aside class="sidebar" [class.open]="sidebarOpen">
@@ -54,10 +55,15 @@
     <header class="topbar">
       <h1 class="page-title">Order Management System</h1>
       <div class="topbar-right">
+        <div class="current-user">
+          <span class="current-user__name">{{ authService.getCurrentUser()?.username }}</span>
+          <span class="current-user__roles">{{ authService.getCurrentUser()?.roles?.join(', ') }}</span>
+        </div>
         <span class="ws-indicator" title="WebSocket connected">
           <span class="ws-dot"></span>
           Live
         </span>
+        <button class="btn btn-secondary btn-sm" type="button" (click)="logout()">Logout</button>
       </div>
     </header>
 
@@ -69,3 +75,9 @@
   <!-- Toast notifications -->
   <app-toast></app-toast>
 </div>
+</ng-container>
+
+<ng-template #guestLayout>
+  <router-outlet></router-outlet>
+  <app-toast></app-toast>
+</ng-template>

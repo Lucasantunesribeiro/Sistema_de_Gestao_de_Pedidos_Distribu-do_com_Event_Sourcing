@@ -13,7 +13,7 @@ import java.util.Map;
  * Development/test utility controller — NOT loaded in the production profile.
  * Exposes simple smoke-test endpoints at /api/test.
  */
-@Profile("!production")
+@Profile({"dev", "test"})
 @RestController
 @RequestMapping("/api/test")
 public class TestController {

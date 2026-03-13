@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -25,6 +26,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/payments")
+@PreAuthorize("hasAnyRole('ADMIN','OPERATOR')")
 @Tag(name = "Payments", description = "Payment management operations")
 public class PaymentController {
 
@@ -147,6 +149,7 @@ public class PaymentController {
 
     @PostMapping("/refund")
     @Operation(summary = "Process payment refund")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> processRefund(@RequestBody Map<String, Object> refundRequest) {
         String paymentId = (String) refundRequest.get("paymentId");
         logger.debug("Processing refund for payment: {}", paymentId);

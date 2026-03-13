@@ -37,6 +37,6 @@ app:
     cache-ttl: 300  # 5 minutes for development
 
 security:
-  secret: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  secret: ${SECURITY_SECRET:${JWT_SECRET_KEY:}}
   enforce-authentication: false
   h2-console-enabled: false

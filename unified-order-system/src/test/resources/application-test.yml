@@ -42,6 +42,12 @@ inventory:
   mock-mode: true
   default-stock: 1000
 
+security:
+  secret: test-secret-key-test-secret-key-123456
+  enforce-authentication: false
+  bootstrap-admin:
+    enabled: false
+
 # Test-specific configurations
 test:
   performance:

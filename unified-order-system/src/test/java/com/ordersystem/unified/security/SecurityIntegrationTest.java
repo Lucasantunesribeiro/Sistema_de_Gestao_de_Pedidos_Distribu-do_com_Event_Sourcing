@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -77,6 +78,7 @@ public class SecurityIntegrationTest {
 
     @Nested
     @DisplayName("2. Input Validation Tests")
+    @WithMockUser(roles = "ADMIN")
     class InputValidationTests {
 
         @Test
@@ -235,6 +237,7 @@ public class SecurityIntegrationTest {
 
     @Nested
     @DisplayName("3. Enum Validation Tests")
+    @WithMockUser(roles = "ADMIN")
     class EnumValidationTests {
 
         @Test
@@ -260,13 +263,14 @@ public class SecurityIntegrationTest {
 
     @Nested
     @DisplayName("4. CORS Tests")
+    @WithMockUser(roles = "ADMIN")
     class CorsTests {
 
         @Test
         @DisplayName("CORS preflight request should be handled correctly")
         void testCorsPreflight() throws Exception {
             mockMvc.perform(options(ORDERS_ENDPOINT)
-                    .header("Origin", "http://localhost:3000")
+                    .header("Origin", "http://localhost:4200")
                     .header("Access-Control-Request-Method", "POST"))
                     .andExpect(status().isOk());
         }
@@ -275,7 +279,7 @@ public class SecurityIntegrationTest {
         @DisplayName("CORS headers should be present in response")
         void testCorsHeadersPresent() throws Exception {
             MvcResult result = mockMvc.perform(get(ORDERS_ENDPOINT)
-                    .header("Origin", "http://localhost:3000"))
+                    .header("Origin", "http://localhost:4200"))
                     .andReturn();
 
             // CORS headers may or may not be present depending on configuration
@@ -314,6 +318,7 @@ public class SecurityIntegrationTest {
 
     @Nested
     @DisplayName("6. Error Handling Tests")
+    @WithMockUser(roles = "ADMIN")
     class ErrorHandlingTests {
 
         @Test
@@ -354,6 +359,7 @@ public class SecurityIntegrationTest {
 
     @Nested
     @DisplayName("7. XSS Prevention Tests")
+    @WithMockUser(roles = "ADMIN")
     class XssPreventionTests {
 
         @Test
@@ -381,6 +387,7 @@ public class SecurityIntegrationTest {
 
     @Nested
     @DisplayName("8. SQL Injection Prevention Tests")
+    @WithMockUser(roles = "ADMIN")
     class SqlInjectionPreventionTests {
 
         @Test
