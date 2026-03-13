@@ -18,11 +18,12 @@ export class WebSocketService implements OnDestroy {
   readonly inventoryEvents$ = new Subject<WebSocketInventoryEvent>();
   readonly paymentEvents$ = new Subject<WebSocketPaymentEvent>();
 
-  connect(): void {
+  connect(token?: string): void {
     if (this.connected) return;
 
     this.client = new Client({
       webSocketFactory: () => new SockJS(environment.wsUrl) as WebSocket,
+      connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
       reconnectDelay: 5000,
       onConnect: () => {
         this.connected = true;
