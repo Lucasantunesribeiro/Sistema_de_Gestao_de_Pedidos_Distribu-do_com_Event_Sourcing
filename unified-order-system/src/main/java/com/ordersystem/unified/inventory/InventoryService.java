@@ -33,9 +33,8 @@ import java.util.stream.Collectors;
  *       returned by {@link #getAvailableQuantity}.</li>
  * </ul>
  *
- * When a product is not found in the Stock table the service always falls back to
- * {@code inventory.default-stock} for availability checks, so dev/test environments
- * that haven't seeded products still behave correctly.
+ * In mock mode, products not found in the Stock table fall back to
+ * {@code inventory.default-stock}. In real mode, missing stock is treated as zero availability.
  */
 @Service
 @Transactional
@@ -180,14 +179,14 @@ public class InventoryService {
 
     /**
      * Returns total available quantity for a product across all warehouses.
-     * Falls back to {@code inventory.default-stock} when no Stock row exists.
+     * Falls back to {@code inventory.default-stock} only in mock mode when no Stock row exists.
      */
     public Integer getAvailableQuantity(String productId) {
         Integer total = stockRepository.getTotalAvailableQuantityByProductId(productId);
-        if (total != null && total > 0) {
-            return total;
+        if (mockMode && !stockRepository.existsStockForProduct(productId)) {
+            return defaultStock;
         }
-        return defaultStock; // fallback for dev/test environments without seeded products
+        return total != null ? total : 0;
     }
 
     public Map<String, Object> getInventory(String productId) {
@@ -275,26 +274,28 @@ public class InventoryService {
             Optional<Stock> stockOpt = stockRepository
                     .findByProductIdAndWarehouseIdWithLock(item.getProductId(), "DEFAULT");
 
-            if (stockOpt.isPresent()) {
-                Stock stock = stockOpt.get();
-                try {
-                    stock.reserveStock(item.getQuantity());
-                    stockRepository.save(stock);
+            if (stockOpt.isEmpty()) {
+                logger.warn("No persisted stock found for product {} in real inventory mode", item.getProductId());
+                reservation.markAsCancelled();
+                reservationRepository.save(reservation);
+                return insufficientStockResponse(item.getProductId());
+            }
 
-                    ReservationItem ri = new ReservationItem(
-                            reservation, stock.getProduct(), stock,
-                            item.getQuantity(), item.getQuantity());
-                    reservationItemRepository.save(ri);
+            Stock stock = stockOpt.get();
+            try {
+                stock.reserveStock(item.getQuantity());
+                stockRepository.save(stock);
 
-                } catch (IllegalStateException e) {
-                    logger.warn("Failed to reserve stock for product {}: {}", item.getProductId(), e.getMessage());
-                    reservation.markAsCancelled();
-                    reservationRepository.save(reservation);
-                    return insufficientStockResponse(item.getProductId());
-                }
-            } else {
-                // Product not seeded in DB – graceful skip (dev/test compatibility)
-                logger.debug("No Stock row for product {} – skipping stock deduction", item.getProductId());
+                ReservationItem ri = new ReservationItem(
+                        reservation, stock.getProduct(), stock,
+                        item.getQuantity(), item.getQuantity());
+                reservationItemRepository.save(ri);
+
+            } catch (IllegalStateException e) {
+                logger.warn("Failed to reserve stock for product {}: {}", item.getProductId(), e.getMessage());
+                reservation.markAsCancelled();
+                reservationRepository.save(reservation);
+                return insufficientStockResponse(item.getProductId());
             }
         }
 

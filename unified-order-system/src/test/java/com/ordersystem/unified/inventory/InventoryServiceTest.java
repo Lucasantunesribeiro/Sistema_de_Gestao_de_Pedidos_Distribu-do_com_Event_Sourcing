@@ -160,4 +160,17 @@ class InventoryServiceTest {
 
         assertThat(true).isTrue();
     }
+
+    @Test
+    void shouldRejectReservationWithoutPersistedStockInRealMode() {
+        ReflectionTestUtils.setField(inventoryService, "mockMode", false);
+        when(stockRepository.existsStockForProduct("product-1")).thenReturn(false);
+        when(stockRepository.existsStockForProduct("product-2")).thenReturn(false);
+
+        ReservationResponse result = inventoryService.reserveItems("ORDER-REAL-1", orderItems);
+
+        assertThat(result).isNotNull();
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getStatus()).isEqualTo(com.ordersystem.unified.inventory.dto.ReservationStatus.INSUFFICIENT_STOCK);
+    }
 }

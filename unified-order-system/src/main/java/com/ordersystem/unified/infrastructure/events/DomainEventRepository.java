@@ -1,6 +1,7 @@
 package com.ordersystem.unified.infrastructure.events;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -39,6 +40,12 @@ public interface DomainEventRepository extends JpaRepository<DomainEventEntity, 
      * Find unprocessed events.
      */
     List<DomainEventEntity> findByProcessedFalseOrderByCreatedAtAsc();
+
+    /**
+     * Find a limited batch of unprocessed events for broker dispatch.
+     */
+    @Query("SELECT e FROM DomainEventEntity e WHERE e.processed = false ORDER BY e.createdAt ASC")
+    List<DomainEventEntity> findPendingForDispatch(Pageable pageable);
 
     /**
      * Find events created within time range.

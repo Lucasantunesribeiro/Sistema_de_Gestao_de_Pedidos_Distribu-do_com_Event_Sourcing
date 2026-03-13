@@ -1,23 +1,29 @@
 package com.ordersystem.unified.payment;
 
+import com.ordersystem.unified.infrastructure.events.EventPublisher;
+import com.ordersystem.unified.payment.dto.CustomerInfo;
 import com.ordersystem.unified.payment.dto.PaymentRequest;
 import com.ordersystem.unified.payment.dto.PaymentResponse;
 import com.ordersystem.unified.payment.dto.PaymentStatus;
+import com.ordersystem.unified.payment.gateway.PaymentGatewayClient;
+import com.ordersystem.unified.payment.gateway.PaymentGatewayRefundRequest;
+import com.ordersystem.unified.payment.gateway.PaymentGatewayRequest;
+import com.ordersystem.unified.payment.gateway.PaymentGatewayResponse;
 import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
 import com.ordersystem.unified.shared.events.PaymentProcessedEvent;
-import com.ordersystem.unified.shared.exceptions.PaymentProcessingException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import com.ordersystem.unified.shared.events.PaymentRefundedEvent;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * Service for processing payments in the unified system.
@@ -29,65 +35,39 @@ public class PaymentService {
 
     private static final Logger logger = LoggerFactory.getLogger(PaymentService.class);
 
-    @Autowired
-    private PaymentRepository paymentRepository;
-
     private static final BigDecimal MAX_PAYMENT_AMOUNT = new BigDecimal("100000.00");
+
+    private final PaymentRepository paymentRepository;
+    private final PaymentGatewayClient paymentGatewayClient;
+    private final EventPublisher eventPublisher;
+
+    public PaymentService(PaymentRepository paymentRepository,
+                          PaymentGatewayClient paymentGatewayClient,
+                          EventPublisher eventPublisher) {
+        this.paymentRepository = paymentRepository;
+        this.paymentGatewayClient = paymentGatewayClient;
+        this.eventPublisher = eventPublisher;
+    }
 
     /**
      * Processes a payment using PaymentRequest DTO.
      */
+    @CacheEvict(cacheNames = "dashboard", allEntries = true)
     public PaymentResponse processPayment(PaymentRequest request) {
         logger.info("Processing payment request for order: {}, amount: {}, method: {}",
                    request.getOrderId(), request.getAmount(), request.getPaymentMethod());
 
-        if (request.getAmount() != null && request.getAmount().compareTo(MAX_PAYMENT_AMOUNT) > 0) {
-            throw new IllegalArgumentException(
-                "Payment amount exceeds maximum limit of " + MAX_PAYMENT_AMOUNT);
-        }
+        validateAmount(request.getAmount());
 
-        com.ordersystem.unified.payment.dto.PaymentMethod method = request.getPaymentMethod();
-        String paymentId = UUID.randomUUID().toString();
-        String shortId = UUID.randomUUID().toString().substring(0, 8);
-
-        String transactionId;
-        PaymentStatus status;
-        String message;
-
-        if (method == com.ordersystem.unified.payment.dto.PaymentMethod.PIX) {
-            transactionId = "PIX-" + shortId;
-            status = PaymentStatus.COMPLETED;
-            message = "Payment processed successfully";
-        } else if (method == com.ordersystem.unified.payment.dto.PaymentMethod.BOLETO) {
-            transactionId = "BOL-" + shortId;
-            status = PaymentStatus.PENDING;
-            message = "Boleto generated successfully. Pay by the due date.";
-        } else {
-            transactionId = "CC-" + shortId;
-            status = PaymentStatus.COMPLETED;
-            message = "Payment processed successfully";
-        }
-
-        // Persist payment
-        String methodName = method != null ? method.name() : "CREDIT_CARD";
-        Payment payment = new Payment(paymentId, request.getOrderId(), request.getAmount(), methodName);
-        payment.setCorrelationId(request.getCorrelationId());
-        if (status == PaymentStatus.COMPLETED) {
-            payment.markAsCompleted(transactionId);
-        }
-        paymentRepository.save(payment);
-
-        PaymentResponse response = new PaymentResponse(
-            paymentId,
+        ProcessedPayment processedPayment = executeCharge(
             request.getOrderId(),
-            status,
             request.getAmount(),
-            transactionId,
-            LocalDateTime.now(),
-            request.getCorrelationId()
+            request.getCorrelationId(),
+            request.getPaymentMethod() != null ? request.getPaymentMethod().name() : "CREDIT_CARD",
+            request.getCustomerInfo()
         );
-        response.setMessage(message);
-        return response;
+
+        return buildResponse(processedPayment.payment(), processedPayment.gatewayResponse());
     }
 
     /**
@@ -100,9 +80,12 @@ public class PaymentService {
     /**
      * Processes a payment for an order with specified payment method.
      */
+    @CacheEvict(cacheNames = "dashboard", allEntries = true)
     public PaymentResult processPayment(String orderId, BigDecimal amount, String correlationId, String paymentMethod) {
         logger.info("Processing payment for order: {}, amount: {}, method: {}, correlationId: {}", 
                    orderId, amount, paymentMethod, correlationId);
+
+        validateAmount(amount);
 
         // Check if payment already exists for this order
         Optional<Payment> existingPayment = paymentRepository.findByOrderId(orderId);
@@ -112,52 +95,25 @@ public class PaymentService {
             return PaymentResult.success(existingPayment.get().getId());
         }
 
-        // Create new payment record
-        String paymentId = UUID.randomUUID().toString();
-        Payment payment = new Payment(paymentId, orderId, amount, paymentMethod);
-        payment.setCorrelationId(correlationId);
+        ProcessedPayment processedPayment = executeCharge(orderId, amount, correlationId, paymentMethod, null);
+        Payment payment = processedPayment.payment();
+        PaymentGatewayResponse gatewayResponse = processedPayment.gatewayResponse();
 
-        try {
-            // Save payment in pending state
-            payment = paymentRepository.save(payment);
-            logger.debug("Payment record created: {}", payment.getId());
-
-            // Simulate payment processing
-            PaymentResult result = simulatePaymentProcessing(payment);
-
-            // Update payment status based on result
-            if (result.isSuccess()) {
-                payment.markAsCompleted(result.getPaymentId());
-                logger.info("Payment successful for order: {}, paymentId: {}, transactionId: {}, correlationId: {}", 
-                           orderId, payment.getId(), result.getPaymentId(), correlationId);
-            } else {
-                payment.markAsFailed(result.getMessage(), result.getErrorCode());
-                logger.warn("Payment failed for order: {}, paymentId: {}, reason: {}, correlationId: {}", 
-                           orderId, payment.getId(), result.getMessage(), correlationId);
-            }
-
-            // Save updated payment
-            payment = paymentRepository.save(payment);
-
-            // Publish payment processed event
-            publishPaymentProcessedEvent(payment, correlationId);
-
-            return result.isSuccess() ? 
-                PaymentResult.success(payment.getId()) : 
-                PaymentResult.failure(result.getMessage(), result.getErrorCode());
-
-        } catch (Exception e) {
-            logger.error("Payment processing failed for order: {}, paymentId: {}, correlationId: {}", 
-                        orderId, paymentId, correlationId, e);
-            
-            // Mark payment as failed if it exists
-            if (payment.getId() != null) {
-                payment.markAsFailed("Payment processing error: " + e.getMessage(), "PROCESSING_ERROR");
-                paymentRepository.save(payment);
-            }
-            
-            throw new PaymentProcessingException("Payment processing failed: " + e.getMessage(), e);
+        if (payment.isCompleted()) {
+            logger.info("Payment successful for order: {}, paymentId: {}, transactionId: {}, correlationId: {}",
+                orderId, payment.getId(), payment.getTransactionId(), correlationId);
+            return PaymentResult.success(payment.getId());
         }
+
+        if (com.ordersystem.unified.shared.events.PaymentStatus.PENDING.equals(payment.getStatus())) {
+            logger.info("Payment pending for order: {}, paymentId: {}, correlationId: {}",
+                orderId, payment.getId(), correlationId);
+            return PaymentResult.pending(payment.getId());
+        }
+
+        logger.warn("Payment failed for order: {}, paymentId: {}, reason: {}, correlationId: {}",
+            orderId, payment.getId(), gatewayResponse.getMessage(), correlationId);
+        return PaymentResult.failure(gatewayResponse.getMessage(), gatewayResponse.getErrorCode());
     }
 
     /**
@@ -192,21 +148,40 @@ public class PaymentService {
      * @param reason    Human-readable refund reason
      * @return refund transaction ID if successful, empty otherwise
      */
+    @CacheEvict(cacheNames = "dashboard", allEntries = true)
     public Optional<String> refundPayment(String paymentId, String reason) {
         logger.info("Processing refund for payment: {}, reason: {}", paymentId, reason);
 
-        return paymentRepository.findById(paymentId).map(payment -> {
+        return paymentRepository.findById(paymentId).flatMap(payment -> {
             if (!payment.isCompleted()) {
                 logger.warn("Cannot refund payment in status {}: paymentId={}", payment.getStatus(), paymentId);
-                return null;
+                return Optional.<String>empty();
             }
 
-            String refundTransactionId = "REF-" + UUID.randomUUID().toString().substring(0, 8);
-            payment.markAsRefunded(refundTransactionId);
-            paymentRepository.save(payment);
+            PaymentGatewayRefundRequest request = new PaymentGatewayRefundRequest();
+            request.setPaymentId(payment.getId());
+            request.setOrderId(payment.getOrderId());
+            request.setAmount(payment.getAmount());
+            request.setCorrelationId(payment.getCorrelationId());
+            request.setReason(reason);
 
-            logger.info("Payment refunded: paymentId={}, refundTxId={}", paymentId, refundTransactionId);
-            return refundTransactionId;
+            PaymentGatewayResponse gatewayResponse = paymentGatewayClient.refund(request);
+            if (gatewayResponse == null) {
+                logger.warn("Gateway returned an empty refund response for paymentId={}", paymentId);
+                return Optional.<String>empty();
+            }
+            String normalizedStatus = normalizeStatus(gatewayResponse.getStatus());
+            if (!"REFUNDED".equals(normalizedStatus) && !gatewayResponse.isApproved()) {
+                logger.warn("Gateway rejected refund for paymentId={}: {}", paymentId, gatewayResponse.getMessage());
+                return Optional.<String>empty();
+            }
+
+            payment.markAsRefunded(gatewayResponse.getTransactionId());
+            paymentRepository.save(payment);
+            publishPaymentRefundedEvent(payment, reason, gatewayResponse.getTransactionId());
+
+            logger.info("Payment refunded: paymentId={}, refundTxId={}", paymentId, gatewayResponse.getTransactionId());
+            return Optional.ofNullable(gatewayResponse.getTransactionId());
         });
     }
 
@@ -220,11 +195,6 @@ public class PaymentService {
 
     // Private helper methods
 
-    private PaymentResult simulatePaymentProcessing(Payment payment) {
-        String transactionId = "txn_" + UUID.randomUUID().toString().substring(0, 8);
-        return PaymentResult.success(transactionId);
-    }
-
     private void publishPaymentProcessedEvent(Payment payment, String correlationId) {
         PaymentProcessedEvent event = new PaymentProcessedEvent(
             payment.getId(),
@@ -237,8 +207,121 @@ public class PaymentService {
             null
         );
 
-        logger.debug("Payment processed event: {}", event);
-        // In a real implementation, this could be published to an event bus
-        // For now, it's just logged for internal tracking
+        eventPublisher.publishWithinTransaction(event);
+        logger.debug("Payment processed event persisted to outbox: {}", event);
+    }
+
+    private void publishPaymentRefundedEvent(Payment payment, String reason, String refundTransactionId) {
+        PaymentRefundedEvent event = new PaymentRefundedEvent(
+            payment.getId(),
+            payment.getOrderId(),
+            null,
+            payment.getAmount(),
+            payment.getAmount(),
+            reason,
+            payment.getCorrelationId()
+        );
+        event.setRefundTransactionId(refundTransactionId);
+        eventPublisher.publishWithinTransaction(event);
+        logger.debug("Payment refunded event persisted to outbox: paymentId={}", payment.getId());
+    }
+
+    private ProcessedPayment executeCharge(String orderId,
+                                           BigDecimal amount,
+                                           String correlationId,
+                                           String paymentMethod,
+                                           CustomerInfo customerInfo) {
+        Payment payment = new Payment(UUID.randomUUID().toString(), orderId, amount, paymentMethod);
+        payment.setCorrelationId(correlationId);
+        payment = paymentRepository.save(payment);
+
+        PaymentGatewayRequest gatewayRequest = new PaymentGatewayRequest();
+        gatewayRequest.setOrderId(orderId);
+        gatewayRequest.setAmount(amount);
+        gatewayRequest.setPaymentMethod(paymentMethod);
+        gatewayRequest.setCorrelationId(correlationId);
+        if (customerInfo != null) {
+            gatewayRequest.setCustomerId(customerInfo.getCustomerId());
+            gatewayRequest.setCustomerName(customerInfo.getCustomerName());
+            gatewayRequest.setCustomerEmail(customerInfo.getCustomerEmail());
+        }
+
+        PaymentGatewayResponse gatewayResponse;
+        try {
+            gatewayResponse = paymentGatewayClient.charge(gatewayRequest);
+            if (gatewayResponse == null) {
+                gatewayResponse = gatewayFailureResponse(new IllegalStateException("Gateway returned an empty response"));
+            }
+        } catch (Exception exception) {
+            logger.error("Payment gateway call failed for order: {}", orderId, exception);
+            gatewayResponse = gatewayFailureResponse(exception);
+        }
+
+        applyGatewayResponse(payment, gatewayResponse);
+        payment = paymentRepository.save(payment);
+        publishPaymentProcessedEvent(payment, correlationId);
+        return new ProcessedPayment(payment, gatewayResponse);
+    }
+
+    private void applyGatewayResponse(Payment payment, PaymentGatewayResponse gatewayResponse) {
+        String normalizedStatus = normalizeStatus(gatewayResponse.getStatus());
+        String message = StringUtils.hasText(gatewayResponse.getMessage())
+            ? gatewayResponse.getMessage()
+            : "Payment processing failed";
+
+        if ("COMPLETED".equals(normalizedStatus) && gatewayResponse.isApproved()) {
+            payment.markAsCompleted(gatewayResponse.getTransactionId());
+            return;
+        }
+
+        if ("PENDING".equals(normalizedStatus)) {
+            payment.markAsPending();
+            payment.setTransactionId(gatewayResponse.getTransactionId());
+            return;
+        }
+
+        payment.markAsFailed(message, gatewayResponse.getErrorCode());
+    }
+
+    private PaymentResponse buildResponse(Payment payment, PaymentGatewayResponse gatewayResponse) {
+        PaymentResponse response = new PaymentResponse(
+            payment.getId(),
+            payment.getOrderId(),
+            PaymentStatus.valueOf(payment.getStatus().name()),
+            payment.getAmount(),
+            payment.getTransactionId(),
+            LocalDateTime.now(),
+            payment.getCorrelationId()
+        );
+        response.setMessage(gatewayResponse.getMessage());
+        response.setErrorMessage(payment.isFailed() ? gatewayResponse.getMessage() : null);
+        return response;
+    }
+
+    private PaymentGatewayResponse gatewayFailureResponse(Exception exception) {
+        PaymentGatewayResponse response = new PaymentGatewayResponse();
+        response.setApproved(false);
+        response.setStatus("FAILED");
+        response.setMessage("Payment gateway error: " + exception.getMessage());
+        response.setErrorCode("GATEWAY_ERROR");
+        return response;
+    }
+
+    private void validateAmount(BigDecimal amount) {
+        if (amount != null && amount.compareTo(MAX_PAYMENT_AMOUNT) > 0) {
+            throw new IllegalArgumentException(
+                "Payment amount exceeds maximum limit of " + MAX_PAYMENT_AMOUNT
+            );
+        }
+    }
+
+    private String normalizeStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return "FAILED";
+        }
+        return status.trim().toUpperCase();
+    }
+
+    private record ProcessedPayment(Payment payment, PaymentGatewayResponse gatewayResponse) {
     }
 }

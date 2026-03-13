@@ -13,8 +13,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   
-  redis:
-    url: ${REDIS_URL}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 logging:
   level:
@@ -25,4 +28,13 @@ logging:
 app:
   redis:
     enabled: true
-    cache-ttl: 7200  # 2 hours for production
+    cache-ttl: 2h
+  messaging:
+    outbox:
+      enabled: true
+
+payment:
+  gateway:
+    enabled: true
+    base-url: ${PAYMENT_GATEWAY_BASE_URL}
+    api-key: ${PAYMENT_GATEWAY_API_KEY:}

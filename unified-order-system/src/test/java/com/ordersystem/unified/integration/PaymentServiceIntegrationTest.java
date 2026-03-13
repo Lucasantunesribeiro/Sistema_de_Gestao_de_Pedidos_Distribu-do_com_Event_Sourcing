@@ -12,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -32,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Import(com.ordersystem.unified.config.TestConfig.class)
+@WithMockUser(username = "payment-admin", roles = "ADMIN")
 public class PaymentServiceIntegrationTest {
 
     @Autowired
@@ -132,8 +134,19 @@ public class PaymentServiceIntegrationTest {
     @Test
     @Order(5)
     void testPaymentRefund() throws Exception {
+        MvcResult processResult = mockMvc.perform(post("/api/payments/process")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validPaymentRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        PaymentResponse processed = objectMapper.readValue(
+            processResult.getResponse().getContentAsString(),
+            PaymentResponse.class
+        );
+
         Map<String, Object> refundRequest = Map.of(
-            "paymentId", "test-payment-id",
+            "paymentId", processed.getPaymentId(),
             "refundAmount", 199.99,
             "reason", "Customer requested refund"
         );
@@ -144,7 +157,8 @@ public class PaymentServiceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.status").value("REFUNDED"))
-                .andExpect(jsonPath("$.message").value("Refund processed successfully"));
+                .andExpect(jsonPath("$.message").value("Refund processed successfully"))
+                .andExpect(jsonPath("$.refundTransactionId").exists());
     }
 
     @Test

@@ -22,6 +22,43 @@ services:
       resources:
         limits:
           memory: 256m
+  rabbitmq:
+    image: rabbitmq:3.11-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${SPRING_RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${SPRING_RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - app-network
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    restart: unless-stopped
+  payment-sandbox:
+    image: wiremock/wiremock:3.9.1
+    command: ["--global-response-templating"]
+    volumes:
+      - ./infra/payment-sandbox:/home/wiremock
+    networks:
+      - app-network
+    restart: unless-stopped
 
   unified-order-system:
     image: ${APP_IMAGE:-246599827442.dkr.ecr.us-east-1.amazonaws.com/unified-order-system:latest}
@@ -42,13 +79,30 @@ services:
       SECURITY_BOOTSTRAP_ADMIN_PASSWORD: ${SECURITY_BOOTSTRAP_ADMIN_PASSWORD:?SECURITY_BOOTSTRAP_ADMIN_PASSWORD is required}
       SECURITY_BOOTSTRAP_ADMIN_EMAIL: ${SECURITY_BOOTSTRAP_ADMIN_EMAIL:?SECURITY_BOOTSTRAP_ADMIN_EMAIL is required}
       SECURITY_CORS_ALLOWED_ORIGINS: ${SECURITY_CORS_ALLOWED_ORIGINS:-*}
-      REDIS_ENABLED: "false"
-      CACHE_TYPE: simple
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_ENABLED: "true"
+      CACHE_TYPE: redis
+      CACHE_TTL: ${CACHE_TTL:-2h}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: ${SPRING_RABBITMQ_USERNAME:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${SPRING_RABBITMQ_PASSWORD:-guest}
+      OUTBOX_ENABLED: "true"
+      PAYMENT_GATEWAY_ENABLED: "true"
+      PAYMENT_GATEWAY_BASE_URL: ${PAYMENT_GATEWAY_BASE_URL:-http://payment-sandbox:8080}
+      PAYMENT_GATEWAY_API_KEY: ${PAYMENT_GATEWAY_API_KEY:-demo-portfolio-key}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       PORT: 8080
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      payment-sandbox:
+        condition: service_started
     networks:
       - app-network
     restart: unless-stopped
@@ -70,6 +124,8 @@ services:
 
 volumes:
   postgres-data:
+  rabbitmq-data:
+  redis-data:
 
 networks:
   app-network:

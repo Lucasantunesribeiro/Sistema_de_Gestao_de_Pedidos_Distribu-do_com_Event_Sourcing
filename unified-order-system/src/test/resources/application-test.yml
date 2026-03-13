@@ -42,10 +42,21 @@ inventory:
   mock-mode: true
   default-stock: 1000
 
+app:
+  redis:
+    enabled: false
+  messaging:
+    outbox:
+      enabled: false
+
 security:
   secret: test-secret-key-test-secret-key-123456
   enforce-authentication: false
   bootstrap-admin:
+    enabled: false
+
+payment:
+  gateway:
     enabled: false
 
 # Test-specific configurations

@@ -1,0 +1,20 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPath": "/payments"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "approved": true,
+      "status": "COMPLETED",
+      "transactionId": "TX-{{randomValue length=12 type='ALPHANUMERIC'}}",
+      "providerPaymentId": "PAY-{{randomValue length=12 type='ALPHANUMERIC'}}",
+      "message": "Sandbox gateway approved payment"
+    }
+  }
+}

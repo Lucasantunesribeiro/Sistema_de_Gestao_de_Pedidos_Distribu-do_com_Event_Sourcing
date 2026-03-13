@@ -15,6 +15,8 @@ import com.ordersystem.unified.shared.events.OrderItem;
 import com.ordersystem.unified.shared.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -48,6 +50,7 @@ public class OrderService {
         this.orderRepository = orderRepository;
     }
 
+    @CacheEvict(cacheNames = {"orders", "orderStatistics", "dashboard"}, allEntries = true)
     public OrderResponse createOrder(CreateOrderRequest request) {
         String orderId = UUID.randomUUID().toString();
         
@@ -108,6 +111,7 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "orders", key = "#orderId")
     public OrderResponse getOrder(String orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found with id: " + orderId));
@@ -148,6 +152,7 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
+    @CacheEvict(cacheNames = {"orders", "orderStatistics", "dashboard"}, allEntries = true)
     public OrderResponse cancelOrder(String orderId, String reason) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found with id: " + orderId));
@@ -163,6 +168,7 @@ public class OrderService {
         return mapToResponse(savedOrder);
     }
 
+    @Cacheable(cacheNames = "orderStatistics", key = "'summary'")
     public Map<String, Object> getOrderStatistics() {
         Map<String, Object> statistics = new HashMap<>();
         long totalOrders = orderRepository.count();
