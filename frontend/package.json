@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
-    "build:prod": "ng build --configuration production",
-    "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "start": "ng serve frontend",
+    "build": "ng build frontend",
+    "build:prod": "ng build frontend --configuration production",
+    "watch": "ng build frontend --watch --configuration development",
+    "test": "ng test frontend",
+    "test:ci": "ng test frontend --watch=false --browsers=ChromeHeadlessNoSandbox --code-coverage"
   },
   "private": true,
   "dependencies": {
@@ -29,7 +30,14 @@
     "@angular-devkit/build-angular": "^17.0.0",
     "@angular/cli": "^17.0.0",
     "@angular/compiler-cli": "^17.0.0",
+    "@types/jasmine": "^5.1.7",
     "@types/sockjs-client": "^1.5.4",
+    "jasmine-core": "^5.2.0",
+    "karma": "^6.4.4",
+    "karma-chrome-launcher": "^3.2.0",
+    "karma-coverage": "^2.2.1",
+    "karma-jasmine": "^5.1.0",
+    "karma-jasmine-html-reporter": "^2.1.0",
     "typescript": "~5.2.2"
   }
 }

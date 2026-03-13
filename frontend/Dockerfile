@@ -4,8 +4,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 # Copy dependency manifests first for layer caching
-COPY package*.json ./
-RUN npm ci --prefer-offline
+COPY package.json package-lock.json ./
+RUN npm ci --prefer-offline --no-audit
 
 # Copy source and build
 COPY . .
