@@ -10,8 +10,11 @@ All commands run from the **project root** unless noted. The active module is `u
 # Install shared libraries (required before building the main module)
 mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am -DskipTests install
 
-# Build and test the main module
-mvn -f unified-order-system/pom.xml clean test -B
+# Build, integration tests, and JaCoCo gate for the main module
+mvn -f unified-order-system/pom.xml clean verify -B
+
+# Frontend unit tests and production build
+cd frontend && npm ci && npm run test:ci && npm run build
 
 # Run all tests (from inside unified-order-system/)
 cd unified-order-system && mvn test -B
@@ -60,7 +63,7 @@ tests/                 # E2E (Playwright) and load tests (k6)
 | `query/` | Read models (CQRS) |
 | `infrastructure/events/` | `EventPublisher`, `DomainEventEntity`, event persistence |
 | `infrastructure/scheduler/` | `ReservationExpiryScheduler` (disabled in tests) |
-| `shared/events/` | Domain event types (OrderCreatedEvent, etc.) |
+| `domain/events/` | Internal domain event types for the modular monolith |
 | `shared/exceptions/` | Exception hierarchy rooted at `OrderSystemException` |
 | `config/` | Spring config, `GlobalExceptionHandler`, security setup |
 | `web/` | Thymeleaf legacy views (superseded by Angular frontend) |
@@ -79,7 +82,7 @@ tests/                 # E2E (Playwright) and load tests (k6)
 
 **Saga Orchestration**: `orchestration/` coordinates order→payment→inventory flows and compensations.
 
-**Database migrations**: Flyway under `src/main/resources/db/migration/`. H2 in tests (`create-drop`), PostgreSQL in production.
+**Database migrations**: Flyway under `src/main/resources/db/migration/`. Tests default to PostgreSQL via Testcontainers, with embedded PostgreSQL fallback when Docker is unavailable.
 
 ## Critical Implementation Notes
 
@@ -103,7 +106,7 @@ tests/                 # E2E (Playwright) and load tests (k6)
 - `OrderBusinessRules` defines `MAX_QUANTITY` and `MAXIMUM_ORDER_VALUE` constants — tests must align with these.
 
 ### Infrastructure
-- Docker Compose services: PostgreSQL 15, RabbitMQ 3.11 (infra only—not used at runtime), Redis Alpine, `unified-order-system`, `frontend` (Angular/Nginx on port 4200).
+- Docker Compose services: PostgreSQL 15, RabbitMQ 3.11 (active outbox dispatch plus legacy reference), Redis Alpine, `unified-order-system`, `frontend` (Angular/Nginx on port 4200).
 - Production environment variables come from a `.env` file (see `.env.example`).
 - JVM in Docker: `-Xms256m -Xmx512m`, G1GC, Alpine JRE 17.
 - Frontend: Angular 17 at `frontend/`. Dev server: `cd frontend && npm start` (proxies `/api` → `localhost:8080`). Docker: `frontend/Dockerfile` (multi-stage node build → nginx).
