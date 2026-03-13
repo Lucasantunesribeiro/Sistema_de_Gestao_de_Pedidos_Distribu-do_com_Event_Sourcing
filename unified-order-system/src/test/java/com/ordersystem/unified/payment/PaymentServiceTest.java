@@ -1,5 +1,8 @@
 package com.ordersystem.unified.payment;
 
+import com.ordersystem.unified.infrastructure.events.EventPublisher;
+import com.ordersystem.unified.payment.gateway.PaymentGatewayClient;
+import com.ordersystem.unified.payment.gateway.PaymentGatewayResponse;
 import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
 import com.ordersystem.unified.shared.events.PaymentStatus;
@@ -31,6 +34,12 @@ class PaymentServiceTest {
     @Mock
     private PaymentRepository paymentRepository;
 
+    @Mock
+    private PaymentGatewayClient paymentGatewayClient;
+
+    @Mock
+    private EventPublisher eventPublisher;
+
     @InjectMocks
     private PaymentService paymentService;
 
@@ -47,6 +56,8 @@ class PaymentServiceTest {
         
         existingPayment = new Payment("payment-123", orderId, amount);
         existingPayment.setCorrelationId(correlationId);
+
+        lenient().when(paymentGatewayClient.charge(any())).thenReturn(approvedGatewayResponse("txn-123"));
     }
 
     @Test
@@ -86,6 +97,7 @@ class PaymentServiceTest {
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getPaymentId()).isEqualTo("payment-123");
 
+        verify(paymentGatewayClient, never()).charge(any());
         verify(paymentRepository, never()).save(any(Payment.class));
     }
 
@@ -122,7 +134,7 @@ class PaymentServiceTest {
             .isInstanceOf(PaymentProcessingException.class)
             .hasMessageContaining("Payment processing failed");
 
-        verify(paymentRepository, times(3)).save(any(Payment.class)); // First, second (fails), third (in catch)
+        verify(paymentRepository, times(2)).save(any(Payment.class));
     }
 
     @Test
@@ -243,5 +255,14 @@ class PaymentServiceTest {
         // Then
         assertThat(result.isSuccess()).isTrue();
         verify(paymentRepository, times(2)).save(any(Payment.class));
+    }
+
+    private PaymentGatewayResponse approvedGatewayResponse(String transactionId) {
+        PaymentGatewayResponse response = new PaymentGatewayResponse();
+        response.setApproved(true);
+        response.setStatus("COMPLETED");
+        response.setTransactionId(transactionId);
+        response.setMessage("Payment processed successfully");
+        return response;
     }
 }

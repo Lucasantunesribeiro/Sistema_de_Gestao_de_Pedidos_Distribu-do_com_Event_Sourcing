@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS inventory (
+  product_id VARCHAR(255) PRIMARY KEY,
+  product_name VARCHAR(255) NOT NULL,
+  available_quantity INTEGER NOT NULL DEFAULT 0,
+  reserved_quantity INTEGER NOT NULL DEFAULT 0,
+  reorder_level INTEGER,
+  max_stock_level INTEGER,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

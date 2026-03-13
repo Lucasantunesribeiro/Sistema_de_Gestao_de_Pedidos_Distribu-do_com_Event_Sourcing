@@ -5,6 +5,7 @@ import com.ordersystem.unified.payment.PaymentResult;
 import com.ordersystem.unified.payment.PaymentService;
 import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -31,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 @ActiveProfiles("test")
 @Import(TestConfig.class)
-class PaymentGatewayIntegrationTest {
+class PaymentGatewayIntegrationTest extends PostgresIntegrationTestSupport {
 
     private static final String API_KEY = "test-api-key";
     private static final AtomicReference<String> chargeResponse = new AtomicReference<>();

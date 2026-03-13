@@ -17,9 +17,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import com.ordersystem.unified.config.TestConfig;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,7 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @Import(TestConfig.class)
-public class OrderControllerTest {
+@WithMockUser(username = "orders-admin", roles = "ADMIN")
+public class OrderControllerTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

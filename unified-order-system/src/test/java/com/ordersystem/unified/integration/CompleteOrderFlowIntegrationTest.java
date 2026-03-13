@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.unified.order.dto.*;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
 import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -37,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional
 @Import(com.ordersystem.unified.config.TestConfig.class)
-public class CompleteOrderFlowIntegrationTest {
+public class CompleteOrderFlowIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;
@@ -50,6 +52,14 @@ public class CompleteOrderFlowIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        seedStock("PROD-001", "Laptop", new BigDecimal("999.99"), 100);
+        seedStock("PROD-002", "Mouse", new BigDecimal("29.99"), 100);
+        seedStock("PROD-003", "Keyboard", new BigDecimal("79.99"), 100);
+        seedStock("PROD-TEST", "Test Product", new BigDecimal("99.99"), 100);
+        seedStock("PROD-LAPTOP", "Gaming Laptop", new BigDecimal("1499.99"), 100);
+        seedStock("PROD-MOUSE", "Gaming Mouse", new BigDecimal("59.99"), 100);
+        seedStock("PROD-KEYBOARD", "Mechanical Keyboard", new BigDecimal("129.99"), 100);
+
         // Create a valid order request for testing
         validOrderRequest = new CreateOrderRequest();
         validOrderRequest.setCustomerId("CUST-12345");
@@ -75,6 +85,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(1)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testSuccessfulOrderCreation() throws Exception {
         // Test successful order creation with payment and inventory integration
         MvcResult result = mockMvc.perform(post("/api/orders")
@@ -106,6 +117,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(2)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testOrderRetrievalAfterCreation() throws Exception {
         // First create an order
         testSuccessfulOrderCreation();
@@ -122,6 +134,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(3)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testOrderCancellation() throws Exception {
         // First create an order
         testSuccessfulOrderCreation();
@@ -143,6 +156,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(4)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testInsufficientInventoryScenario() throws Exception {
         // Create an order with very high quantities to trigger insufficient inventory
         CreateOrderRequest largeOrderRequest = new CreateOrderRequest();
@@ -168,6 +182,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(5)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testInvalidOrderRequest() throws Exception {
         // Test with invalid order request (missing required fields)
         CreateOrderRequest invalidRequest = new CreateOrderRequest();
@@ -183,6 +198,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(6)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testOrdersByCustomer() throws Exception {
         // First create an order
         testSuccessfulOrderCreation();
@@ -197,6 +213,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(7)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testOrdersByStatus() throws Exception {
         // Test retrieving orders by status
         mockMvc.perform(get("/api/orders/status/{status}", OrderStatus.CONFIRMED))
@@ -206,6 +223,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(8)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testOrderStatistics() throws Exception {
         // Test order statistics endpoint
         mockMvc.perform(get("/api/orders/statistics"))
@@ -219,6 +237,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(9)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testPaymentIntegration() throws Exception {
         // Test different payment methods
         CreateOrderRequest pixOrderRequest = new CreateOrderRequest();
@@ -245,6 +264,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(10)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testConcurrentOrderCreation() throws Exception {
         // Test concurrent order creation to verify thread safety
         CreateOrderRequest request1 = createOrderRequest("CUST-CONCURRENT-1", "Concurrent Customer 1");
@@ -274,6 +294,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(11)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testOrderFlowWithMultipleItems() throws Exception {
         // Test order with multiple items of different types
         CreateOrderRequest multiItemRequest = new CreateOrderRequest();
@@ -313,6 +334,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(12)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testOrderNotFound() throws Exception {
         // Test retrieving non-existent order
         mockMvc.perform(get("/api/orders/{orderId}", "NON-EXISTENT-ORDER"))
@@ -321,6 +343,7 @@ public class CompleteOrderFlowIntegrationTest {
 
     @Test
     @Order(13)
+    @WithMockUser(username = "orders-admin", roles = "ADMIN")
     void testHealthCheckIntegration() throws Exception {
         // Test that health check includes all services
         mockMvc.perform(get("/api/health"))

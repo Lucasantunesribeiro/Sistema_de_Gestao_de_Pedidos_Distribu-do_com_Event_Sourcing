@@ -2,32 +2,35 @@
 spring:
   main:
     allow-bean-definition-overriding: true
+  autoconfigure:
+    exclude:
+      - com.ordersystem.common.messaging.MessagingAutoConfiguration
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: 
-  
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 2
+  flyway:
+    enabled: true
+    locations: classpath:db/migration,classpath:db/migration/postgres
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false
-  
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-  
-  # Disable scheduling for tests
   task:
     scheduling:
       enabled: false
 
-# Logging configuration for tests
+management:
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
+
 logging:
   level:
     com.ordersystem.unified: INFO
@@ -37,10 +40,9 @@ logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
-# Inventory mock mode – avoids needing seeded Stock rows in H2
 inventory:
-  mock-mode: true
-  default-stock: 1000
+  mock-mode: false
+  default-stock: 0
 
 app:
   redis:
@@ -50,23 +52,26 @@ app:
       enabled: false
 
 security:
-  secret: test-secret-key-test-secret-key-123456
-  enforce-authentication: false
+  secret: test-secret-key-test-secret-key-1234567890
+  enforce-authentication: true
   bootstrap-admin:
-    enabled: false
+    enabled: true
+    username: admin
+    password: Admin123!SecurePass
+    email: admin@example.com
+    roles:
+      - ADMIN
 
 payment:
   gateway:
     enabled: false
 
-# Test-specific configurations
 test:
   performance:
-    enabled: true
+    enabled: false
     timeout: 30000
-  
   mock:
     payment:
       success-rate: 0.95
     inventory:
-      default-stock: 1000
+      default-stock: 0

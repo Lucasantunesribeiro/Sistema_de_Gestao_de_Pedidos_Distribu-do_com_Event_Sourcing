@@ -13,6 +13,7 @@ import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
 import com.ordersystem.unified.shared.events.PaymentProcessedEvent;
 import com.ordersystem.unified.shared.events.PaymentRefundedEvent;
+import com.ordersystem.unified.shared.exceptions.PaymentProcessingException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -58,16 +59,20 @@ public class PaymentService {
                    request.getOrderId(), request.getAmount(), request.getPaymentMethod());
 
         validateAmount(request.getAmount());
+        try {
+            ProcessedPayment processedPayment = executeCharge(
+                request.getOrderId(),
+                request.getAmount(),
+                request.getCorrelationId(),
+                request.getPaymentMethod() != null ? request.getPaymentMethod().name() : "CREDIT_CARD",
+                request.getCustomerInfo()
+            );
 
-        ProcessedPayment processedPayment = executeCharge(
-            request.getOrderId(),
-            request.getAmount(),
-            request.getCorrelationId(),
-            request.getPaymentMethod() != null ? request.getPaymentMethod().name() : "CREDIT_CARD",
-            request.getCustomerInfo()
-        );
-
-        return buildResponse(processedPayment.payment(), processedPayment.gatewayResponse());
+            return buildResponse(processedPayment.payment(), processedPayment.gatewayResponse());
+        } catch (RuntimeException exception) {
+            logger.error("Payment request processing failed for order: {}", request.getOrderId(), exception);
+            throw new PaymentProcessingException("Payment processing failed: " + exception.getMessage(), exception);
+        }
     }
 
     /**
@@ -95,9 +100,16 @@ public class PaymentService {
             return PaymentResult.success(existingPayment.get().getId());
         }
 
-        ProcessedPayment processedPayment = executeCharge(orderId, amount, correlationId, paymentMethod, null);
-        Payment payment = processedPayment.payment();
-        PaymentGatewayResponse gatewayResponse = processedPayment.gatewayResponse();
+        final Payment payment;
+        final PaymentGatewayResponse gatewayResponse;
+        try {
+            ProcessedPayment processedPayment = executeCharge(orderId, amount, correlationId, paymentMethod, null);
+            payment = processedPayment.payment();
+            gatewayResponse = processedPayment.gatewayResponse();
+        } catch (RuntimeException exception) {
+            logger.error("Payment processing failed for order: {}", orderId, exception);
+            throw new PaymentProcessingException("Payment processing failed: " + exception.getMessage(), exception);
+        }
 
         if (payment.isCompleted()) {
             logger.info("Payment successful for order: {}, paymentId: {}, transactionId: {}, correlationId: {}",

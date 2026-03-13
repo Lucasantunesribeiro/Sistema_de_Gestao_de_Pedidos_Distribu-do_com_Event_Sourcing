@@ -2,6 +2,7 @@ package com.ordersystem.unified.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.unified.inventory.dto.*;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -34,7 +36,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional
 @org.springframework.context.annotation.Import(com.ordersystem.unified.config.TestConfig.class)
-public class InventoryServiceIntegrationTest {
+@WithMockUser(username = "inventory-admin", roles = "ADMIN")
+public class InventoryServiceIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

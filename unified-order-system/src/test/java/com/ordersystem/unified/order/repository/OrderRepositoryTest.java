@@ -1,14 +1,19 @@
 package com.ordersystem.unified.order.repository;
 
+import com.ordersystem.unified.config.JpaRepositoryTestApplication;
 import com.ordersystem.unified.order.model.Order;
 import com.ordersystem.unified.order.model.OrderItemEntity;
 import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,7 +26,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for OrderRepository.
  */
 @DataJpaTest
-class OrderRepositoryTest {
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@ActiveProfiles("test")
+@ContextConfiguration(classes = JpaRepositoryTestApplication.class)
+class OrderRepositoryTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private TestEntityManager entityManager;
@@ -35,6 +43,11 @@ class OrderRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        entityManager.getEntityManager().createQuery("DELETE FROM OrderItemEntity").executeUpdate();
+        entityManager.getEntityManager().createQuery("DELETE FROM Order").executeUpdate();
+        entityManager.flush();
+        entityManager.clear();
+
         // Create test orders
         order1 = new Order("order-1", "customer-1", "John Doe", new BigDecimal("100.00"));
         order1.setStatus(OrderStatus.PENDING);

@@ -12,6 +12,7 @@ import com.ordersystem.unified.order.repository.OrderRepository;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
 import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("test")
 @org.springframework.context.annotation.Import(com.ordersystem.unified.config.TestConfig.class)
 @Transactional
-class CompleteOrderFlowWithBusinessRulesTest {
+class CompleteOrderFlowWithBusinessRulesTest extends PostgresIntegrationTestSupport {
 
     @Autowired(required = false)
     private CreateOrderUseCase createOrderUseCase;
@@ -56,6 +57,16 @@ class CompleteOrderFlowWithBusinessRulesTest {
 
     @Autowired(required = false)
     private DomainEventRepository eventRepository;
+
+    @org.junit.jupiter.api.BeforeEach
+    void seedInventory() {
+        seedStock("PROD-001", "Test Product", new BigDecimal("50.00"), 20);
+        seedStock("PROD-002", "Test Product 2", new BigDecimal("100.00"), 20);
+        seedStock("PROD-004", "Product 4", new BigDecimal("25.00"), 20);
+        seedStock("PROD-005", "Product 5", new BigDecimal("50.00"), 20);
+        seedStock("PROD-006", "Product 6", new BigDecimal("10.00"), 20);
+        seedStock("PROD-007", "Traced Product", new BigDecimal("75.00"), 20);
+    }
 
     @Test
     void shouldCreateOrderWithFullFlow() {
