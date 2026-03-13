@@ -1,13 +1,18 @@
 package com.ordersystem.unified.payment.repository;
 
+import com.ordersystem.unified.config.JpaRepositoryTestApplication;
 import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.shared.events.PaymentStatus;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,8 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for PaymentRepository.
  */
 @DataJpaTest
-@org.springframework.test.context.ActiveProfiles("test")
-class PaymentRepositoryTest {
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@ActiveProfiles("test")
+@ContextConfiguration(classes = JpaRepositoryTestApplication.class)
+class PaymentRepositoryTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private TestEntityManager entityManager;
@@ -35,6 +42,10 @@ class PaymentRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        entityManager.getEntityManager().createQuery("DELETE FROM Payment").executeUpdate();
+        entityManager.flush();
+        entityManager.clear();
+
         // Create test payments
         payment1 = new Payment("payment-1", "order-1", new BigDecimal("100.00"));
         payment1.setStatus(PaymentStatus.COMPLETED);

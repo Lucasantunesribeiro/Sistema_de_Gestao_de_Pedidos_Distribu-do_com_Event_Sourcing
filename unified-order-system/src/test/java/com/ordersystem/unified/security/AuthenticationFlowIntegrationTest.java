@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.unified.auth.model.ApplicationUser;
 import com.ordersystem.unified.auth.repository.ApplicationUserRepository;
 import com.ordersystem.unified.config.TestConfig;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @ContextConfiguration(classes = {com.ordersystem.unified.Application.class, TestConfig.class})
 @DisplayName("Authentication Flow Integration Tests")
-class AuthenticationFlowIntegrationTest {
+class AuthenticationFlowIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

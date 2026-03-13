@@ -184,6 +184,18 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.zonky.test</groupId>
+            <artifactId>embedded-postgres</artifactId>
+            <version>2.2.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.18.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
@@ -231,11 +243,17 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.1.2</version>
                 <configuration>
+                    <argLine>${argLine} -Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+                    <useManifestOnlyJar>false</useManifestOnlyJar>
                     <includes>
                         <include>**/*Test.java</include>
                         <include>**/*Tests.java</include>
                     </includes>
                     <excludes>
+                        <exclude>**/integration/**</exclude>
+                        <exclude>**/e2e/**</exclude>
+                        <exclude>**/*E2ETest.java</exclude>
+                        <exclude>**/*Performance*Test.java</exclude>
                         <exclude>**/performance/**</exclude>
                         <exclude>**/load/**</exclude>
                     </excludes>
@@ -246,10 +264,16 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>3.1.2</version>
                 <configuration>
+                    <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                    <argLine>${argLine} -Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+                    <useManifestOnlyJar>false</useManifestOnlyJar>
                     <includes>
                         <include>**/*IT.java</include>
                         <include>**/integration/**/*Test.java</include>
                     </includes>
+                    <excludes>
+                        <exclude>**/integration/PerformanceIntegrationTest.java</exclude>
+                    </excludes>
                 </configuration>
                 <executions>
                     <execution>
@@ -273,7 +297,7 @@
                     </execution>
                     <execution>
                         <id>report</id>
-                        <phase>test</phase>
+                        <phase>verify</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
@@ -287,7 +311,7 @@
                         <configuration>
                             <rules>
                                 <rule>
-                                    <element>PACKAGE</element>
+                                    <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>

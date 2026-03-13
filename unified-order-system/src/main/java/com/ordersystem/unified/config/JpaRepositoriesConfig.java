@@ -1,5 +1,22 @@
 package com.ordersystem.unified.config;
 
+import com.ordersystem.unified.auth.model.ApplicationUser;
+import com.ordersystem.unified.auth.repository.ApplicationUserRepository;
+import com.ordersystem.unified.infrastructure.events.DomainEventEntity;
+import com.ordersystem.unified.infrastructure.events.DomainEventRepository;
+import com.ordersystem.unified.inventory.model.Product;
+import com.ordersystem.unified.inventory.model.Reservation;
+import com.ordersystem.unified.inventory.model.ReservationItem;
+import com.ordersystem.unified.inventory.model.Stock;
+import com.ordersystem.unified.inventory.repository.ProductRepository;
+import com.ordersystem.unified.inventory.repository.ReservationItemRepository;
+import com.ordersystem.unified.inventory.repository.ReservationRepository;
+import com.ordersystem.unified.inventory.repository.StockRepository;
+import com.ordersystem.unified.order.model.Order;
+import com.ordersystem.unified.order.model.OrderItemEntity;
+import com.ordersystem.unified.order.repository.OrderRepository;
+import com.ordersystem.unified.payment.model.Payment;
+import com.ordersystem.unified.payment.repository.PaymentRepository;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,21 +35,28 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  */
 @Configuration
 @EnableJpaRepositories(
-    basePackages = {
-        "com.ordersystem.unified.auth.repository",
-        "com.ordersystem.unified.order.repository",
-        "com.ordersystem.unified.inventory.repository",
-        "com.ordersystem.unified.payment.repository",
-        "com.ordersystem.unified.infrastructure.events"
+    basePackageClasses = {
+        ApplicationUserRepository.class,
+        OrderRepository.class,
+        ProductRepository.class,
+        StockRepository.class,
+        ReservationRepository.class,
+        ReservationItemRepository.class,
+        PaymentRepository.class,
+        DomainEventRepository.class
     }
 )
 @EntityScan(
-    basePackages = {
-        "com.ordersystem.unified.auth.model",
-        "com.ordersystem.unified.order.model",
-        "com.ordersystem.unified.payment.model",
-        "com.ordersystem.unified.inventory.model",
-        "com.ordersystem.unified.infrastructure.events"
+    basePackageClasses = {
+        ApplicationUser.class,
+        Order.class,
+        OrderItemEntity.class,
+        Product.class,
+        Stock.class,
+        Reservation.class,
+        ReservationItem.class,
+        Payment.class,
+        DomainEventEntity.class
     }
 )
 @EnableTransactionManagement

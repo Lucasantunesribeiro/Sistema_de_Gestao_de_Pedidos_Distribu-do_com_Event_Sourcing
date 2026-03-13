@@ -2,6 +2,7 @@ package com.ordersystem.unified.security;
 
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ import static org.hamcrest.Matchers.*;
 @org.springframework.test.context.ActiveProfiles("test")
 @org.springframework.context.annotation.Import(com.ordersystem.unified.config.TestConfig.class)
 @DisplayName("Security Integration Tests")
-public class SecurityIntegrationTest {
+public class SecurityIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;
@@ -51,28 +52,18 @@ public class SecurityIntegrationTest {
         }
 
         @Test
-        @DisplayName("Protected endpoint should be accessible when authentication is disabled (dev mode)")
+        @DisplayName("Protected endpoint should require authentication")
         void testProtectedEndpointWithoutAuth() throws Exception {
-            // In development mode with SECURITY_ENFORCE_AUTH=false, this should return 200
-            // In production with SECURITY_ENFORCE_AUTH=true, this should return 401/403
-            MvcResult result = mockMvc.perform(get(ORDERS_ENDPOINT))
-                    .andReturn();
-
-            int status = result.getResponse().getStatus();
-            // Accept either 200 (dev mode) or 401/403 (production mode)
-            assert status == 200 || status == 401 || status == 403;
+            mockMvc.perform(get(ORDERS_ENDPOINT))
+                    .andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("Invalid JWT token should be rejected when authentication is enabled")
         void testInvalidJwtRejected() throws Exception {
-            MvcResult result = mockMvc.perform(get(ORDERS_ENDPOINT)
+            mockMvc.perform(get(ORDERS_ENDPOINT)
                     .header("Authorization", "Bearer invalid-jwt-token"))
-                    .andReturn();
-
-            int status = result.getResponse().getStatus();
-            // Accept either 200 (dev mode) or 401/403 (production mode with invalid token)
-            assert status == 200 || status == 401 || status == 403;
+                    .andExpect(status().isUnauthorized());
         }
     }
 
@@ -231,7 +222,7 @@ public class SecurityIntegrationTest {
             mockMvc.perform(post(ORDERS_ENDPOINT)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(invalidRequest))
-                    .andExpect(status().isCreated()); // blank productId auto-generates UUID
+                    .andExpect(status().isBadRequest());
         }
     }
 

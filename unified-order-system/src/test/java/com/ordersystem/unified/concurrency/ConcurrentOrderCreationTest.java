@@ -5,6 +5,7 @@ import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("test")
 @org.springframework.context.annotation.Import(com.ordersystem.unified.config.TestConfig.class)
-public class ConcurrentOrderCreationTest {
+public class ConcurrentOrderCreationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private OrderService orderService;

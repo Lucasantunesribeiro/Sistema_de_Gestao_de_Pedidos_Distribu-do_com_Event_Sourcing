@@ -254,7 +254,7 @@ public class InventoryService {
         String reservationId = "RES-" + UUID.randomUUID().toString().substring(0, 8);
         Reservation reservation = new Reservation(
                 reservationId, orderId, businessRules.calculateExpiryTime());
-        reservationRepository.save(reservation);
+        reservation = reservationRepository.saveAndFlush(reservation);
 
         ReservationResponse response = new ReservationResponse();
         response.setReservationId(reservationId);
@@ -268,7 +268,7 @@ public class InventoryService {
 
         Reservation reservation = new Reservation(
                 reservationId, orderId, businessRules.calculateExpiryTime());
-        reservationRepository.save(reservation);
+        reservation = reservationRepository.saveAndFlush(reservation);
 
         for (OrderItem item : items) {
             Optional<Stock> stockOpt = stockRepository

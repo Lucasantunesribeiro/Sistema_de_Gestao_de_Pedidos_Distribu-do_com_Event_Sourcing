@@ -2,6 +2,7 @@ package com.ordersystem.unified.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.unified.payment.dto.*;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -34,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Import(com.ordersystem.unified.config.TestConfig.class)
 @WithMockUser(username = "payment-admin", roles = "ADMIN")
-public class PaymentServiceIntegrationTest {
+public class PaymentServiceIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

@@ -1,11 +1,15 @@
 package com.ordersystem.unified.inventory.repository;
 
 import com.ordersystem.unified.inventory.model.Inventory;
+import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Arrays;
@@ -18,8 +22,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for InventoryRepository.
  */
 @DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
-public class InventoryRepositoryTest {
+@Import(com.ordersystem.unified.config.TestConfig.class)
+@Disabled("Legacy inventory aggregate replaced by Product/Stock/Reservation in the active runtime")
+public class InventoryRepositoryTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private TestEntityManager entityManager;

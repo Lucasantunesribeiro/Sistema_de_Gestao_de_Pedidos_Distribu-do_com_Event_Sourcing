@@ -59,6 +59,28 @@ public class Reservation {
         this.orderId = orderId;
         this.expiryTime = expiryTime;
     }
+
+    @PrePersist
+    void beforeInsert() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+        if (status == null) {
+            status = ReservationStatus.RESERVED;
+        }
+    }
+
+    @PreUpdate
+    void beforeUpdate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        updatedAt = LocalDateTime.now();
+    }
     
     // Business methods
     public boolean isExpired() {
