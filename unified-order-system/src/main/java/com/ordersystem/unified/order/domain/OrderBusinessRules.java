@@ -1,7 +1,7 @@
 package com.ordersystem.unified.order.domain;
 
 import com.ordersystem.unified.order.model.Order;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.InvalidOrderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -200,3 +200,4 @@ public class OrderBusinessRules {
         return requiresApproval;
     }
 }
+

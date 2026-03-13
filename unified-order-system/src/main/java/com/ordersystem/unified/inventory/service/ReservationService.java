@@ -34,8 +34,8 @@ public class ReservationService {
         reservationRepository.save(freshReservation);
         
         if (freshReservation.getItems() != null && !freshReservation.getItems().isEmpty()) {
-            java.util.List<com.ordersystem.unified.shared.events.OrderItem> items = freshReservation.getItems().stream()
-                .map(item -> new com.ordersystem.unified.shared.events.OrderItem(
+            java.util.List<com.ordersystem.unified.domain.events.OrderItem> items = freshReservation.getItems().stream()
+                .map(item -> new com.ordersystem.unified.domain.events.OrderItem(
                     item.getProductId(),
                     "", // product name not available
                     item.getQuantity(),
@@ -43,7 +43,7 @@ public class ReservationService {
                 ))
                 .collect(java.util.stream.Collectors.toList());
 
-            com.ordersystem.unified.shared.events.InventoryReleasedEvent event = new com.ordersystem.unified.shared.events.InventoryReleasedEvent(
+            com.ordersystem.unified.domain.events.InventoryReleasedEvent event = new com.ordersystem.unified.domain.events.InventoryReleasedEvent(
                 freshReservation.getId(),
                 freshReservation.getOrderId(),
                 items,
@@ -57,3 +57,4 @@ public class ReservationService {
         }
     }
 }
+

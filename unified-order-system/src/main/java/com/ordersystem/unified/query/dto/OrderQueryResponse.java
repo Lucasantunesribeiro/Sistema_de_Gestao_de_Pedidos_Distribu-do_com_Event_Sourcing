@@ -2,7 +2,7 @@ package com.ordersystem.unified.query.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ordersystem.unified.order.dto.OrderResponse;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 
 import java.util.List;
 import java.util.Map;

@@ -1,7 +1,7 @@
 package com.ordersystem.unified.payment.repository;
 
 import com.ordersystem.unified.payment.model.Payment;
-import com.ordersystem.unified.shared.events.PaymentStatus;
+import com.ordersystem.unified.domain.events.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

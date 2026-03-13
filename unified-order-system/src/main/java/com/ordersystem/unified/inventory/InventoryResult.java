@@ -1,6 +1,6 @@
 package com.ordersystem.unified.inventory;
 
-import com.ordersystem.unified.shared.events.InventoryStatus;
+import com.ordersystem.unified.domain.events.InventoryStatus;
 
 /**
  * Result of an inventory operation.

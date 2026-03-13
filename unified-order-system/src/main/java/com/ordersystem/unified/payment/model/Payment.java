@@ -1,6 +1,6 @@
 package com.ordersystem.unified.payment.model;
 
-import com.ordersystem.unified.shared.events.PaymentStatus;
+import com.ordersystem.unified.domain.events.PaymentStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

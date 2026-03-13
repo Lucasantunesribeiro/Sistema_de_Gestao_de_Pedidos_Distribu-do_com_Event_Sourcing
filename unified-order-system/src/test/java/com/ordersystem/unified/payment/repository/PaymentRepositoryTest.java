@@ -2,7 +2,7 @@ package com.ordersystem.unified.payment.repository;
 
 import com.ordersystem.unified.config.JpaRepositoryTestApplication;
 import com.ordersystem.unified.payment.model.Payment;
-import com.ordersystem.unified.shared.events.PaymentStatus;
+import com.ordersystem.unified.domain.events.PaymentStatus;
 import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -247,3 +247,4 @@ class PaymentRepositoryTest extends PostgresIntegrationTestSupport {
         assertThat(deletedPayment).isEmpty();
     }
 }
+

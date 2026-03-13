@@ -5,7 +5,7 @@ import com.ordersystem.unified.payment.gateway.PaymentGatewayClient;
 import com.ordersystem.unified.payment.gateway.PaymentGatewayResponse;
 import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
-import com.ordersystem.unified.shared.events.PaymentStatus;
+import com.ordersystem.unified.domain.events.PaymentStatus;
 import com.ordersystem.unified.shared.exceptions.PaymentProcessingException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -266,3 +266,4 @@ class PaymentServiceTest {
         return response;
     }
 }
+

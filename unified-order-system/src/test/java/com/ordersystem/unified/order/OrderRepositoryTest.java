@@ -4,7 +4,7 @@ import com.ordersystem.unified.config.JpaRepositoryTestApplication;
 import com.ordersystem.unified.order.model.Order;
 import com.ordersystem.unified.order.model.OrderItemEntity;
 import com.ordersystem.unified.order.repository.OrderRepository;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -166,3 +166,4 @@ public class OrderRepositoryTest extends PostgresIntegrationTestSupport {
         assertThat(retrievedOrder.get().getItems()).hasSize(2);
     }
 }
+

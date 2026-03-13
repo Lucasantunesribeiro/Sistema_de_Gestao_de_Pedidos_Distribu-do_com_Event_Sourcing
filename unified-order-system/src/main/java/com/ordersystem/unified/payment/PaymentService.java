@@ -11,8 +11,8 @@ import com.ordersystem.unified.payment.gateway.PaymentGatewayRequest;
 import com.ordersystem.unified.payment.gateway.PaymentGatewayResponse;
 import com.ordersystem.unified.payment.model.Payment;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
-import com.ordersystem.unified.shared.events.PaymentProcessedEvent;
-import com.ordersystem.unified.shared.events.PaymentRefundedEvent;
+import com.ordersystem.unified.domain.events.PaymentProcessedEvent;
+import com.ordersystem.unified.domain.events.PaymentRefundedEvent;
 import com.ordersystem.unified.shared.exceptions.PaymentProcessingException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -117,7 +117,7 @@ public class PaymentService {
             return PaymentResult.success(payment.getId());
         }
 
-        if (com.ordersystem.unified.shared.events.PaymentStatus.PENDING.equals(payment.getStatus())) {
+        if (com.ordersystem.unified.domain.events.PaymentStatus.PENDING.equals(payment.getStatus())) {
             logger.info("Payment pending for order: {}, paymentId: {}, correlationId: {}",
                 orderId, payment.getId(), correlationId);
             return PaymentResult.pending(payment.getId());
@@ -202,7 +202,7 @@ public class PaymentService {
      */
     public boolean hasSuccessfulPayment(String orderId) {
         return paymentRepository.existsByOrderIdAndStatus(orderId, 
-            com.ordersystem.unified.shared.events.PaymentStatus.COMPLETED);
+            com.ordersystem.unified.domain.events.PaymentStatus.COMPLETED);
     }
 
     // Private helper methods
@@ -337,3 +337,4 @@ public class PaymentService {
     private record ProcessedPayment(Payment payment, PaymentGatewayResponse gatewayResponse) {
     }
 }
+

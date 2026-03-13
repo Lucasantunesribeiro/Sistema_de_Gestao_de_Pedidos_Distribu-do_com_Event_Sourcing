@@ -4,7 +4,7 @@ import com.ordersystem.unified.inventory.repository.ProductRepository;
 import com.ordersystem.unified.order.model.Order;
 import com.ordersystem.unified.order.repository.OrderRepository;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
@@ -126,3 +126,4 @@ public class DashboardController {
         return health;
     }
 }
+

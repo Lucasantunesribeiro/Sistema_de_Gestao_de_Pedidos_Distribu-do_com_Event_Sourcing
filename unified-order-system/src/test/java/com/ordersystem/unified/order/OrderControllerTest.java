@@ -7,7 +7,7 @@ import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -177,3 +177,4 @@ public class OrderControllerTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$[0].status").value("CONFIRMED"));
     }
 }
+

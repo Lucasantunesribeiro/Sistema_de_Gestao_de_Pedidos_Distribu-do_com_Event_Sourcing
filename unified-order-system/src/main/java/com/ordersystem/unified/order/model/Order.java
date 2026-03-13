@@ -1,6 +1,6 @@
 package com.ordersystem.unified.order.model;
 
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import lombok.Builder;
 import lombok.AllArgsConstructor;
 import jakarta.persistence.*;

@@ -11,7 +11,7 @@ import com.ordersystem.unified.order.dto.OrderResponse;
 import com.ordersystem.unified.order.repository.OrderRepository;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
 import com.ordersystem.unified.payment.repository.PaymentRepository;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -282,3 +282,4 @@ class CompleteOrderFlowWithBusinessRulesTest extends PostgresIntegrationTestSupp
         System.out.println("Order traced with correlation ID: " + correlationId);
     }
 }
+
