@@ -9,7 +9,7 @@ import com.ordersystem.unified.inventory.model.Stock;
 import com.ordersystem.unified.inventory.repository.ReservationItemRepository;
 import com.ordersystem.unified.inventory.repository.ReservationRepository;
 import com.ordersystem.unified.inventory.repository.StockRepository;
-import com.ordersystem.unified.shared.events.OrderItem;
+import com.ordersystem.unified.domain.events.OrderItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -339,3 +339,4 @@ public class InventoryService {
         return response;
     }
 }
+

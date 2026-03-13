@@ -6,7 +6,7 @@ import com.ordersystem.unified.inventory.model.Reservation;
 import com.ordersystem.unified.inventory.repository.ReservationItemRepository;
 import com.ordersystem.unified.inventory.repository.ReservationRepository;
 import com.ordersystem.unified.inventory.repository.StockRepository;
-import com.ordersystem.unified.shared.events.OrderItem;
+import com.ordersystem.unified.domain.events.OrderItem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -174,3 +174,4 @@ class InventoryServiceTest {
         assertThat(result.getStatus()).isEqualTo(com.ordersystem.unified.inventory.dto.ReservationStatus.INSUFFICIENT_STOCK);
     }
 }
+

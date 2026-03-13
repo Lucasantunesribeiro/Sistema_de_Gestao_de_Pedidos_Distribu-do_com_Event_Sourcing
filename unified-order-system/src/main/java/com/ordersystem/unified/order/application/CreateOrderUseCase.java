@@ -13,7 +13,7 @@ import com.ordersystem.unified.order.repository.OrderRepository;
 import com.ordersystem.unified.payment.PaymentService;
 import com.ordersystem.unified.payment.PaymentResult;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
-import com.ordersystem.unified.shared.events.*;
+import com.ordersystem.unified.domain.events.*;
 import com.ordersystem.unified.shared.exceptions.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -421,3 +421,4 @@ public class CreateOrderUseCase {
         return response;
     }
 }
+

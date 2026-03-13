@@ -2,7 +2,7 @@ package com.ordersystem.unified.infrastructure.events;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ordersystem.unified.shared.events.BaseEvent;
+import com.ordersystem.unified.domain.events.BaseEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -167,20 +167,20 @@ public class EventPublisher {
     // Helper methods to extract aggregate information from events
     private String getAggregateId(BaseEvent event) {
         // Use reflection or pattern matching to extract aggregate ID
-        if (event instanceof com.ordersystem.unified.shared.events.OrderCreatedEvent) {
-            return ((com.ordersystem.unified.shared.events.OrderCreatedEvent) event).getOrderId();
-        } else if (event instanceof com.ordersystem.unified.shared.events.PaymentProcessedEvent) {
-            return ((com.ordersystem.unified.shared.events.PaymentProcessedEvent) event).getOrderId();
-        } else if (event instanceof com.ordersystem.unified.shared.events.InventoryReservedEvent) {
-            return ((com.ordersystem.unified.shared.events.InventoryReservedEvent) event).getOrderId();
-        } else if (event instanceof com.ordersystem.unified.shared.events.OrderStatusUpdatedEvent) {
-            return ((com.ordersystem.unified.shared.events.OrderStatusUpdatedEvent) event).getOrderId();
-        } else if (event instanceof com.ordersystem.unified.shared.events.OrderCancelledEvent) {
-            return ((com.ordersystem.unified.shared.events.OrderCancelledEvent) event).getOrderId();
-        } else if (event instanceof com.ordersystem.unified.shared.events.PaymentRefundedEvent) {
-            return ((com.ordersystem.unified.shared.events.PaymentRefundedEvent) event).getOrderId();
-        } else if (event instanceof com.ordersystem.unified.shared.events.InventoryReleasedEvent) {
-            return ((com.ordersystem.unified.shared.events.InventoryReleasedEvent) event).getOrderId();
+        if (event instanceof com.ordersystem.unified.domain.events.OrderCreatedEvent) {
+            return ((com.ordersystem.unified.domain.events.OrderCreatedEvent) event).getOrderId();
+        } else if (event instanceof com.ordersystem.unified.domain.events.PaymentProcessedEvent) {
+            return ((com.ordersystem.unified.domain.events.PaymentProcessedEvent) event).getOrderId();
+        } else if (event instanceof com.ordersystem.unified.domain.events.InventoryReservedEvent) {
+            return ((com.ordersystem.unified.domain.events.InventoryReservedEvent) event).getOrderId();
+        } else if (event instanceof com.ordersystem.unified.domain.events.OrderStatusUpdatedEvent) {
+            return ((com.ordersystem.unified.domain.events.OrderStatusUpdatedEvent) event).getOrderId();
+        } else if (event instanceof com.ordersystem.unified.domain.events.OrderCancelledEvent) {
+            return ((com.ordersystem.unified.domain.events.OrderCancelledEvent) event).getOrderId();
+        } else if (event instanceof com.ordersystem.unified.domain.events.PaymentRefundedEvent) {
+            return ((com.ordersystem.unified.domain.events.PaymentRefundedEvent) event).getOrderId();
+        } else if (event instanceof com.ordersystem.unified.domain.events.InventoryReleasedEvent) {
+            return ((com.ordersystem.unified.domain.events.InventoryReleasedEvent) event).getOrderId();
         }
 
         logger.warn("Unknown event type for aggregate ID extraction: {}",
@@ -202,3 +202,4 @@ public class EventPublisher {
         return "Unknown";
     }
 }
+

@@ -1,6 +1,6 @@
 package com.ordersystem.unified.payment;
 
-import com.ordersystem.unified.shared.events.PaymentStatus;
+import com.ordersystem.unified.domain.events.PaymentStatus;
 
 /**
  * Result of a payment processing operation.

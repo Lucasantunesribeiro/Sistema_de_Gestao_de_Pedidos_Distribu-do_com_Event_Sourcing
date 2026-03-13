@@ -5,7 +5,7 @@ import com.ordersystem.unified.order.dto.OrderItemRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
 import com.ordersystem.unified.order.model.Order;
 import com.ordersystem.unified.order.repository.OrderRepository;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 
 import org.junit.jupiter.api.BeforeEach;

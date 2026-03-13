@@ -1,7 +1,7 @@
 package com.ordersystem.unified.order.repository;
 
 import com.ordersystem.unified.order.model.Order;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

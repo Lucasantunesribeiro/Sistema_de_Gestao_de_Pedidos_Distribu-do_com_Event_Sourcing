@@ -3,7 +3,7 @@ package com.ordersystem.unified.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.unified.order.dto.*;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

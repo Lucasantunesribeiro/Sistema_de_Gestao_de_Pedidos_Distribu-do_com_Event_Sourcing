@@ -10,8 +10,8 @@ import com.ordersystem.unified.order.repository.OrderRepository;
 import com.ordersystem.unified.payment.PaymentService;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
 import com.ordersystem.unified.payment.model.Payment;
-import com.ordersystem.unified.shared.events.OrderCancelledEvent;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderCancelledEvent;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.InvalidOrderException;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 import org.slf4j.Logger;
@@ -262,3 +262,4 @@ public class CancelOrderUseCase {
         return response;
     }
 }
+

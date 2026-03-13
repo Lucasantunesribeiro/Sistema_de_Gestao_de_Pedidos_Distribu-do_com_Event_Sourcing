@@ -10,9 +10,9 @@ import com.ordersystem.unified.order.dto.OrderItemResponse;
 import com.ordersystem.unified.order.model.Order;
 import com.ordersystem.unified.order.model.OrderItemEntity;
 import com.ordersystem.unified.order.repository.OrderRepository;
-import com.ordersystem.unified.shared.events.OrderCreatedEvent;
-import com.ordersystem.unified.shared.events.OrderItem;
-import com.ordersystem.unified.shared.events.OrderStatus;
+import com.ordersystem.unified.domain.events.OrderCreatedEvent;
+import com.ordersystem.unified.domain.events.OrderItem;
+import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
@@ -290,3 +290,4 @@ public class OrderService {
         }
     }
 }
+
