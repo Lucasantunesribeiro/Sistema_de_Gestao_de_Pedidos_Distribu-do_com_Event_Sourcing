@@ -14,10 +14,11 @@ Sistema de gestão de pedidos em arquitetura de monólito modular, construído c
   - `common-security`: autenticação JWT, rate limiting e propriedades de segurança
   - `common-messaging`: correlação de mensagens e auto-configuração de mensageria
   - `common-observability`: correlação de logs e cabeçalhos para rastreabilidade
-- `shared-events/`: payloads de eventos legados (preferir eventos em `unified-order-system/shared/events/`)
+- `legacy/`: ativos historicos fora do runtime principal
+  - `legacy/shared-events/`: payloads de eventos legados
+  - `legacy/services/`: microservicos legados (`order-service`, `payment-service`, `inventory-service`, `order-query-service`)
 - `unified-order-system/`: monólito modular principal (módulo de foco)
 - `frontend/`: frontend Angular 17 (dashboard, pedidos, estoque)
-- `services/`: microserviços legados (`order-service`, `payment-service`, `inventory-service`, `order-query-service`)
 - `observability/`: configuração de Prometheus, Grafana, Loki e Tempo
 - `tests/`: testes end-to-end (Playwright) e testes de carga com k6
 
@@ -136,7 +137,8 @@ Fluxo principal de pedido:
   ```bash
   bash scripts/generate-jwt-secret.sh
   ```
-- O build Docker do backend precisa ser feito a partir do diretório raiz do repositório (para incluir `libs`, `shared-events` e `unified-order-system`).
+- O build Docker do backend precisa ser feito a partir do diretório raiz do repositório (para incluir `libs` e `unified-order-system`).
+- O runtime ativo do produto e `frontend/` + `unified-order-system/`. Tudo em `legacy/` fica fora da pipeline principal e serve apenas como referência histórica.
 - Em produção, habilite autenticação e use um gerenciador de segredos:
   - `SECURITY_ENFORCE_AUTH=true`
   - Segredos gerenciados via AWS Secrets Manager, SSM Parameter Store ou equivalente.

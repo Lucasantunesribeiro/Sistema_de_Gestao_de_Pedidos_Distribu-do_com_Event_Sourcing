@@ -8,7 +8,7 @@ All commands run from the **project root** unless noted. The active module is `u
 
 ```bash
 # Install shared libraries (required before building the main module)
-mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability,shared-events -am -DskipTests install
+mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am -DskipTests install
 
 # Build and test the main module
 mvn -f unified-order-system/pom.xml clean test -B
@@ -38,12 +38,14 @@ libs/
   common-security/     # JWT auth, rate limiting, security properties
   common-messaging/    # Message correlation, auto-configuration
   common-observability/ # Log correlation, tracing headers
-shared-events/         # Legacy event payloads (pre-consolidation)
 unified-order-system/  # Main application (monolith consolidation of microservices)
-services/              # Legacy microservices (not actively developed)
+legacy/shared-events/  # Legacy event payloads (pre-consolidation)
+legacy/services/       # Legacy microservices (not actively developed)
 observability/         # Prometheus, Grafana, Loki, Tempo configs
 tests/                 # E2E (Playwright) and load tests (k6)
 ```
+
+`legacy/` holds the historical microservices and their old shared contracts. The active runtime and build pipeline are `unified-order-system/` plus `frontend/`.
 
 ### unified-order-system Package Structure
 

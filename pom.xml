@@ -17,7 +17,6 @@
         <module>libs/common-security</module>
         <module>libs/common-messaging</module>
         <module>libs/common-observability</module>
-        <module>shared-events</module>
         <module>unified-order-system</module>
     </modules>
 
