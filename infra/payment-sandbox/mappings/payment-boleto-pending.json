@@ -1,0 +1,25 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/payments",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": "$[?(@.paymentMethod == 'BOLETO')]"
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "approved": false,
+      "status": "PENDING",
+      "transactionId": "BOL-{{randomValue length=10 type='ALPHANUMERIC'}}",
+      "providerPaymentId": "PAY-{{randomValue length=12 type='ALPHANUMERIC'}}",
+      "message": "Sandbox gateway generated boleto for asynchronous settlement"
+    }
+  }
+}

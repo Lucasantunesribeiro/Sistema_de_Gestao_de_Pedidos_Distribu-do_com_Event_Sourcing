@@ -88,6 +88,9 @@ public interface StockRepository extends JpaRepository<Stock, String> {
      */
     @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM Stock s WHERE s.product.id = :productId AND s.availableQuantity >= :quantity")
     boolean hasProductSufficientStock(@Param("productId") String productId, @Param("quantity") Integer quantity);
+
+    @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM Stock s WHERE s.product.id = :productId")
+    boolean existsStockForProduct(@Param("productId") String productId);
     
     /**
      * Get stock statistics for dashboard

@@ -7,6 +7,7 @@ import com.ordersystem.unified.payment.repository.PaymentRepository;
 import com.ordersystem.unified.shared.events.OrderStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,6 +42,7 @@ public class DashboardController {
     }
 
     @GetMapping("/api/dashboard")
+    @Cacheable(cacheNames = "dashboard", key = "'summary'")
     public Map<String, Object> getDashboard() {
         long totalOrders = orderRepository.count();
         long pendingOrders = orderRepository.countByStatus(OrderStatus.PENDING);

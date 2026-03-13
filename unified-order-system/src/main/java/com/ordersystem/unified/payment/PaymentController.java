@@ -152,14 +152,25 @@ public class PaymentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> processRefund(@RequestBody Map<String, Object> refundRequest) {
         String paymentId = (String) refundRequest.get("paymentId");
+        String reason = (String) refundRequest.getOrDefault("reason", "Refund requested");
         logger.debug("Processing refund for payment: {}", paymentId);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("status", "REFUNDED");
-        result.put("message", "Refund processed successfully");
-        result.put("paymentId", paymentId);
-        return ResponseEntity.ok(result);
+        return paymentService.refundPayment(paymentId, reason)
+            .map(refundTransactionId -> {
+                Map<String, Object> result = new HashMap<>();
+                result.put("success", true);
+                result.put("status", "REFUNDED");
+                result.put("message", "Refund processed successfully");
+                result.put("paymentId", paymentId);
+                result.put("refundTransactionId", refundTransactionId);
+                return ResponseEntity.ok(result);
+            })
+            .orElseGet(() -> ResponseEntity.unprocessableEntity().body(Map.of(
+                "success", false,
+                "status", "REFUND_REJECTED",
+                "message", "Refund could not be processed for the requested payment",
+                "paymentId", paymentId
+            )));
     }
 
     @PostMapping("/process-legacy")

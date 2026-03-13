@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/refunds"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "approved": true,
+      "status": "REFUNDED",
+      "transactionId": "REF-{{randomValue length=10 type='ALPHANUMERIC'}}",
+      "providerPaymentId": "{{jsonPath request.body '$.paymentId'}}",
+      "message": "Sandbox gateway processed refund"
+    }
+  }
+}

@@ -20,9 +20,10 @@ spring:
     console:
       enabled: false
   
-  redis:
-    host: localhost
-    port: 6379
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 logging:
   level:
@@ -33,10 +34,17 @@ logging:
 
 app:
   redis:
-    enabled: true
-    cache-ttl: 300  # 5 minutes for development
+    enabled: false
+    cache-ttl: 5m
+  messaging:
+    outbox:
+      enabled: false
 
 security:
   secret: ${SECURITY_SECRET:${JWT_SECRET_KEY:}}
   enforce-authentication: false
   h2-console-enabled: false
+
+payment:
+  gateway:
+    enabled: false
