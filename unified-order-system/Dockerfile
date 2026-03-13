@@ -6,11 +6,10 @@ WORKDIR /app
 # Copy build files
 COPY pom.xml .
 COPY libs ./libs
-COPY shared-events ./shared-events
 COPY unified-order-system ./unified-order-system
 
 # Install shared libs, then package the application
-RUN mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability,shared-events -am -DskipTests install && \
+RUN mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am -DskipTests install && \
     mvn -f unified-order-system/pom.xml -DskipTests package
 
 # Runtime stage

@@ -48,28 +48,19 @@ print_status "Node version: $(node --version)"
 print_status "NPM version: $(npm --version)"
 
 # 1. Optimize Maven Build
-print_status "Building shared events library..."
-cd shared-events
-mvn clean install -DskipTests -B -q
-if [ $? -eq 0 ]; then
-    print_success "Shared events library built successfully"
-else
-    print_error "Failed to build shared events library"
-    exit 1
-fi
+print_status "Building active shared libraries..."
+mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am clean install -DskipTests -B -q
+print_success "Active shared libraries built successfully"
 
-# Return to root directory
-cd ..
-
-print_status "Building Java services with optimizations..."
-mvn clean package -DskipTests -B -T 1C -q \
+print_status "Building unified runtime with optimizations..."
+mvn -f unified-order-system/pom.xml clean package -DskipTests -B -T 1C -q \
     -Dmaven.compile.fork=true \
     -Dmaven.compiler.maxmem=1024m
 
 if [ $? -eq 0 ]; then
-    print_success "Java services built successfully"
+    print_success "Unified runtime built successfully"
 else
-    print_error "Failed to build Java services"
+    print_error "Failed to build unified runtime"
     exit 1
 fi
 
@@ -111,10 +102,7 @@ cd ..
 # 3. Validate JAR files
 print_status "Validating JAR files..."
 JAR_FILES=(
-    "services/order-service/target/order-service-1.0.0.jar"
-    "services/payment-service/target/payment-service-1.0.0.jar"
-    "services/inventory-service/target/inventory-service-1.0.0.jar"
-    "services/order-query-service/target/order-query-service-1.0.0.jar"
+    "unified-order-system/target/unified-order-system-1.0.0.jar"
 )
 
 for jar in "${JAR_FILES[@]}"; do
@@ -162,7 +150,7 @@ echo "  ✅ Output directory: frontend/dist/"
 echo ""
 echo "Performance Metrics:"
 echo "  📊 Total build time: ${SECONDS}s"
-echo "  📦 Services ready for containerization"
+echo "  📦 Unified runtime ready for containerization"
 echo "  🚀 Ready for Render deployment"
 
 print_success "All builds completed successfully! 🎉"

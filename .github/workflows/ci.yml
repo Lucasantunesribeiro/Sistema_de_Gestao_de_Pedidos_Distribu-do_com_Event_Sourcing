@@ -23,8 +23,8 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
 
-      - name: Install shared libraries
-        run: mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability,shared-events -am -DskipTests install -q
+      - name: Install active shared libraries
+        run: mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am -DskipTests install -q
 
       - name: Build and test
         run: mvn -f unified-order-system/pom.xml clean test -B
