@@ -48,6 +48,7 @@ Desenvolvimento local do frontend:
 cd frontend
 npm install
 npm start          # dev server em http://localhost:4200 com proxy para :8080
+npm run test:ci    # testes unitarios headless via Karma + Chrome
 npm run build      # build de produção em dist/
 ```
 
@@ -58,16 +59,22 @@ npm run build      # build de produção em dist/
   ```
 - Rodar todos os testes (a partir de `unified-order-system/`):
   ```bash
-  cd unified-order-system && mvn clean test
+  mvn -f unified-order-system/pom.xml clean verify
   ```
 - Rodar um teste específico:
   ```bash
-  cd unified-order-system && mvn test -Dtest=CompleteOrderFlowIntegrationTest
+  mvn -f unified-order-system/pom.xml test -Dtest=CompleteOrderFlowIntegrationTest
   ```
 - Build da imagem Docker do monólito:
   ```bash
   docker build -t unified-order-system:latest -f unified-order-system/Dockerfile .
   ```
+
+## CI/CD
+- A pipeline principal de GitHub Actions executa `mvn -f unified-order-system/pom.xml clean verify`.
+- O frontend entra na pipeline com `npm ci`, `npm run test:ci` e `npm run build`.
+- O smoke E2E com Playwright valida a SPA Angular publicada em `http://localhost:4200`.
+- O deploy automatizado em EC2 sobe backend e frontend juntos via `docker compose`.
 
 ## Testes de carga (k6)
 ```bash
@@ -111,19 +118,18 @@ O repositório contém automações para deploy em EC2 e uso de ECR:
   ```
   Pode ser sobrescrita via variável `APP_IMAGE`.
 
-- **URL pública atual (EC2)**
-  A instância EC2 atualmente expõe a aplicação em:
+- **URL validated by automated deployment**
+  The `deploy-ec2.yml` workflow validates the published frontend at:
   ```text
-  http://98.92.208.98/dashboard
+  http://<EC2_HOST>:4200/login
   ```
-  Esse é o endpoint principal da interface web (Dashboard do OrderFlow).
 
 ## Arquitetura (visão geral)
 O sistema usa Clean Architecture dentro de um monólito modular:
 - `order/application/`: casos de uso (ex.: `CreateOrderUseCase`, `CancelOrderUseCase`) implementando o padrão Saga
 - `order/domain/`: regras de negócio e validações (`OrderBusinessRules`)
 - `infrastructure/events/`: Event Sourcing via `EventPublisher` (persiste todos os eventos de domínio na tabela `domain_events`)
-- `shared/events/`: classes de eventos de domínio (`OrderCreatedEvent`, `PaymentProcessedEvent`, `InventoryReservedEvent`, etc.)
+- `domain/events/`: internal domain events of the modular monolith (`OrderCreatedEvent`, `PaymentProcessedEvent`, `InventoryReservedEvent`, etc.)
 - `config/`: configuração Spring (segurança, cache, banco de dados, métricas, CORS, WebSocket)
 - `frontend/`: Angular 17 com componentes standalone, serviços HTTP e integração WebSocket via SockJS + STOMP
 
@@ -139,6 +145,7 @@ Fluxo principal de pedido:
   ```
 - O build Docker do backend precisa ser feito a partir do diretório raiz do repositório (para incluir `libs` e `unified-order-system`).
 - O runtime ativo do produto e `frontend/` + `unified-order-system/`. Tudo em `legacy/` fica fora da pipeline principal e serve apenas como referência histórica.
+- `libs/common-events/` is the active integration contract; `legacy/shared-events/` remains only for historical compatibility.
 - Em produção, habilite autenticação e use um gerenciador de segredos:
   - `SECURITY_ENFORCE_AUTH=true`
   - Segredos gerenciados via AWS Secrets Manager, SSM Parameter Store ou equivalente.
