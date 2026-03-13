@@ -219,6 +219,9 @@ public class InventoryServiceIntegrationTest extends PostgresIntegrationTestSupp
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.products").exists())
                 .andExpect(jsonPath("$.totalProducts").exists())
+                .andExpect(jsonPath("$.totalAvailable").isNumber())
+                .andExpect(jsonPath("$.totalReserved").isNumber())
+                .andExpect(jsonPath("$.items").isArray())
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 

@@ -6,9 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  backend-verify:
+    name: Backend Verify
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -16,15 +22,106 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-
-      - uses: actions/cache@v3
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
+          cache: maven
 
       - name: Install active shared libraries
         run: mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am -DskipTests install -q
 
-      - name: Build and test
-        run: mvn -f unified-order-system/pom.xml clean test -B
+      - name: Run backend verify
+        run: mvn -f unified-order-system/pom.xml clean verify -B
+
+  frontend-unit:
+    name: Frontend Unit And Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Angular unit tests
+        working-directory: frontend
+        run: npm run test:ci
+
+      - name: Build Angular application
+        working-directory: frontend
+        run: npm run build
+
+  frontend-e2e:
+    name: Frontend E2E
+    runs-on: ubuntu-latest
+    needs: [backend-verify, frontend-unit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            tests/e2e/package-lock.json
+
+      - name: Prepare compose environment
+        run: |
+          cp .env.example .env
+          python - <<'PY'
+          from pathlib import Path
+          env = Path('.env')
+          content = env.read_text()
+          replacements = {
+              'JWT_SECRET_KEY=': 'JWT_SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+              'SECURITY_SECRET=': 'SECURITY_SECRET=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+              'SECURITY_CORS_ALLOWED_ORIGINS=http://localhost:4200': 'SECURITY_CORS_ALLOWED_ORIGINS=http://localhost:4200,http://127.0.0.1:4200',
+          }
+          for old, new in replacements.items():
+              content = content.replace(old, new)
+          env.write_text(content)
+          PY
+
+      - name: Start application stack
+        run: docker compose up -d --build postgres rabbitmq redis payment-sandbox unified-order-system frontend
+
+      - name: Wait for backend and frontend health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/actuator/health > /dev/null && curl -sf http://localhost:4200/login > /dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Stack failed to become healthy in time"
+          exit 1
+
+      - name: Install Playwright dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        working-directory: tests/e2e
+        env:
+          BASE_URL: http://localhost:4200
+          API_BASE_URL: http://localhost:8080
+          E2E_USERNAME: admin
+          E2E_PASSWORD: change-this-admin-password
+        run: npm test
+
+      - name: Dump compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Tear down application stack
+        if: always()
+        run: docker compose down -v

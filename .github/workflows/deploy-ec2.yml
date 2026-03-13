@@ -22,7 +22,7 @@ jobs:
 
     environment:
       name: production
-      url: http://${{ secrets.EC2_HOST }}:8080
+      url: http://${{ secrets.EC2_HOST }}:4200
 
     steps:
       - name: Deploy via SSH
@@ -47,13 +47,13 @@ jobs:
             fi
 
             echo "=== Building and restarting services ==="
-            docker compose pull postgres rabbitmq redis
-            docker compose up -d --build --remove-orphans unified-order-system
+            docker compose pull postgres rabbitmq redis payment-sandbox
+            docker compose up -d --build --remove-orphans unified-order-system frontend
 
             echo "=== Waiting for health check ==="
             for i in $(seq 1 12); do
-              if curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1; then
-                echo "Application is healthy"
+              if curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1 && curl -sf http://localhost:4200/login > /dev/null 2>&1; then
+                echo "Application and frontend are healthy"
                 break
               fi
               echo "Waiting... ($i/12)"
@@ -61,6 +61,7 @@ jobs:
             done
 
             curl -sf http://localhost:8080/actuator/health || { echo "Health check failed"; exit 1; }
+            curl -sf http://localhost:4200/login || { echo "Frontend health check failed"; exit 1; }
 
             echo "=== Cleanup old images ==="
             docker image prune -f

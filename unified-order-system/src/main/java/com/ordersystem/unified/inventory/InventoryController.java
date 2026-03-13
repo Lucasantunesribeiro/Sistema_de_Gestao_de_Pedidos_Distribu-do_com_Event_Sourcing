@@ -248,15 +248,33 @@ public class InventoryController {
     @GetMapping("/status")
     @Transactional(readOnly = true)
     public ResponseEntity<Map<String, Object>> getInventoryStatus() {
-        long totalProducts = productRepository.countByActiveTrue();
-        List<Stock> lowStockItems = stockRepository.findLowStockItems();
-        List<Stock> outOfStockItems = stockRepository.findOutOfStockItems();
+        List<Product> products = productRepository.findByActiveTrue();
+        List<Map<String, Object>> items = products.stream()
+            .map(this::mapInventoryStatusItem)
+            .collect(Collectors.toList());
+
+        int totalAvailable = items.stream()
+            .mapToInt(item -> ((Number) item.get("availableQuantity")).intValue())
+            .sum();
+        int totalReserved = items.stream()
+            .mapToInt(item -> ((Number) item.get("reservedQuantity")).intValue())
+            .sum();
+        long lowStockItems = items.stream()
+            .filter(item -> ((Number) item.get("availableQuantity")).intValue() > 0)
+            .filter(item -> ((Number) item.get("availableQuantity")).intValue() < 10)
+            .count();
+        long outOfStockItems = items.stream()
+            .filter(item -> ((Number) item.get("availableQuantity")).intValue() <= 0)
+            .count();
 
         Map<String, Object> status = new HashMap<>();
-        status.put("products", totalProducts);
-        status.put("totalProducts", totalProducts);
-        status.put("lowStockItems", lowStockItems.size());
-        status.put("outOfStockItems", outOfStockItems.size());
+        status.put("products", products.size());
+        status.put("totalProducts", products.size());
+        status.put("totalAvailable", totalAvailable);
+        status.put("totalReserved", totalReserved);
+        status.put("lowStockItems", lowStockItems);
+        status.put("outOfStockItems", outOfStockItems);
+        status.put("items", items);
         status.put("timestamp", System.currentTimeMillis());
         return ResponseEntity.ok(status);
     }
@@ -376,5 +394,21 @@ public class InventoryController {
         map.put("available", available != null ? available : 0);
         map.put("reserved", reserved != null ? reserved : 0);
         return map;
+    }
+
+    private Map<String, Object> mapInventoryStatusItem(Product product) {
+        Integer available = stockRepository.getTotalAvailableQuantityByProductId(product.getId());
+        Integer reserved = stockRepository.getTotalReservedQuantityByProductId(product.getId());
+        int availableQuantity = available != null ? available : 0;
+        int reservedQuantity = reserved != null ? reserved : 0;
+        int totalQuantity = availableQuantity + reservedQuantity;
+
+        Map<String, Object> item = new HashMap<>();
+        item.put("productId", product.getId());
+        item.put("productName", product.getName());
+        item.put("availableQuantity", availableQuantity);
+        item.put("reservedQuantity", reservedQuantity);
+        item.put("totalQuantity", totalQuantity);
+        return item;
     }
 }
