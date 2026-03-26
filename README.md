@@ -1,151 +1,145 @@
-# OrderFlow — Sistema Distribuído de Gestão de Pedidos
+# OrderFlow — Distributed Order Management System
 
-Sistema de gestão de pedidos em arquitetura de monólito modular, construído com Java 17, Spring Boot 3, PostgreSQL e Redis. Implementa Event Sourcing, Clean Architecture e padrão Saga para orquestração de transações distribuídas.
+A production-grade modular monolith built with Java 17, Spring Boot 3, PostgreSQL, Redis and RabbitMQ. Demonstrates Event Sourcing, Clean Architecture, Saga orchestration and a full Angular 17 frontend — deployed continuously to AWS EC2 via GitHub Actions.
 
-## Requisitos
-- Java 17
-- Maven 3.9+
-- Docker + Docker Compose v2
-- Node 20+ (somente para desenvolvimento do frontend Angular)
+## Live Demo
 
-## Estrutura do repositório
-- `libs/`: bibliotecas compartilhadas
-  - `common-events`: envelopes de eventos versionados e convenções de fila
-  - `common-security`: autenticação JWT, rate limiting e propriedades de segurança
-  - `common-messaging`: correlação de mensagens e auto-configuração de mensageria
-  - `common-observability`: correlação de logs e cabeçalhos para rastreabilidade
-- `legacy/`: ativos historicos fora do runtime principal
-  - `legacy/shared-events/`: payloads de eventos legados
-  - `legacy/services/`: microservicos legados (`order-service`, `payment-service`, `inventory-service`, `order-query-service`)
-- `unified-order-system/`: monólito modular principal (módulo de foco)
-- `frontend/`: frontend Angular 17 (dashboard, pedidos, estoque)
-- `observability/`: configuração de Prometheus, Grafana, Loki e Tempo
-- `tests/`: testes end-to-end (Playwright) e testes de carga com k6
+| Resource | URL |
+|---|---|
+| **Frontend (Angular)** | http://98.92.208.98:4200 |
+| **API Health** | http://98.92.208.98:8080/actuator/health |
+| **Swagger / OpenAPI** | http://98.92.208.98:8080/swagger-ui/index.html |
 
-## Execução local (Docker Compose)
-1. Copiar o template de ambiente:
-   ```bash
-   cp .env.example .env
-   ```
-2. Definir `JWT_SECRET_KEY` (64 caracteres hexadecimais) e manter o `.env` fora do controle de versão.
-3. Opcional: definir `COMPOSE_PROJECT_NAME=orderflow` para evitar colisão de nomes de containers.
-4. Subir toda a stack (backend + frontend + infra):
-   ```bash
-   docker compose up -d --build
-   ```
-5. Subir apenas o backend:
-   ```bash
-   docker compose up -d --build unified-order-system
-   ```
-6. Subir também o stack de observabilidade:
-   ```bash
-   docker compose -f docker-compose.observability.yml up -d
-   ```
+Login with the default admin credentials configured in `.env.example` (`admin` / `change-this-admin-password`) or the credentials configured in the running instance.
 
-## Frontend (Angular 17)
-Desenvolvimento local do frontend:
-```bash
-cd frontend
-npm install
-npm start          # dev server em http://localhost:4200 com proxy para :8080
-npm run test:ci    # testes unitarios headless via Karma + Chrome
-npm run build      # build de produção em dist/
+## What this project demonstrates
+
+- **Event Sourcing** — every domain event is persisted to the `domain_events` table for full audit trail and replay
+- **Clean Architecture** — each bounded context (`order/`, `payment/`, `inventory/`) has its own `application/`, `domain/`, `dto/`, `model/`, `repository/` layers
+- **Saga orchestration** — `orchestration/` coordinates the order→inventory→payment flow and triggers compensating transactions on failure
+- **CQRS** — `query/` module provides read models separate from write operations
+- **JWT security** — stateless authentication via `common-security` library with rate limiting and CORS configuration
+- **Observability** — Micrometer Tracing (Brave → Tempo/Zipkin), Prometheus metrics, Grafana/Loki/Tempo stack in `docker-compose.observability.yml`
+- **Outbox pattern** — `DomainEventOutboxPublisher` dispatches domain events to RabbitMQ reliably via transactional outbox
+- **CI/CD pipeline** — GitHub Actions runs 238+ integration tests (Testcontainers + PostgreSQL), Angular unit tests, Playwright E2E smoke tests and auto-deploys to EC2 on every push to `main`
+
+## Repository layout
+
+```
+libs/
+  common-events/        # Versioned event envelopes, queue naming conventions
+  common-security/      # JWT auth, rate limiting, security properties
+  common-messaging/     # RabbitMQ auto-configuration, outbox dispatch
+  common-observability/ # Log correlation, tracing headers
+unified-order-system/   # Main application — active runtime
+frontend/               # Angular 17 dashboard (orders, inventory, real-time WebSocket)
+observability/          # Prometheus, Grafana, Loki, Tempo configs
+tests/                  # E2E (Playwright) and load tests (k6)
+legacy/                 # Historical microservices — not in the active pipeline
 ```
 
-## Build e testes (Maven)
-- Build de todos os módulos (sem testes):
-  ```bash
-  mvn clean install -DskipTests
-  ```
-- Rodar todos os testes (a partir de `unified-order-system/`):
-  ```bash
-  mvn -f unified-order-system/pom.xml clean verify
-  ```
-- Rodar um teste específico:
-  ```bash
-  mvn -f unified-order-system/pom.xml test -Dtest=CompleteOrderFlowIntegrationTest
-  ```
-- Build da imagem Docker do monólito:
-  ```bash
-  docker build -t unified-order-system:latest -f unified-order-system/Dockerfile .
-  ```
+## Running locally
+
+```bash
+# 1. Copy and fill the environment file
+cp .env.example .env
+# Set SECURITY_SECRET and JWT_SECRET_KEY to any 64-char hex string:
+bash scripts/generate-jwt-secret.sh
+
+# 2. Start the full stack (backend + frontend + infra)
+docker compose up -d --build
+
+# 3. Open in browser
+open http://localhost:4200
+```
+
+Optional — observability stack (Grafana, Loki, Tempo, Prometheus):
+```bash
+docker compose -f docker-compose.observability.yml up -d
+# Grafana: http://localhost:3000  (admin/admin)
+```
+
+## Build and test (Maven)
+
+```bash
+# Install shared libraries (required first)
+mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am -DskipTests install
+
+# Run all integration tests + JaCoCo coverage gate (60% minimum)
+mvn -f unified-order-system/pom.xml clean verify -B
+
+# Run a single test class
+mvn -f unified-order-system/pom.xml test -Dtest=CompleteOrderFlowIntegrationTest -B
+
+# Run a single test method
+mvn -f unified-order-system/pom.xml test -Dtest=ClassName#methodName -B
+```
+
+## Frontend (Angular 17)
+
+```bash
+cd frontend
+npm ci
+npm start           # dev server at http://localhost:4200 (proxies /api → :8080)
+npm run test:ci     # headless unit tests via Karma + Chrome
+npm run build       # production build to dist/
+```
+
+## Key endpoints
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/auth/login` | JWT authentication |
+| `GET  /api/orders` | List orders (paginated) |
+| `POST /api/orders` | Create order (triggers Saga) |
+| `DELETE /api/orders/{id}` | Cancel order (compensation) |
+| `GET  /api/inventory` | Inventory status |
+| `GET  /api/health` | Detailed service health |
+| `GET  /actuator/health` | Spring Boot actuator health |
+| `WS   /ws` | WebSocket (SockJS/STOMP) — topics: `/topic/orders`, `/topic/inventory`, `/topic/payments` |
+
+## Architecture overview
+
+```
+HTTP → Spring Security (JWT) → REST Controllers
+                                     ↓
+                              Use Cases (application/)
+                                     ↓
+                         Domain rules (domain/)  +  JPA Entities (model/)
+                                     ↓
+                         EventPublisher → domain_events table (Event Sourcing)
+                                     ↓
+                      DomainEventOutboxPublisher → RabbitMQ (Outbox pattern)
+```
+
+Order lifecycle: `PENDING → INVENTORY_RESERVED → PAYMENT_PROCESSING → CONFIRMED`
+Cancellation triggers: inventory release + payment refund (compensating transactions)
 
 ## CI/CD
-- A pipeline principal de GitHub Actions executa `mvn -f unified-order-system/pom.xml clean verify`.
-- O frontend entra na pipeline com `npm ci`, `npm run test:ci` e `npm run build`.
-- O smoke E2E com Playwright valida a SPA Angular publicada em `http://localhost:4200`.
-- O deploy automatizado em EC2 sobe backend e frontend juntos via `docker compose`.
 
-## Testes de carga (k6)
+- **backend-verify**: installs shared libs → `mvn clean verify` (238+ tests, Testcontainers + PostgreSQL, JaCoCo gate)
+- **frontend-unit**: `npm ci` → Angular unit tests → production build
+- **frontend-e2e**: full Docker Compose stack → Playwright smoke tests
+- **deploy-ec2**: SSH deploy to AWS EC2 on every successful `main` push
+
+## Load testing (k6)
+
 ```bash
-# Requer k6 instalado: https://k6.io/docs/get-started/installation/
 k6 run tests/k6/load-test.js
-
-# Com VUs e duração customizados
 k6 run --vus 50 --duration 60s tests/k6/load-test.js
-
-# Apontando para instância remota
 BASE_URL=http://98.92.208.98 k6 run tests/k6/load-test.js
 ```
 
-## Variáveis de ambiente principais
-- Banco de dados:
-  - `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
-  - `DATABASE_URL` (produção/PostgreSQL, usada pelo `application-production.yml`)
-- Segurança:
-  - `JWT_SECRET_KEY` (64 caracteres hexadecimais)
-  - `SECURITY_SECRET` (mesmo valor de `JWT_SECRET_KEY`)
-  - `SECURITY_ENFORCE_AUTH` (`false` para dev, `true` para produção)
-  - `CORS_ALLOWED_ORIGINS` (padrão: `http://localhost:4200,http://localhost:8080`)
-- Cache:
-  - `REDIS_HOST`, `REDIS_PORT`, `REDIS_ENABLED`
+## Environment variables
 
-## Endpoints úteis (ambiente local)
-- **Frontend (Angular)**: `http://localhost:4200`
-- **Health da aplicação**: `http://localhost:8080/actuator/health`
-- **API docs (Swagger/OpenAPI)**: `http://localhost:8080/swagger-ui/index.html`
-- **WebSocket**: `ws://localhost:8080/ws` (SockJS + STOMP)
-  - Tópicos: `/topic/orders`, `/topic/inventory`, `/topic/payments`
-- **Grafana (observabilidade)**: `http://localhost:3000` (usuario/senha padrão `admin/admin`)
+| Variable | Description |
+|---|---|
+| `SECURITY_SECRET` / `JWT_SECRET_KEY` | JWT signing key (64+ hex chars) |
+| `POSTGRES_*` | PostgreSQL connection |
+| `SPRING_RABBITMQ_*` | RabbitMQ connection |
+| `REDIS_HOST`, `REDIS_PORT` | Redis connection |
+| `PAYMENT_GATEWAY_BASE_URL` | WireMock payment sandbox URL |
+| `SECURITY_CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins |
+| `SECURITY_BOOTSTRAP_ADMIN_*` | Auto-created admin user on first boot |
 
-## Deploy na AWS
-O repositório contém automações para deploy em EC2 e uso de ECR:
-
-- **Imagem Docker padrão (ECR)**
-  Definida em `docker-compose.prod.yml`:
-  ```text
-  246599827442.dkr.ecr.us-east-1.amazonaws.com/unified-order-system:latest
-  ```
-  Pode ser sobrescrita via variável `APP_IMAGE`.
-
-- **URL validated by automated deployment**
-  The `deploy-ec2.yml` workflow validates the published frontend at:
-  ```text
-  http://<EC2_HOST>:4200/login
-  ```
-
-## Arquitetura (visão geral)
-O sistema usa Clean Architecture dentro de um monólito modular:
-- `order/application/`: casos de uso (ex.: `CreateOrderUseCase`, `CancelOrderUseCase`) implementando o padrão Saga
-- `order/domain/`: regras de negócio e validações (`OrderBusinessRules`)
-- `infrastructure/events/`: Event Sourcing via `EventPublisher` (persiste todos os eventos de domínio na tabela `domain_events`)
-- `domain/events/`: internal domain events of the modular monolith (`OrderCreatedEvent`, `PaymentProcessedEvent`, `InventoryReservedEvent`, etc.)
-- `config/`: configuração Spring (segurança, cache, banco de dados, métricas, CORS, WebSocket)
-- `frontend/`: Angular 17 com componentes standalone, serviços HTTP e integração WebSocket via SockJS + STOMP
-
-Fluxo principal de pedido:
-- Status: `PENDING → INVENTORY_RESERVED → PAYMENT_PROCESSING → CONFIRMED`
-- Cancelamentos disparam transações compensatórias (liberação de estoque + estorno de pagamento via `PaymentService.refundPayment()`).
-
-## Observações
-- **Nunca** commitar `.env` ou qualquer segredo.
-- Para gerar um `JWT_SECRET_KEY` seguro:
-  ```bash
-  bash scripts/generate-jwt-secret.sh
-  ```
-- O build Docker do backend precisa ser feito a partir do diretório raiz do repositório (para incluir `libs` e `unified-order-system`).
-- O runtime ativo do produto e `frontend/` + `unified-order-system/`. Tudo em `legacy/` fica fora da pipeline principal e serve apenas como referência histórica.
-- `libs/common-events/` is the active integration contract; `legacy/shared-events/` remains only for historical compatibility.
-- Em produção, habilite autenticação e use um gerenciador de segredos:
-  - `SECURITY_ENFORCE_AUTH=true`
-  - Segredos gerenciados via AWS Secrets Manager, SSM Parameter Store ou equivalente.
+> **Never commit `.env`** — use `bash scripts/generate-jwt-secret.sh` to generate secrets.

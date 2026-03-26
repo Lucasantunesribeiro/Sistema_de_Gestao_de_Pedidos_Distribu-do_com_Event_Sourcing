@@ -66,6 +66,8 @@ tests/                 # E2E (Playwright) and load tests (k6)
 | `domain/events/` | Internal domain event types for the modular monolith |
 | `shared/exceptions/` | Exception hierarchy rooted at `OrderSystemException` |
 | `config/` | Spring config, `GlobalExceptionHandler`, security setup |
+| `auth/` | JWT login endpoint, `ApplicationUser` entity, login/response DTOs |
+| `health/` | `HealthController` — liveness/readiness probe endpoint |
 | `web/` | Thymeleaf legacy views (superseded by Angular frontend) |
 | `websocket/` | Real-time event streaming via SockJS + STOMP |
 
@@ -78,7 +80,7 @@ tests/                 # E2E (Playwright) and load tests (k6)
 - `model/` — JPA entities
 - `repository/` — Spring Data JPA interfaces
 
-**Event Sourcing**: Every domain event is persisted to `domain_events` table via `EventPublisher`. When adding new event types, update `EventPublisher.getAggregateId()` which uses `instanceof` checks.
+**Event Sourcing**: Every domain event is persisted to `domain_events` table via `EventPublisher`. When adding new event types, update `EventPublisher.getAggregateId()` which uses `instanceof` checks. All domain events extend `BaseEvent`, which requires passing `correlationId`, `causationId`, and `eventType` to the superclass constructor — the no-arg constructor leaves all fields null (Jackson deserialization only).
 
 **Saga Orchestration**: `orchestration/` coordinates order→payment→inventory flows and compensations.
 
