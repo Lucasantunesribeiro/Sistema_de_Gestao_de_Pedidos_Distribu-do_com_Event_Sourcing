@@ -13,7 +13,6 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
-import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 
 @AutoConfiguration(before = RabbitAutoConfiguration.class)
@@ -34,11 +33,10 @@ public class MessagingAutoConfiguration {
 
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
-            SimpleRabbitListenerContainerFactoryConfigurer configurer,
             ConnectionFactory connectionFactory,
             MessageConverter messageConverter) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
-        configurer.configure(factory, connectionFactory);
+        factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter);
         factory.setDefaultRequeueRejected(false);
         factory.setAdviceChain(RetryInterceptorBuilder.stateless()
