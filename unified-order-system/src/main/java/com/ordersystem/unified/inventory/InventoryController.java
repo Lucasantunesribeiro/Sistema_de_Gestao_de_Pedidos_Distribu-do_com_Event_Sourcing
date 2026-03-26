@@ -347,7 +347,7 @@ public class InventoryController {
         Product product = new Product(productId, name.trim(), sku, price);
         product.setDescription((String) request.get("description"));
         product.setCategory((String) request.get("category"));
-        productRepository.save(product);
+        product = productRepository.save(product);
 
         if (quantity > 0) {
             Stock stock = new Stock(product, "DEFAULT", quantity);
