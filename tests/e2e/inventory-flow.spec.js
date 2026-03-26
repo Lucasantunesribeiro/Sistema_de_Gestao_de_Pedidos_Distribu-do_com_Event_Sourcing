@@ -7,6 +7,7 @@ const ADMIN_PASSWORD = process.env.E2E_PASSWORD || 'change-this-admin-password';
 
 async function loginViaUi(page) {
   await page.goto('/login');
+  await page.waitForLoadState('networkidle');
   await page.getByLabel('Username or email').fill(ADMIN_USERNAME);
   await page.getByLabel('Password').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: /sign in/i }).click();
@@ -47,8 +48,16 @@ async function seedProduct(request, suffix) {
 }
 
 test.describe('Inventory Flow E2E', () => {
+  test.beforeEach(async ({ page }) => {
+    page.on('pageerror', err => console.error('[page error]', err.message));
+    page.on('console', msg => {
+      if (msg.type() === 'error') console.error('[browser]', msg.text());
+    });
+  });
+
   test('1. Login redirects into the Angular dashboard', async ({ page }) => {
     await page.goto('/login');
+    await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: /orderflow control plane/i })).toBeVisible();
 
     await loginViaUi(page);
