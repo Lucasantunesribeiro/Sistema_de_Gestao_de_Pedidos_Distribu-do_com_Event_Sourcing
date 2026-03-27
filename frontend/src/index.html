@@ -6,6 +6,10 @@
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!-- sockjs-client accesses Node's `global` at module-eval time.
+       Angular's esbuild builder does not polyfill it.
+       This shim must live in index.html so it runs before any JS bundle loads. -->
+  <script>window['global'] = window;</script>
 </head>
 <body>
   <app-root></app-root>
