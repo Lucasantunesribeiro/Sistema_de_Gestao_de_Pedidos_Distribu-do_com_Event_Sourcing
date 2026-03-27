@@ -25,7 +25,6 @@ public class CreateOrderRequest {
     @Size(min = 1, max = ValidationConstants.MAX_NAME_LENGTH, message = "Customer name must be between 1 and " + ValidationConstants.MAX_NAME_LENGTH + " characters")
     private String customerName;
 
-    @NotBlank(message = "Customer email is required")
     @Email(message = "Customer email must be valid")
     @Size(max = ValidationConstants.MAX_EMAIL_LENGTH, message = ValidationConstants.MSG_EMAIL_TOO_LONG)
     private String customerEmail;

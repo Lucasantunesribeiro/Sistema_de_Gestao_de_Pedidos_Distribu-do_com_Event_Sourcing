@@ -7,6 +7,8 @@ const ADMIN_PASSWORD = process.env.E2E_PASSWORD || 'change-this-admin-password';
 
 async function loginViaUi(page) {
   await page.goto('/login');
+  await page.waitForLoadState('networkidle');
+  console.log('[e2e] after goto /login — url:', page.url());
   await page.getByLabel('Username or email').fill(ADMIN_USERNAME);
   await page.getByLabel('Password').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: /sign in/i }).click();
@@ -47,8 +49,17 @@ async function seedProduct(request, suffix) {
 }
 
 test.describe('Inventory Flow E2E', () => {
+  test.beforeEach(async ({ page }) => {
+    page.on('pageerror', err => console.error('[page error]', err.message));
+    page.on('console', msg => {
+      if (msg.type() === 'error') console.error('[browser]', msg.text());
+    });
+  });
+
   test('1. Login redirects into the Angular dashboard', async ({ page }) => {
     await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+    console.log('[e2e] test1 after goto /login — url:', page.url());
     await expect(page.getByRole('heading', { name: /orderflow control plane/i })).toBeVisible();
 
     await loginViaUi(page);
@@ -87,7 +98,8 @@ test.describe('Inventory Flow E2E', () => {
     await page.locator('#unitPrice-0').fill('49.99');
     await page.getByRole('button', { name: /create order/i }).click();
 
-    await expect(page).toHaveURL(/\/orders\/.+/);
+    // Match a real order ID (UUID-like, >10 chars) — not /orders/new which also matches /.+/
+    await expect(page).toHaveURL(/\/orders\/.{10,}/);
     await expect(page.getByText(customerName)).toBeVisible();
     await expect(page.getByText(product.name)).toBeVisible();
     await expect(page.getByText('PIX')).toBeVisible();

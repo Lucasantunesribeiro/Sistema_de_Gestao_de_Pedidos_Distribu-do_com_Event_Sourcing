@@ -118,6 +118,8 @@ services:
       TRACING_ENABLED: "true"
       TRACING_SAMPLE_RATE: "1.0"
       ZIPKIN_BASE_URL: http://tempo:9411
+      MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
+      MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,9 +135,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 120s
     logging:
       driver: "json-file"
       options:
