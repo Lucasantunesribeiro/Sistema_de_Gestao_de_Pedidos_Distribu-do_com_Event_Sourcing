@@ -54,3 +54,7 @@ data/
 
 # Vercel
 .vercel/
+
+# Arquivos locais — não subir ao GitHub
+CLAUDE.md
+Descricao_Portfolio.md
