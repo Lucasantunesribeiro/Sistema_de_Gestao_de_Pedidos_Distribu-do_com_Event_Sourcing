@@ -194,6 +194,8 @@ public class CreateOrderUseCase {
 
         Order order = new Order(orderId, customerId, customerName, totalAmount);
         order.setCorrelationId(request.getCorrelationId());
+        PaymentMethod pm = request.getPaymentMethod() != null ? request.getPaymentMethod() : PaymentMethod.PIX;
+        order.setPaymentMethod(pm);
 
         // Add items
         if (request.getItems() != null) {
@@ -418,6 +420,7 @@ public class CreateOrderUseCase {
             .collect(Collectors.toList());
 
         response.setItems(itemResponses);
+        response.setPaymentMethod(order.getPaymentMethod());
         return response;
     }
 }

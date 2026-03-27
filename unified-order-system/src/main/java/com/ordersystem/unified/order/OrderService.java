@@ -74,7 +74,7 @@ public class OrderService {
 
         Order order = new Order(orderId, customerId, customerName, totalAmount);
         order.setCorrelationId(request.getCorrelationId());
-        // paymentMethod currently not persisted; keep resolved to validate input path
+        order.setPaymentMethod(paymentMethod);
         if (paymentMethod == null) {
             throw new IllegalArgumentException("Payment method is required");
         }
@@ -251,6 +251,7 @@ public class OrderService {
         response.setPaymentId(order.getPaymentId());
         response.setTransactionId(order.getTransactionId());
         response.setCancellationReason(order.getCancellationReason());
+        response.setPaymentMethod(order.getPaymentMethod());
 
         List<OrderItemResponse> itemResponses = order.getItems().stream().map(item -> {
             OrderItemResponse itemResponse = new OrderItemResponse();
