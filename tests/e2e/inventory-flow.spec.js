@@ -98,7 +98,8 @@ test.describe('Inventory Flow E2E', () => {
     await page.locator('#unitPrice-0').fill('49.99');
     await page.getByRole('button', { name: /create order/i }).click();
 
-    await expect(page).toHaveURL(/\/orders\/.+/);
+    // Match a real order ID (UUID-like, >10 chars) — not /orders/new which also matches /.+/
+    await expect(page).toHaveURL(/\/orders\/.{10,}/);
     await expect(page.getByText(customerName)).toBeVisible();
     await expect(page.getByText(product.name)).toBeVisible();
     await expect(page.getByText('PIX')).toBeVisible();
