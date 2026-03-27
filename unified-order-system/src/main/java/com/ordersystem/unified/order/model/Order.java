@@ -1,6 +1,7 @@
 package com.ordersystem.unified.order.model;
 
 import com.ordersystem.unified.domain.events.OrderStatus;
+import com.ordersystem.unified.payment.dto.PaymentMethod;
 import lombok.Builder;
 import lombok.AllArgsConstructor;
 import jakarta.persistence.*;
@@ -76,6 +77,10 @@ public class Order {
 
     @Column(name = "cancellation_reason")
     private String cancellationReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 50)
+    private PaymentMethod paymentMethod;
 
     // Default constructor for JPA
     protected Order() {
@@ -153,6 +158,9 @@ public class Order {
 
     public String getCancellationReason() { return cancellationReason; }
     public void setCancellationReason(String cancellationReason) { this.cancellationReason = cancellationReason; }
+
+    public PaymentMethod getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
 
     @Override
     public boolean equals(Object o) {

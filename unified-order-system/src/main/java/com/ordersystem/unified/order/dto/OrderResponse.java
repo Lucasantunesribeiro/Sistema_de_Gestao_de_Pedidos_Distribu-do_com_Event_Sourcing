@@ -2,6 +2,7 @@ package com.ordersystem.unified.order.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ordersystem.unified.domain.events.OrderStatus;
+import com.ordersystem.unified.payment.dto.PaymentMethod;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -50,6 +51,9 @@ public class OrderResponse {
 
     @JsonProperty("cancellationReason")
     private String cancellationReason;
+
+    @JsonProperty("paymentMethod")
+    private PaymentMethod paymentMethod;
 
     // Default constructor for JSON serialization
     public OrderResponse() {}
@@ -190,6 +194,14 @@ public class OrderResponse {
 
     public void setCancellationReason(String cancellationReason) {
         this.cancellationReason = cancellationReason;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
     }
 
     @Override
