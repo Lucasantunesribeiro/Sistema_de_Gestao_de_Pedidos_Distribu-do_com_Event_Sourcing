@@ -2,6 +2,8 @@ package com.ordersystem.unified.config;
 
 import java.time.Duration;
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -31,11 +33,23 @@ public class CacheConfig {
     @Bean
     @ConditionalOnProperty(prefix = "app.redis", name = "enabled", havingValue = "true")
     public CacheManager redisCacheManager(RedisConnectionFactory redisConnectionFactory,
-                                          @Value("${app.redis.cache-ttl:1h}") Duration cacheTtl) {
+                                          @Value("${app.redis.cache-ttl:1h}") Duration cacheTtl,
+                                          ObjectMapper objectMapper) {
+        // Copy Spring Boot's auto-configured ObjectMapper (which includes JavaTimeModule)
+        // and add polymorphic type info so Redis can deserialize cached objects correctly.
+        ObjectMapper cacheMapper = objectMapper.copy()
+            .activateDefaultTypingAsProperty(
+                BasicPolymorphicTypeValidator.builder()
+                    .allowIfSubType(Object.class)
+                    .build(),
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                "@class"
+            );
+
         RedisCacheConfiguration configuration = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(cacheTtl)
             .serializeValuesWith(RedisSerializationContext.SerializationPair
-                .fromSerializer(new GenericJackson2JsonRedisSerializer()));
+                .fromSerializer(new GenericJackson2JsonRedisSerializer(cacheMapper)));
 
         return RedisCacheManager.builder(redisConnectionFactory)
             .cacheDefaults(configuration)
