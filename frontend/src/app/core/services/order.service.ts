@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import {
   Order,
@@ -23,9 +23,19 @@ export class OrderService {
     if (status) {
       params = params.set('status', status);
     }
+    // Backend returns a plain Order[] array; wrap it into an OrdersPage for the component.
     return this.http
-      .get<OrdersPage>(this.baseUrl, { params })
-      .pipe(catchError(this.handleError));
+      .get<Order[]>(this.baseUrl, { params })
+      .pipe(
+        map((orders) => ({
+          content: orders,
+          totalElements: orders.length,
+          totalPages: orders.length > 0 ? 1 : 0,
+          size: orders.length,
+          number: page,
+        })),
+        catchError(this.handleError)
+      );
   }
 
   getOrderById(orderId: string): Observable<Order> {
