@@ -20,7 +20,7 @@ services:
     ports:
       - "9090:9090"
     networks:
-      - ordersystem-net
+      - order-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -52,7 +52,7 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - ordersystem-net
+      - order-network
     restart: unless-stopped
     depends_on:
       - prometheus
@@ -81,7 +81,7 @@ services:
     ports:
       - "3100:3100"
     networks:
-      - ordersystem-net
+      - order-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -105,7 +105,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - ordersystem-net
+      - order-network
     restart: unless-stopped
     depends_on:
       - loki
@@ -129,7 +129,7 @@ services:
       - "4318:4318"   # otlp http
       - "9411:9411"   # zipkin
     networks:
-      - ordersystem-net
+      - order-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -157,7 +157,7 @@ services:
     ports:
       - "9093:9093"
     networks:
-      - ordersystem-net
+      - order-network
     restart: unless-stopped
     depends_on:
       - prometheus
@@ -189,7 +189,7 @@ services:
     ports:
       - "9100:9100"
     networks:
-      - ordersystem-net
+      - order-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -206,7 +206,7 @@ services:
     ports:
       - "9187:9187"
     networks:
-      - ordersystem-net
+      - order-network
     restart: unless-stopped
     depends_on:
       - postgres
