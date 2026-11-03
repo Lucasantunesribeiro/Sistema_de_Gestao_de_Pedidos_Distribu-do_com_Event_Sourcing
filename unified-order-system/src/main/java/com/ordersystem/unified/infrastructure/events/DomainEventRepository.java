@@ -22,6 +22,28 @@ public interface DomainEventRepository extends JpaRepository<DomainEventEntity, 
     List<DomainEventEntity> findByAggregateIdOrderByCreatedAtAsc(String aggregateId);
 
     /**
+     * Stream de um agregado em ordem de versão (fonte do replay).
+     */
+    List<DomainEventEntity> findByAggregateTypeAndAggregateIdOrderByAggregateVersionAsc(
+        String aggregateType,
+        String aggregateId
+    );
+
+    /**
+     * Todos os streams de um tipo, ordenados de forma determinística (agregado, versão).
+     * Usado na reconstrução de projeções.
+     */
+    List<DomainEventEntity> findByAggregateTypeOrderByAggregateIdAscAggregateVersionAsc(String aggregateType);
+
+    /**
+     * Versão atual do stream (0 quando o stream não existe).
+     */
+    @Query("SELECT COALESCE(MAX(e.aggregateVersion), 0) FROM DomainEventEntity e "
+        + "WHERE e.aggregateType = :aggregateType AND e.aggregateId = :aggregateId")
+    long findCurrentVersion(@Param("aggregateType") String aggregateType,
+                            @Param("aggregateId") String aggregateId);
+
+    /**
      * Find events by aggregate type.
      */
     List<DomainEventEntity> findByAggregateTypeOrderByCreatedAtDesc(String aggregateType);
@@ -44,7 +66,8 @@ public interface DomainEventRepository extends JpaRepository<DomainEventEntity, 
     /**
      * Find a limited batch of unprocessed events for broker dispatch.
      */
-    @Query("SELECT e FROM DomainEventEntity e WHERE e.processed = false ORDER BY e.createdAt ASC")
+    @Query("SELECT e FROM DomainEventEntity e WHERE e.processed = false "
+        + "ORDER BY e.createdAt ASC, e.aggregateVersion ASC")
     List<DomainEventEntity> findPendingForDispatch(Pageable pageable);
 
     /**

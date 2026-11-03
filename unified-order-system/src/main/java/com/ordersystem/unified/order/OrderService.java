@@ -1,6 +1,7 @@
 package com.ordersystem.unified.order;
 
-import com.ordersystem.unified.infrastructure.events.EventPublisher;
+import com.ordersystem.unified.order.application.OrderEventSourcingRepository;
+import com.ordersystem.unified.order.domain.OrderAggregate;
 import com.ordersystem.unified.shared.util.SafeEnumParser;
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
@@ -10,11 +11,9 @@ import com.ordersystem.unified.order.dto.OrderItemResponse;
 import com.ordersystem.unified.order.model.Order;
 import com.ordersystem.unified.order.model.OrderItemEntity;
 import com.ordersystem.unified.order.repository.OrderRepository;
-import com.ordersystem.unified.domain.events.OrderCreatedEvent;
 import com.ordersystem.unified.domain.events.OrderItem;
 import com.ordersystem.unified.domain.events.OrderStatus;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -42,12 +41,11 @@ import java.math.RoundingMode;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderEventSourcingRepository orderEvents;
 
-    @Autowired
-    private EventPublisher eventPublisher;
-
-    public OrderService(OrderRepository orderRepository) {
+    public OrderService(OrderRepository orderRepository, OrderEventSourcingRepository orderEvents) {
         this.orderRepository = orderRepository;
+        this.orderEvents = orderEvents;
     }
 
     @CacheEvict(cacheNames = {"orders", "orderStatistics", "dashboard"}, allEntries = true)
@@ -104,8 +102,11 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // Publish OrderCreatedEvent (event sourcing — persisted via EventPublisher/domain_events)
-        publishOrderCreatedEvent(savedOrder, request.getCorrelationId());
+        // Stream Order:<id> v1 (same transaction as the row: both commit or neither)
+        orderEvents.save(OrderAggregate.create(
+                savedOrder.getId(), savedOrder.getCustomerId(), savedOrder.getCustomerName(),
+                toEventItems(savedOrder), savedOrder.getTotalAmount(),
+                request.getCorrelationId() != null ? request.getCorrelationId() : UUID.randomUUID().toString()));
 
         return mapToResponse(savedOrder);
     }
@@ -160,6 +161,11 @@ public class OrderService {
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new IllegalStateException("Order " + orderId + " is already cancelled");
         }
+
+        OrderAggregate aggregate = orderEvents.loadOrStartFrom(order);
+        aggregate.cancel(reason, null, order.getCorrelationId(), order.getReservationId(), order.getPaymentId(),
+                false, false);
+        orderEvents.save(aggregate);
 
         order.updateStatus(OrderStatus.CANCELLED);
         order.setCancellationReason(reason);
@@ -267,28 +273,9 @@ public class OrderService {
         return response;
     }
 
-    private void publishOrderCreatedEvent(Order order, String correlationId) {
-        try {
-            List<OrderItem> eventItems = order.getItems().stream()
-                    .map(i -> new OrderItem(i.getProductId(), i.getProductName(), i.getQuantity(), i.getUnitPrice()))
-                    .collect(Collectors.toList());
-
-            OrderCreatedEvent event = new OrderCreatedEvent(
-                    order.getId(),
-                    order.getCustomerId(),
-                    order.getCustomerName(),
-                    eventItems,
-                    order.getTotalAmount(),
-                    correlationId != null ? correlationId : UUID.randomUUID().toString(),
-                    null
-            );
-            // Use REQUIRED propagation (no new connection) so concurrent tests don't exhaust pool
-            eventPublisher.publishWithinTransaction(event);
-        } catch (Exception e) {
-            // Non-fatal: log and continue — event will be re-published on retry or via audit
-            org.slf4j.LoggerFactory.getLogger(getClass())
-                    .warn("Failed to publish OrderCreatedEvent for order {}: {}", order.getId(), e.getMessage());
-        }
+    private List<OrderItem> toEventItems(Order order) {
+        return order.getItems().stream()
+                .map(i -> new OrderItem(i.getProductId(), i.getProductName(), i.getQuantity(), i.getUnitPrice()))
+                .collect(Collectors.toList());
     }
 }
-

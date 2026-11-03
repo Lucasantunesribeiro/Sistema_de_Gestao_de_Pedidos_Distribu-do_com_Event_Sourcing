@@ -1,5 +1,7 @@
 package com.ordersystem.unified.order;
 
+import com.ordersystem.unified.order.application.OrderEventSourcingRepository;
+import com.ordersystem.unified.order.domain.OrderAggregate;
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
@@ -11,6 +13,7 @@ import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +34,9 @@ class OrderServiceTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private OrderEventSourcingRepository orderEvents;
 
     @InjectMocks
     private OrderService orderService;
@@ -68,6 +74,31 @@ class OrderServiceTest {
         assertThat(response.getCustomerId()).isEqualTo("customer-123");
         assertThat(response.getTotalAmount()).isEqualTo(new BigDecimal("50.00"));
         verify(orderRepository).save(any(Order.class));
+
+        ArgumentCaptor<OrderAggregate> stored = ArgumentCaptor.forClass(OrderAggregate.class);
+        verify(orderEvents).save(stored.capture());
+        assertThat(stored.getValue().getOrderId()).isEqualTo(response.getOrderId());
+        assertThat(stored.getValue().getCommittedVersion()).isZero();
+        assertThat(stored.getValue().getStatus()).isEqualTo(OrderStatus.PENDING);
+    }
+
+    @Test
+    void cancelOrderAppendsCancellationToEventStream() {
+        String orderId = UUID.randomUUID().toString();
+        Order order = new Order(orderId, "cust-1", "Name", new BigDecimal("20.00"));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        OrderAggregate aggregate = OrderAggregate.create(orderId, "cust-1", "Name", java.util.List.of(),
+            new BigDecimal("20.00"), "corr");
+        aggregate.markCommitted();
+        when(orderEvents.loadOrStartFrom(order)).thenReturn(aggregate);
+
+        OrderResponse response = orderService.cancelOrder(orderId, "desistência");
+
+        assertThat(response.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(orderEvents).save(aggregate);
+        assertThat(aggregate.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(aggregate.getUncommittedEvents()).hasSize(1);
     }
 
     @Test

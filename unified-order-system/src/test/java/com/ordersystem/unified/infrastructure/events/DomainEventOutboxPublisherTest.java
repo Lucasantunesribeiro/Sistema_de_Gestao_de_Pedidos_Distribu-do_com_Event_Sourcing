@@ -9,7 +9,10 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Pageable;
 
@@ -76,5 +79,36 @@ class DomainEventOutboxPublisherTest {
             any(MessagePostProcessor.class)
         );
         verify(domainEventRepository).save(event);
+    }
+
+    @Test
+    void shouldSendStreamMetadataUsedByIdempotentConsumers() {
+        OutboxMessagingProperties properties = new OutboxMessagingProperties();
+        domainEventOutboxPublisher = new DomainEventOutboxPublisher(
+            domainEventRepository, rabbitTemplate, objectMapper, properties);
+
+        DomainEventEntity event = DomainEventEntity.builder()
+            .aggregateId("order-9")
+            .aggregateType("Order")
+            .aggregateVersion(3)
+            .eventType("OrderStatusUpdatedEvent")
+            .eventData("{\"orderId\":\"order-9\",\"newStatus\":\"CONFIRMED\"}")
+            .build();
+        event.setCreatedAt(LocalDateTime.of(2026, 1, 2, 3, 4, 5));
+
+        ArgumentCaptor<MessagePostProcessor> postProcessor = ArgumentCaptor.forClass(MessagePostProcessor.class);
+        domainEventOutboxPublisher.dispatchEvent(event);
+        verify(rabbitTemplate).convertAndSend(
+            org.mockito.ArgumentMatchers.eq("order.exchange"),
+            org.mockito.ArgumentMatchers.eq("order.status.updated"),
+            any(Object.class),
+            postProcessor.capture());
+
+        Message message = postProcessor.getValue().postProcessMessage(new Message(new byte[0], new MessageProperties()));
+        MessageProperties sent = message.getMessageProperties();
+        assertThat(sent.getMessageId()).isEqualTo(event.getId());
+        assertThat((Object) sent.getHeader("aggregateVersion")).isEqualTo(3L);
+        assertThat((Object) sent.getHeader("aggregateType")).isEqualTo("Order");
+        assertThat((Object) sent.getHeader("occurredAt")).isEqualTo("2026-01-02T03:04:05");
     }
 }

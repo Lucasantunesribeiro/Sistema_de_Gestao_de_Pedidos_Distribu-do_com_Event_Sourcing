@@ -1,7 +1,5 @@
 package com.ordersystem.unified.infrastructure.events;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.unified.domain.events.BaseEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,10 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Event Publisher for domain events (Event Sourcing Pattern).
- * Persists all domain events for audit trail and event replay.
+ * Publica eventos de domínio gravando-os no event store / outbox ({@code domain_events}).
  *
- * Production-ready with transactional guarantees and error handling.
+ * <p>Todos os métodos participam da transação do chamador ({@code REQUIRED}). Antes, {@code publish}
+ * usava {@code REQUIRES_NEW}: se o caso de uso falhasse depois, o pedido sofria rollback mas o evento
+ * ficava gravado (e era enviado ao RabbitMQ) apontando para um pedido inexistente. Falha ao gravar o
+ * evento agora também derruba a transação, em vez de ser engolida com um log.
+ *
+ * <p>Eventos do agregado Order devem ser gravados via {@code OrderEventSourcingRepository}, que usa
+ * versão esperada; este publisher acrescenta no fim do stream (Payment/Inventory).
  */
 @Component
 public class EventPublisher {
@@ -27,103 +30,38 @@ public class EventPublisher {
     private DomainEventRepository eventRepository;
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private EventStore eventStore;
 
     /**
-     * Publishes a domain event by persisting it to the event store.
-     * Uses REQUIRES_NEW to ensure event is persisted even if parent transaction fails.
-     *
-     * @param event Domain event to publish
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void publish(BaseEvent event) {
-        try {
-            logger.debug("Publishing event: type={}, aggregateId={}",
-                        event.getClass().getSimpleName(), getAggregateId(event));
-
-            // Serialize event data to JSON
-            String eventData = objectMapper.writeValueAsString(event);
-
-            // Create event entity
-            DomainEventEntity eventEntity = DomainEventEntity.builder()
-                .aggregateId(getAggregateId(event))
-                .aggregateType(getAggregateType(event))
-                .eventType(event.getClass().getSimpleName())
-                .eventData(eventData)
-                .correlationId(event.getCorrelationId())
-                .build();
-
-            // Persist event
-            eventRepository.save(eventEntity);
-
-            logger.info("Event published successfully: type={}, id={}",
-                       eventEntity.getEventType(), eventEntity.getId());
-
-        } catch (JsonProcessingException e) {
-            logger.error("Failed to serialize event: {}", event.getClass().getSimpleName(), e);
-            throw new RuntimeException("Event serialization failed", e);
-        } catch (Exception e) {
-            logger.error("Failed to publish event: {}", event.getClass().getSimpleName(), e);
-            throw new RuntimeException("Event publishing failed", e);
-        }
-    }
-
-    /**
-     * Publishes an event within the caller's existing transaction (no new connection needed).
-     * Use this from service methods that are already transactional and don't need
-     * the event to survive a rollback of the parent transaction.
+     * Grava o evento no stream do agregado correspondente, na transação corrente.
      *
      * @param event Domain event to publish
      */
     @Transactional(propagation = Propagation.REQUIRED)
-    public void publishWithinTransaction(BaseEvent event) {
-        try {
-            String eventData = objectMapper.writeValueAsString(event);
-            DomainEventEntity eventEntity = DomainEventEntity.builder()
-                .aggregateId(getAggregateId(event))
-                .aggregateType(getAggregateType(event))
-                .eventType(event.getClass().getSimpleName())
-                .eventData(eventData)
-                .correlationId(event.getCorrelationId())
-                .build();
-            eventRepository.save(eventEntity);
-            logger.debug("Event published within current tx: type={}", eventEntity.getEventType());
-        } catch (Exception e) {
-            logger.warn("Failed to publish event within transaction: {} — {}", event.getClass().getSimpleName(), e.getMessage());
-        }
+    public void publish(BaseEvent event) {
+        String aggregateType = getAggregateType(event);
+        String aggregateId = getAggregateId(event);
+        long version = eventStore.appendToStream(aggregateType, aggregateId, List.of(event));
+        logger.info("Event stored: type={}, stream={}:{}, version={}",
+            event.getClass().getSimpleName(), aggregateType, aggregateId, version);
     }
 
     /**
-     * Publishes multiple events in a single transaction.
+     * Mantido por compatibilidade: equivalente a {@link #publish(BaseEvent)}.
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void publishWithinTransaction(BaseEvent event) {
+        publish(event);
+    }
+
+    /**
+     * Publishes multiple events in the current transaction.
      *
      * @param events List of events to publish
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRED)
     public void publishAll(List<BaseEvent> events) {
-        logger.debug("Publishing {} events", events.size());
-
-        for (BaseEvent event : events) {
-            try {
-                String eventData = objectMapper.writeValueAsString(event);
-
-                DomainEventEntity eventEntity = DomainEventEntity.builder()
-                    .aggregateId(getAggregateId(event))
-                    .aggregateType(getAggregateType(event))
-                    .eventType(event.getClass().getSimpleName())
-                    .eventData(eventData)
-                    .correlationId(event.getCorrelationId())
-                    .build();
-
-                eventRepository.save(eventEntity);
-
-            } catch (JsonProcessingException e) {
-                logger.error("Failed to serialize event in batch: {}",
-                           event.getClass().getSimpleName(), e);
-                // Continue with other events
-            }
-        }
-
-        logger.info("Published {} events successfully", events.size());
+        events.forEach(this::publish);
     }
 
     /**

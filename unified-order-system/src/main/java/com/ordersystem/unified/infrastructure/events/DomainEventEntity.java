@@ -10,10 +10,19 @@ import java.util.UUID;
  * Entity for persisting domain events (Event Sourcing).
  * All important business events are stored for audit trail and replay.
  *
- * Production-ready with indexing for performance.
+ * <p>Cada stream é identificado por {@code (aggregate_type, aggregate_id)} e cada evento recebe
+ * {@code aggregate_version} sequencial (1, 2, 3...). A restrição única sobre essas três colunas é a
+ * garantia final de concorrência otimista: dois writers que leram a mesma versão não conseguem
+ * gravar o mesmo número de versão.
+ *
+ * <p>O campo {@code version} (JPA {@code @Version}) é outra coisa: trava otimista da própria linha
+ * do outbox (flag {@code processed}).
  */
 @Entity
-@Table(name = "domain_events", indexes = {
+@Table(name = "domain_events", uniqueConstraints = {
+    @UniqueConstraint(name = "uq_domain_events_stream_version",
+        columnNames = {"aggregate_type", "aggregate_id", "aggregate_version"})
+}, indexes = {
     @Index(name = "idx_aggregate_id", columnList = "aggregate_id"),
     @Index(name = "idx_event_type", columnList = "event_type"),
     @Index(name = "idx_correlation_id", columnList = "correlation_id"),
@@ -30,6 +39,9 @@ public class DomainEventEntity {
 
     @Column(name = "aggregate_type", nullable = false, length = 100)
     private String aggregateType;
+
+    @Column(name = "aggregate_version", nullable = false)
+    private Long aggregateVersion;
 
     @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
@@ -81,6 +93,7 @@ public class DomainEventEntity {
     public static class Builder {
         private String aggregateId;
         private String aggregateType;
+        private Long aggregateVersion;
         private String eventType;
         private String eventData;
         private String correlationId;
@@ -94,6 +107,11 @@ public class DomainEventEntity {
 
         public Builder aggregateType(String aggregateType) {
             this.aggregateType = aggregateType;
+            return this;
+        }
+
+        public Builder aggregateVersion(long aggregateVersion) {
+            this.aggregateVersion = aggregateVersion;
             return this;
         }
 
@@ -124,6 +142,7 @@ public class DomainEventEntity {
 
         public DomainEventEntity build() {
             DomainEventEntity event = new DomainEventEntity(aggregateId, aggregateType, eventType, eventData);
+            event.aggregateVersion = this.aggregateVersion;
             event.correlationId = this.correlationId;
             event.userId = this.userId;
             event.metadata = this.metadata;
@@ -160,6 +179,14 @@ public class DomainEventEntity {
 
     public void setAggregateType(String aggregateType) {
         this.aggregateType = aggregateType;
+    }
+
+    public Long getAggregateVersion() {
+        return aggregateVersion;
+    }
+
+    public void setAggregateVersion(Long aggregateVersion) {
+        this.aggregateVersion = aggregateVersion;
     }
 
     public String getEventType() {
@@ -237,8 +264,8 @@ public class DomainEventEntity {
     @Override
     public String toString() {
         return String.format(
-            "DomainEvent{id='%s', aggregateId='%s', type='%s', eventType='%s', createdAt=%s}",
-            id, aggregateId, aggregateType, eventType, createdAt
+            "DomainEvent{id='%s', aggregateId='%s', type='%s', aggregateVersion=%s, eventType='%s', createdAt=%s}",
+            id, aggregateId, aggregateType, aggregateVersion, eventType, createdAt
         );
     }
 }

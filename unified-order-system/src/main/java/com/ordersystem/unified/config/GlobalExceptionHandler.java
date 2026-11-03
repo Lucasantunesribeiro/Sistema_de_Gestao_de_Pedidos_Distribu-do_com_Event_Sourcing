@@ -2,6 +2,7 @@ package com.ordersystem.unified.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -127,6 +128,22 @@ public class GlobalExceptionHandler {
 
         logger.warn("Business error [{}]: {}", ex.getErrorCode(), ex.getMessage());
         return ResponseEntity.status(ex.getHttpStatus()).body(errorResponse);
+    }
+
+    /**
+     * Conflito de versão na linha JPA ({@code @Version}) entre duas requisições concorrentes:
+     * é conflito do cliente (409), não erro interno.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLockingFailure(OptimisticLockingFailureException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                "CONCURRENCY_CONFLICT",
+                "Resource was modified concurrently; reload and retry",
+                null,
+                LocalDateTime.now()
+        );
+        logger.warn("Optimistic locking conflict: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
     @ExceptionHandler(RuntimeException.class)

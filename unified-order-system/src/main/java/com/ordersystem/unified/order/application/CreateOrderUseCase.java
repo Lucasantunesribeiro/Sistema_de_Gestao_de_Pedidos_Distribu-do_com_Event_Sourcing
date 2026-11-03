@@ -3,6 +3,7 @@ package com.ordersystem.unified.order.application;
 import com.ordersystem.unified.infrastructure.events.EventPublisher;
 import com.ordersystem.unified.inventory.InventoryService;
 import com.ordersystem.unified.inventory.dto.ReservationResponse;
+import com.ordersystem.unified.order.domain.OrderAggregate;
 import com.ordersystem.unified.order.domain.OrderBusinessRules;
 import com.ordersystem.unified.order.dto.CreateOrderRequest;
 import com.ordersystem.unified.order.dto.OrderItemRequest;
@@ -56,6 +57,9 @@ public class CreateOrderUseCase {
     @Autowired
     private EventPublisher eventPublisher;
 
+    @Autowired
+    private OrderEventSourcingRepository orderEvents;
+
     /**
      * Executes the complete order creation flow.
      * Steps:
@@ -96,10 +100,17 @@ public class CreateOrderUseCase {
             Order order = createOrderEntity(request);
             orderId = order.getId();
 
+            // Event-sourced stream Order:<id> starts at v1 (OrderCreatedEvent, PENDING)
+            OrderAggregate aggregate = OrderAggregate.create(
+                order.getId(), order.getCustomerId(), order.getCustomerName(),
+                toEventItems(order), order.getTotalAmount(), correlationId);
+            orderEvents.save(aggregate);
+
             // Step 3: Reserve inventory
             reservationId = reserveInventory(order, request, correlationId);
             order.setReservationId(reservationId);
-            order.updateStatus(OrderStatus.INVENTORY_RESERVED);
+            transition(order, aggregate, OrderStatus.INVENTORY_RESERVED,
+                "Inventory reserved: " + reservationId, correlationId);
             orderRepository.save(order);
 
             // Publish inventory reserved event
@@ -118,15 +129,13 @@ public class CreateOrderUseCase {
                 .orElse(null);
             order.setTransactionId(transactionId);
 
-            order.updateStatus(OrderStatus.PAYMENT_PROCESSING);
+            transition(order, aggregate, OrderStatus.PAYMENT_PROCESSING,
+                "Payment processed: " + paymentId, correlationId);
             orderRepository.save(order);
 
             // Step 5: Confirm order
-            order.updateStatus(OrderStatus.CONFIRMED);
+            transition(order, aggregate, OrderStatus.CONFIRMED, "Order confirmed", correlationId);
             Order savedOrder = orderRepository.save(order);
-
-            // Publish order confirmed event
-            publishOrderCreatedEvent(savedOrder, correlationId);
 
             logger.info("Order created successfully: orderId={}, reservationId={}, paymentId={}",
                        orderId, reservationId, paymentId);
@@ -267,10 +276,18 @@ public class CreateOrderUseCase {
     }
 
     /**
-     * Publishes order created event.
+     * Applies a status transition to both the event-sourced aggregate (validated by the state
+     * machine and appended with optimistic concurrency) and the JPA read/write row.
      */
-    private void publishOrderCreatedEvent(Order order, String correlationId) {
-        List<OrderItem> items = order.getItems().stream()
+    private void transition(Order order, OrderAggregate aggregate, OrderStatus target,
+                            String reason, String correlationId) {
+        aggregate.changeStatus(target, reason, correlationId);
+        orderEvents.save(aggregate);
+        order.updateStatus(target);
+    }
+
+    private List<OrderItem> toEventItems(Order order) {
+        return order.getItems().stream()
             .map(item -> new OrderItem(
                 item.getProductId(),
                 item.getProductName(),
@@ -278,18 +295,6 @@ public class CreateOrderUseCase {
                 item.getUnitPrice()
             ))
             .collect(Collectors.toList());
-
-        OrderCreatedEvent event = new OrderCreatedEvent(
-            order.getId(),
-            order.getCustomerId(),
-            order.getCustomerName(),
-            items,
-            order.getTotalAmount(),
-            correlationId,
-            null
-        );
-
-        eventPublisher.publish(event);
     }
 
     /**

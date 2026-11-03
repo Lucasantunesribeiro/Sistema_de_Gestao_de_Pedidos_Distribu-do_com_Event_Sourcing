@@ -1,7 +1,7 @@
 package com.ordersystem.unified.order.application;
 
-import com.ordersystem.unified.infrastructure.events.EventPublisher;
 import com.ordersystem.unified.inventory.InventoryService;
+import com.ordersystem.unified.order.domain.OrderAggregate;
 import com.ordersystem.unified.order.domain.OrderBusinessRules;
 import com.ordersystem.unified.order.dto.CancelOrderRequest;
 import com.ordersystem.unified.order.dto.OrderResponse;
@@ -10,8 +10,8 @@ import com.ordersystem.unified.order.repository.OrderRepository;
 import com.ordersystem.unified.payment.PaymentService;
 import com.ordersystem.unified.payment.dto.PaymentMethod;
 import com.ordersystem.unified.payment.model.Payment;
-import com.ordersystem.unified.domain.events.OrderCancelledEvent;
 import com.ordersystem.unified.domain.events.OrderStatus;
+import com.ordersystem.unified.shared.exceptions.ConcurrencyException;
 import com.ordersystem.unified.shared.exceptions.InvalidOrderException;
 import com.ordersystem.unified.shared.exceptions.OrderNotFoundException;
 import org.slf4j.Logger;
@@ -57,7 +57,7 @@ public class CancelOrderUseCase {
     private OrderBusinessRules businessRules;
 
     @Autowired
-    private EventPublisher eventPublisher;
+    private OrderEventSourcingRepository orderEvents;
 
     /**
      * Executes order cancellation with compensating transactions.
@@ -89,6 +89,11 @@ public class CancelOrderUseCase {
                 logger.warn("Force cancellation requested for order: {}", orderId);
             }
 
+            // The event-sourced aggregate is the authority for state transitions (even with
+            // forceCancel): validate before running any compensation.
+            OrderAggregate aggregate = orderEvents.loadOrStartFrom(order);
+            aggregate.ensureCanBeCancelled();
+
             // Track compensation results
             boolean inventoryReleased = false;
             boolean paymentRefunded = false;
@@ -112,15 +117,17 @@ public class CancelOrderUseCase {
             order.setCancellationReason(request.getReason());
             Order savedOrder = orderRepository.save(order);
 
-            // Step 6: Publish cancellation event
-            publishCancellationEvent(savedOrder, request, inventoryReleased, paymentRefunded, correlationId);
+            // Step 6: Append OrderCancelledEvent with optimistic concurrency (expected version = loaded version)
+            aggregate.cancel(request.getReason(), request.getCancelledBy(), correlationId,
+                order.getReservationId(), order.getPaymentId(), inventoryReleased, paymentRefunded);
+            orderEvents.save(aggregate);
 
             logger.info("Order cancelled successfully: orderId={}, inventoryReleased={}, paymentRefunded={}",
                        orderId, inventoryReleased, paymentRefunded);
 
             return mapToResponse(savedOrder);
 
-        } catch (OrderNotFoundException | InvalidOrderException e) {
+        } catch (OrderNotFoundException | InvalidOrderException | ConcurrencyException e) {
             logger.error("Order cancellation validation failed: orderId={}", orderId, e);
             throw e;
 
@@ -201,30 +208,6 @@ public class CancelOrderUseCase {
             // In production, this should trigger an alert for manual intervention
             return false;
         }
-    }
-
-    /**
-     * Publishes order cancellation event for event sourcing.
-     */
-    private void publishCancellationEvent(Order order, CancelOrderRequest request,
-                                         boolean inventoryReleased, boolean paymentRefunded,
-                                         String correlationId) {
-        OrderCancelledEvent event = OrderCancelledEvent.builder()
-            .orderId(order.getId())
-            .customerId(order.getCustomerId())
-            .totalAmount(order.getTotalAmount())
-            .cancellationReason(request.getReason())
-            .correlationId(correlationId)
-            .cancelledBy(request.getCancelledBy())
-            .reservationId(order.getReservationId())
-            .paymentId(order.getPaymentId())
-            .inventoryReleased(inventoryReleased)
-            .paymentRefunded(paymentRefunded)
-            .build();
-
-        eventPublisher.publish(event);
-
-        logger.debug("Order cancellation event published: orderId={}", order.getId());
     }
 
     /**

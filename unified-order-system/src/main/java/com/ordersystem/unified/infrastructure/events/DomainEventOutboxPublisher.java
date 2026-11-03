@@ -67,6 +67,12 @@ public class DomainEventOutboxPublisher {
                 message.getMessageProperties().setHeader("aggregateType", event.getAggregateType());
                 message.getMessageProperties().setHeader("eventType", event.getEventType());
                 message.getMessageProperties().setHeader("eventId", event.getId());
+                if (event.getAggregateVersion() != null) {
+                    message.getMessageProperties().setHeader("aggregateVersion", event.getAggregateVersion());
+                }
+                if (event.getCreatedAt() != null) {
+                    message.getMessageProperties().setHeader("occurredAt", event.getCreatedAt().toString());
+                }
                 if (event.getCorrelationId() != null) {
                     message.getMessageProperties().setHeader(
                         MessagingConstants.CORRELATION_ID_HEADER,
