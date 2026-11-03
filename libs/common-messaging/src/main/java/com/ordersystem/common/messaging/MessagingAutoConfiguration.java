@@ -2,6 +2,7 @@ package com.ordersystem.common.messaging;
 
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
@@ -38,6 +39,9 @@ public class MessagingAutoConfiguration {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter);
+        // AUTO: o ack só é enviado quando o listener retorna sem exceção, ou seja, depois do commit
+        // da transação do handler. Exceção -> retry (3x) -> reject sem requeue -> dead-letter da fila.
+        factory.setAcknowledgeMode(AcknowledgeMode.AUTO);
         factory.setDefaultRequeueRejected(false);
         factory.setAdviceChain(RetryInterceptorBuilder.stateless()
                 .maxAttempts(3)

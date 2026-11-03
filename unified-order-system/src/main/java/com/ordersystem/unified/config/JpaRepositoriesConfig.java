@@ -21,6 +21,10 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
+import com.ordersystem.unified.infrastructure.messaging.ProcessedEvent;
+import com.ordersystem.unified.infrastructure.messaging.ProcessedEventRepository;
+import com.ordersystem.unified.query.projection.OrderProjection;
+import com.ordersystem.unified.query.projection.OrderProjectionRepository;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
@@ -43,7 +47,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         ReservationRepository.class,
         ReservationItemRepository.class,
         PaymentRepository.class,
-        DomainEventRepository.class
+        DomainEventRepository.class,
+        ProcessedEventRepository.class,
+        OrderProjectionRepository.class
     }
 )
 @EntityScan(
@@ -56,7 +62,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         Reservation.class,
         ReservationItem.class,
         Payment.class,
-        DomainEventEntity.class
+        DomainEventEntity.class,
+        ProcessedEvent.class,
+        OrderProjection.class
     }
 )
 @EnableTransactionManagement

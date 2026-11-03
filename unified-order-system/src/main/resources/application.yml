@@ -91,6 +91,10 @@ app:
       enabled: ${OUTBOX_ENABLED:false}
       batch-size: ${OUTBOX_BATCH_SIZE:50}
       fixed-delay: ${OUTBOX_FIXED_DELAY:5000}
+    consumers:
+      order-projection:
+        # Consumidor idempotente (order.projection.queue -> order_projection). Requer RabbitMQ.
+        enabled: ${ORDER_PROJECTION_CONSUMER_ENABLED:false}
   
   order:
     max-items-per-order: ${MAX_ITEMS:10}

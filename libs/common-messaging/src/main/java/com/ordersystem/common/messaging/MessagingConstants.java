@@ -36,6 +36,12 @@ public final class MessagingConstants {
     public static final String PAYMENT_AUDIT_QUEUE = "payment.audit.queue";
     public static final String INVENTORY_AUDIT_QUEUE = "inventory.audit.queue";
 
+    /** Fila do consumidor idempotente que mantém a projeção {@code order_projection}. */
+    public static final String ORDER_PROJECTION_QUEUE = "order.projection.queue";
+    /** Dead-letter exchange/fila: mensagens rejeitadas após esgotar o retry. */
+    public static final String ORDER_DLX_EXCHANGE = "order.dlx";
+    public static final String ORDER_PROJECTION_DLQ = "order.projection.dlq";
+
     public static final String ORDER_CREATED_ROUTING_KEY = "order.created";
     public static final String ORDER_CANCELLED_ROUTING_KEY = "order.cancelled";
     public static final String ORDER_STATUS_UPDATED_ROUTING_KEY = "order.status.updated";
