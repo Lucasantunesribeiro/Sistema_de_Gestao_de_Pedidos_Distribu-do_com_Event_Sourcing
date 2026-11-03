@@ -28,4 +28,21 @@ public enum OrderStatus {
     public boolean isSuccessful() {
         return this == CONFIRMED;
     }
+
+    /**
+     * Máquina de estados do pedido: única fonte de verdade para transições válidas.
+     * Usada pelo agregado event-sourced e por {@code OrderBusinessRules}.
+     */
+    public boolean canTransitionTo(OrderStatus target) {
+        if (target == null || isTerminal()) {
+            return false;
+        }
+        return switch (this) {
+            case PENDING -> target == INVENTORY_RESERVED || target == CANCELLED || target == FAILED;
+            case INVENTORY_RESERVED -> target == PAYMENT_PROCESSING || target == CANCELLED || target == FAILED;
+            case PAYMENT_PROCESSING -> target == CONFIRMED || target == FAILED || target == CANCELLED;
+            case CONFIRMED -> target == CANCELLED;
+            case CANCELLED, FAILED -> false;
+        };
+    }
 }

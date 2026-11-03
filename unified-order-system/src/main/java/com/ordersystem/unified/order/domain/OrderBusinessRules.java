@@ -134,26 +134,11 @@ public class OrderBusinessRules {
     public boolean isValidStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
         logger.debug("Validating status transition: {} -> {}", currentStatus, newStatus);
 
-        // Terminal states cannot transition
         if (currentStatus.isTerminal()) {
             logger.warn("Cannot transition from terminal status: {}", currentStatus);
             return false;
         }
-
-        // Define valid transitions
-        return switch (currentStatus) {
-            case PENDING -> newStatus == OrderStatus.INVENTORY_RESERVED ||
-                          newStatus == OrderStatus.CANCELLED ||
-                          newStatus == OrderStatus.FAILED;
-            case INVENTORY_RESERVED -> newStatus == OrderStatus.PAYMENT_PROCESSING ||
-                                     newStatus == OrderStatus.CANCELLED ||
-                                     newStatus == OrderStatus.FAILED;
-            case PAYMENT_PROCESSING -> newStatus == OrderStatus.CONFIRMED ||
-                                      newStatus == OrderStatus.FAILED ||
-                                      newStatus == OrderStatus.CANCELLED;
-            case CONFIRMED -> newStatus == OrderStatus.CANCELLED;
-            case CANCELLED, FAILED -> false; // Terminal states
-        };
+        return currentStatus.canTransitionTo(newStatus);
     }
 
     /**
