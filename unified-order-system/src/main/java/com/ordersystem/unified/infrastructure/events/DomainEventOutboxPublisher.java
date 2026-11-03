@@ -3,7 +3,9 @@ package com.ordersystem.unified.infrastructure.events;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ordersystem.common.messaging.MessagingConstants;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -45,15 +47,30 @@ public class DomainEventOutboxPublisher {
         }
 
         logger.info("Dispatching {} pending domain event(s) to RabbitMQ", pendingEvents.size());
+        // Ordem por stream: se a versão N de um stream falha, as versões seguintes desse stream
+        // ficam para o próximo ciclo. Enviar N+1 antes de N faria o consumidor ver uma lacuna,
+        // esgotar o retry e mandar N+1 para a DLQ, deixando a projeção parada em N.
+        Set<String> blockedStreams = new HashSet<>();
         for (DomainEventEntity event : pendingEvents) {
-            dispatchEvent(event);
+            String stream = event.getAggregateType() + ":" + event.getAggregateId();
+            if (blockedStreams.contains(stream)) {
+                logger.debug("Skipping eventId={} (v{}): earlier event of stream {} failed in this batch",
+                    event.getId(), event.getAggregateVersion(), stream);
+                continue;
+            }
+            if (!dispatchEvent(event)) {
+                blockedStreams.add(stream);
+            }
         }
     }
 
+    /**
+     * @return {@code true} se o evento foi enviado (ou já estava processado); {@code false} se falhou
+     */
     @Transactional
-    public void dispatchEvent(DomainEventEntity event) {
+    public boolean dispatchEvent(DomainEventEntity event) {
         if (event.isProcessed()) {
-            return;
+            return true;
         }
 
         try {
@@ -90,6 +107,7 @@ public class DomainEventOutboxPublisher {
                 event.getEventType(),
                 route.routingKey()
             );
+            return true;
         } catch (Exception exception) {
             logger.error(
                 "Failed to dispatch domain event to broker: eventId={}, eventType={}",
@@ -97,6 +115,7 @@ public class DomainEventOutboxPublisher {
                 event.getEventType(),
                 exception
             );
+            return false;
         }
     }
 

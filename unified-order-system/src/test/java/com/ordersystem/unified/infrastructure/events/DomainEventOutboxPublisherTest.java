@@ -111,4 +111,51 @@ class DomainEventOutboxPublisherTest {
         assertThat((Object) sent.getHeader("aggregateType")).isEqualTo("Order");
         assertThat((Object) sent.getHeader("occurredAt")).isEqualTo("2026-01-02T03:04:05");
     }
+
+    @Test
+    void failedEventHoldsBackLaterVersionsOfTheSameStreamButNotOtherStreams() {
+        domainEventOutboxPublisher = new DomainEventOutboxPublisher(
+            domainEventRepository, rabbitTemplate, objectMapper, new OutboxMessagingProperties());
+
+        DomainEventEntity orderAv1 = orderEvent("order-A", 1, "OrderCreatedEvent");
+        DomainEventEntity orderAv2 = orderEvent("order-A", 2, "OrderStatusUpdatedEvent");
+        DomainEventEntity orderBv1 = orderEvent("order-B", 1, "OrderCreatedEvent");
+
+        when(domainEventRepository.findPendingForDispatch(any(Pageable.class)))
+            .thenReturn(List.of(orderAv1, orderBv1, orderAv2));
+        when(domainEventRepository.save(any(DomainEventEntity.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        // Broker falha só no envio de order-A v1
+        doAnswer(invocation -> {
+            MessagePostProcessor processor = invocation.getArgument(3);
+            Message message = processor.postProcessMessage(new Message(new byte[0], new MessageProperties()));
+            if (orderAv1.getId().equals(message.getMessageProperties().getMessageId())) {
+                throw new org.springframework.amqp.AmqpConnectException(new java.io.IOException("broker down"));
+            }
+            return null;
+        }).when(rabbitTemplate).convertAndSend(
+            any(String.class), any(String.class), any(Object.class), any(MessagePostProcessor.class));
+
+        domainEventOutboxPublisher.publishPendingEvents();
+
+        assertThat(orderAv1.isProcessed()).isFalse();
+        // v2 não pode sair antes de v1: o consumidor veria uma lacuna
+        assertThat(orderAv2.isProcessed()).isFalse();
+        // outro stream segue normalmente
+        assertThat(orderBv1.isProcessed()).isTrue();
+        verify(rabbitTemplate, org.mockito.Mockito.times(2)).convertAndSend(
+            any(String.class), any(String.class), any(Object.class), any(MessagePostProcessor.class));
+    }
+
+    private static DomainEventEntity orderEvent(String orderId, long version, String type) {
+        DomainEventEntity event = DomainEventEntity.builder()
+            .aggregateId(orderId)
+            .aggregateType("Order")
+            .aggregateVersion(version)
+            .eventType(type)
+            .eventData("{\"orderId\":\"" + orderId + "\"}")
+            .build();
+        event.setCreatedAt(LocalDateTime.of(2026, 1, 1, 0, 0).plusSeconds(version));
+        return event;
+    }
 }
