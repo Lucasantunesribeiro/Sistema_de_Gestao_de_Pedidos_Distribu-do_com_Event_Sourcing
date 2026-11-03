@@ -1,0 +1,66 @@
+# Blueprint do Render (plano free) para a API Spring Boot.
+# Banco: PostgreSQL externo gratuito (Neon). RabbitMQ (CloudAMQP) e Redis são opcionais:
+# sem eles o outbox/consumidor ficam desligados e o cache é em memória.
+# Passo a passo e limitações: seção "Deploy gratuito" do README.
+services:
+  - type: web
+    name: orderflow-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./unified-order-system/Dockerfile
+    dockerContext: .
+    # O free tem 512 MB de RAM: sobrescreve o -Xmx512m do Dockerfile (heap + metaspace + threads
+    # estourariam o limite).
+    dockerCommand: java -Xms128m -Xmx300m -XX:MaxMetaspaceSize=128m -Xss512k -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -jar app.jar
+    healthCheckPath: /actuator/health
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production,docker
+      # Neon: jdbc:postgresql://<host>.neon.tech/<db>?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: SPRING_FLYWAY_ENABLED
+        value: "true"
+      - key: HIKARI_MAX_POOL_SIZE
+        value: "5"
+      - key: HIKARI_MIN_IDLE
+        value: "1"
+      - key: SECURITY_SECRET
+        generateValue: true
+      - key: SECURITY_ENFORCE_AUTH
+        value: "true"
+      # URL do frontend publicado (ex.: https://<projeto>.vercel.app)
+      - key: SECURITY_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: SECURITY_BOOTSTRAP_ADMIN_ENABLED
+        value: "true"
+      - key: SECURITY_BOOTSTRAP_ADMIN_USERNAME
+        value: admin
+      - key: SECURITY_BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: SECURITY_BOOTSTRAP_ADMIN_EMAIL
+        value: admin@demo.orderflow
+      # Sem Redis no plano gratuito: cache em memória
+      - key: REDIS_ENABLED
+        value: "false"
+      - key: CACHE_TYPE
+        value: simple
+      # Mensageria: "false" sem broker. Com CloudAMQP, troque para "true" e adicione no painel
+      # SPRING_RABBITMQ_ADDRESSES=amqps://<usuario>:<senha>@<host>/<vhost> (não declarada aqui
+      # porque um valor vazio quebraria a configuração do RabbitMQ).
+      - key: OUTBOX_ENABLED
+        value: "false"
+      - key: ORDER_PROJECTION_CONSUMER_ENABLED
+        value: "false"
+      # Pagamento: cliente simulado embutido (não precisa do WireMock)
+      - key: PAYMENT_GATEWAY_ENABLED
+        value: "false"
+      - key: TRACING_ENABLED
+        value: "false"
