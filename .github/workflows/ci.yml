@@ -6,14 +6,18 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   backend-verify:
     name: Backend Verify
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -24,8 +28,9 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Install active shared libraries
-        run: mvn -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am -DskipTests install -q
+      # Bibliotecas compartilhadas: compila, roda os testes delas e instala no repositório local
+      - name: Build, test and install shared libraries
+        run: mvn -B -pl libs/common-events,libs/common-security,libs/common-messaging,libs/common-observability -am install
 
       - name: Run backend verify
         run: mvn -f unified-order-system/pom.xml clean verify -B
@@ -33,6 +38,7 @@ jobs:
   frontend-unit:
     name: Frontend Unit And Build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +64,7 @@ jobs:
   frontend-e2e:
     name: Frontend E2E
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [backend-verify, frontend-unit]
 
     steps:
