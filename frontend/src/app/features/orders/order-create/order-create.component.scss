@@ -12,7 +12,7 @@
 }
 
 .breadcrumb-link {
-  color: #3b82f6;
+  color: #2563eb;
   &:hover { text-decoration: underline; }
 }
 
@@ -43,6 +43,9 @@
   gap: 1rem;
   margin-bottom: 1rem;
 
+  // Permite que os campos encolham dentro da coluna (evita overflow em 390px)
+  > * { min-width: 0; }
+
   &--narrow {
     grid-template-columns: 120px 1fr auto;
     align-items: end;
@@ -71,7 +74,7 @@
 
 .items-hint {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-bottom: 1rem;
 }
 
@@ -164,7 +167,7 @@
     grid-template-columns: 1fr;
 
     &--narrow {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
   }
 

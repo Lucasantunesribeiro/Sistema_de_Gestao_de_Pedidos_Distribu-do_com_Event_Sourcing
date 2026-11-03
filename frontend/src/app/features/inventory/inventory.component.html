@@ -61,7 +61,7 @@
 
     <!-- Empty -->
     <div class="empty-state" *ngIf="state === 'empty' || filteredItems.length === 0">
-      <div class="empty-icon">&#128230;</div>
+      <svg class="empty-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10" /></svg>
       <div class="empty-title">
         {{ state === 'empty' ? 'No inventory data available' : 'No items match the filter' }}
       </div>

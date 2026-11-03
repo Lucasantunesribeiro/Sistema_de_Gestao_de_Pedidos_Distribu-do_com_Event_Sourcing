@@ -23,6 +23,14 @@ a {
   text-decoration: none;
 }
 
+// Foco visível consistente para navegação por teclado
+a:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
@@ -134,8 +142,10 @@ img {
 }
 
 .form-control {
+  width: 100%;
   padding: 0.625rem 0.875rem;
-  border: 1px solid #d1d5db;
+  // borda com contraste >= 3:1 (WCAG 1.4.11)
+  border: 1px solid #848e9f;
   border-radius: 0.5rem;
   font-size: 0.9rem;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -145,7 +155,7 @@ img {
   &:focus {
     outline: none;
     border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
   }
 
   &.error {
@@ -226,9 +236,18 @@ tbody td {
   justify-content: center;
   padding: 4rem 2rem;
   text-align: center;
-  color: #94a3b8;
+  color: #64748b;
 
-  .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+  .empty-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    fill: none;
+    stroke: #94a3b8;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .empty-title { font-size: 1.125rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem; }
   .empty-sub { font-size: 0.875rem; }
 }
@@ -292,6 +311,51 @@ tbody td {
 
 .stat-sub {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.25rem;
+}
+
+// Acessibilidade: link "pular para o conteúdo" e texto só para leitores de tela
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100px;
+  z-index: 300;
+  background: #1e3a5f;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  &:focus { top: 0.75rem; }
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+// Ícone de menu (três barras) usado na sidebar e na topbar; cor via currentColor
+.hamburger {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  position: relative;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: currentColor;
+    left: 0;
+  }
+  &::before { top: -5px; }
+  &::after  { top: 5px; }
 }
