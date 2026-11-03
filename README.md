@@ -199,16 +199,55 @@ E2E: `tests/e2e` (Playwright) roda no CI contra a stack do compose.
 
 `.github/workflows/ci.yml` roda em `pull_request` e `push` para `main`: build e testes das libs e
 do backend (`mvn verify`), testes e build do frontend, e smoke E2E com Playwright sobre o compose.
-`deploy-ec2.yml` faz deploy por SSH após CI verde de um **push** em `main` (ou manualmente); não
-roda para pull requests.
+`deploy-ec2.yml` é **legado e só manual** (`workflow_dispatch`): o deploy automático para EC2
+falhava desde março e não há intenção de pagar AWS/Azure/Oracle. Não roda em push nem em pull
+request; sem os secrets `EC2_*` falha no passo de SSH.
 
-**Deploy EC2 é legado.** O workflow foi mantido como estava (só ganhou a trava contra execuções
-vindas de pull request), mas não há intenção de manter infraestrutura paga (AWS, Azure, Oracle).
-Sem os secrets `EC2_*` configurados ele falha no passo de SSH. Alternativa gratuita sugerida, não
-implementada: rodar a stack localmente com `docker compose up`; para uma demo pública, publicar só
-o frontend estático (GitHub Pages) e expor a API de uma máquina própria via Cloudflare Tunnel
-(camada gratuita), sem custo de nuvem. Qualquer opção de hospedagem gratuita tem limites de
-memória/tempo que precisam ser avaliados para PostgreSQL + RabbitMQ + Redis.
+## Deploy gratuito (Render + Neon + Vercel)
+
+Configuração versionada, sem custo e sem cartão nos planos usados:
+
+| Peça | Onde | Arquivo |
+|---|---|---|
+| API Spring Boot (Docker) | Render, web service free | `render.yaml` |
+| PostgreSQL | Neon, plano free | — (só `DATABASE_URL`) |
+| Frontend Angular | Vercel, plano Hobby | `frontend/vercel.json` |
+| RabbitMQ (opcional) | CloudAMQP, plano Little Lemur | — (só `SPRING_RABBITMQ_ADDRESSES`) |
+
+Redis fica de fora (cache em memória, `CACHE_TYPE=simple`) e o gateway de pagamento usa o cliente
+simulado embutido (`PAYMENT_GATEWAY_ENABLED=false`), então o WireMock não é necessário.
+
+Passo a passo (feito pelo dono do repositório, com as próprias contas):
+
+1. **Neon**: crie um projeto e um banco. Anote host, banco, usuário e senha. A URL para a aplicação é
+   JDBC: `jdbc:postgresql://<host>.neon.tech/<banco>?sslmode=require`. O Flyway cria o schema no
+   primeiro boot.
+2. **Render**: *New > Blueprint*, selecione este repositório (branch `main`); o `render.yaml` cria o
+   serviço `orderflow-api`. Preencha os valores pedidos: `DATABASE_URL`, `DB_USERNAME`,
+   `DB_PASSWORD`, `SECURITY_BOOTSTRAP_ADMIN_PASSWORD` e `SECURITY_CORS_ALLOWED_ORIGINS` (a URL do
+   Vercel). `SECURITY_SECRET` é gerado pelo Render. Teste `https://<serviço>.onrender.com/actuator/health`.
+3. **Vercel**: no projeto (existente ou novo), *Root Directory* = `frontend`. O `vercel.json` define
+   build (`npm run build:prod`), saída (`dist/frontend/browser`), fallback de SPA e o proxy de `/api` e
+   `/ws` para `https://orderflow-api.onrender.com`. Se o Render der outro nome ao serviço, ajuste as
+   duas URLs em `frontend/vercel.json`.
+4. **Opcional — mensageria**: crie uma instância CloudAMQP, adicione `SPRING_RABBITMQ_ADDRESSES`
+   (`amqps://usuario:senha@host/vhost`) no Render e troque `OUTBOX_ENABLED` e
+   `ORDER_PROJECTION_CONSUMER_ENABLED` para `true`.
+
+O que foi verificado localmente: a aplicação sobe com exatamente essas variáveis (perfil
+`production,docker`, sem Redis e sem RabbitMQ, JVM com `-Xmx300m`, ~315 MB de RSS), aplica as
+migrations, responde `UP` em `/actuator/health`, autentica o admin e cria pedidos. Nenhum deploy real
+foi feito a partir deste repositório.
+
+Limitações do plano gratuito:
+
+- O Render free hiberna após ~15 min sem tráfego; a primeira requisição depois disso leva perto de
+  1 minuto (a inicialização local levou ~50 s).
+- O proxy do Vercel não encaminha WebSocket; o indicador "Live" pode ficar "Offline" e as
+  notificações em tempo real não chegam. O restante da interface funciona por HTTP.
+- Neon free tem limite de armazenamento e de conexões; por isso `HIKARI_MAX_POOL_SIZE=5`.
+- Sem RabbitMQ, eventos ficam só no event store (`processed = false`) e a projeção
+  `order_projection` não é atualizada pelo consumidor; o rebuild por replay continua disponível.
 
 ## Limitações conhecidas
 
