@@ -63,7 +63,8 @@ jobs:
 
   frontend-e2e:
     name: Frontend E2E
-    runs-on: ubuntu-latest
+    # Playwright desta versão não suporta chromium no ubuntu-latest atual (26.04)
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [backend-verify, frontend-unit]
 
