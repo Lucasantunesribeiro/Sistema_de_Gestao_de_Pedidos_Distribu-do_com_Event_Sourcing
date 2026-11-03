@@ -1,10 +1,11 @@
-name: Deploy to EC2
+name: Deploy to EC2 (legado, manual)
 
+# Legado: o deploy automático para EC2 falhava desde março e o dono não quer manter infraestrutura
+# paga. Fica apenas manual (workflow_dispatch); nunca roda em push nem em pull_request.
+# O contexto secrets não é permitido em environment.url: era isso que fazia cada push gerar uma
+# execução com falha ("workflow file issue", 0 jobs). A URL foi removida.
+# Deploy gratuito atual: render.yaml (API) + frontend/vercel.json (ver README, "Deploy gratuito").
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -18,12 +19,9 @@ jobs:
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
-    # Só implanta após CI verde de um push na main (nunca a partir de execuções de pull_request)
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
 
     environment:
       name: production
-      url: http://${{ secrets.EC2_HOST }}:4200
 
     steps:
       - name: Deploy via SSH
