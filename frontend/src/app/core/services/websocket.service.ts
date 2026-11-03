@@ -1,5 +1,5 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
-import { Subject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { environment } from '../../../environments/environment';
@@ -14,6 +14,8 @@ export class WebSocketService implements OnDestroy {
   private connected = false;
   private readonly notificationService = inject(NotificationService);
 
+  /** Estado real da conexão STOMP (usado pelo indicador "Live" da topbar). */
+  readonly connected$ = new BehaviorSubject<boolean>(false);
   readonly orderEvents$ = new Subject<WebSocketOrderEvent>();
   readonly inventoryEvents$ = new Subject<WebSocketInventoryEvent>();
   readonly paymentEvents$ = new Subject<WebSocketPaymentEvent>();
@@ -27,12 +29,17 @@ export class WebSocketService implements OnDestroy {
       reconnectDelay: 5000,
       onConnect: () => {
         this.connected = true;
+        this.connected$.next(true);
         console.log('WebSocket connected');
         this.subscribeToTopics();
       },
       onDisconnect: () => {
         this.connected = false;
+        this.connected$.next(false);
         console.log('WebSocket disconnected');
+      },
+      onWebSocketClose: () => {
+        this.connected$.next(false);
       },
       onStompError: (frame) => {
         console.error('STOMP error:', frame);
@@ -79,11 +86,13 @@ export class WebSocketService implements OnDestroy {
     if (this.client?.active) {
       this.client.deactivate();
       this.connected = false;
+      this.connected$.next(false);
     }
   }
 
   ngOnDestroy(): void {
     this.disconnect();
+    this.connected$.complete();
     this.orderEvents$.complete();
     this.inventoryEvents$.complete();
     this.paymentEvents$.complete();

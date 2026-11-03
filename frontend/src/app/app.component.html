@@ -1,47 +1,39 @@
 <ng-container *ngIf="authService.isAuthenticated(); else guestLayout">
-<div class="app-shell" [class.sidebar-collapsed]="!sidebarOpen">
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="app-shell" [class.sidebar-collapsed]="!sidebarOpen" [class.is-mobile]="isMobile">
   <!-- Sidebar -->
-  <aside class="sidebar" [class.open]="sidebarOpen">
+  <aside id="app-sidebar" class="sidebar" [class.open]="sidebarOpen" aria-label="Sidebar">
     <div class="sidebar-header">
       <div class="logo" *ngIf="sidebarOpen">
-        <span class="logo-icon">OF</span>
+        <span class="logo-icon" aria-hidden="true">OF</span>
         <span class="logo-text">OrderFlow</span>
       </div>
-      <button class="sidebar-toggle" (click)="toggleSidebar()" aria-label="Toggle sidebar">
-        <span class="hamburger"></span>
+      <button
+        class="sidebar-toggle"
+        type="button"
+        (click)="toggleSidebar()"
+        [attr.aria-label]="sidebarOpen ? 'Collapse navigation' : 'Expand navigation'"
+        [attr.aria-expanded]="sidebarOpen"
+        aria-controls="app-sidebar"
+      >
+        <span class="hamburger" aria-hidden="true"></span>
       </button>
     </div>
 
-    <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+    <nav class="sidebar-nav" aria-label="Main navigation">
       <a
-        routerLink="/dashboard"
+        *ngFor="let item of navItems"
+        [routerLink]="item.path"
         routerLinkActive="active"
+        #rla="routerLinkActive"
+        [attr.aria-current]="rla.isActive ? 'page' : null"
         class="nav-item"
-        [title]="!sidebarOpen ? 'Dashboard' : ''"
+        [title]="!sidebarOpen ? item.label : ''"
       >
-        <span class="nav-icon" aria-hidden="true">&#9781;</span>
-        <span class="nav-label" *ngIf="sidebarOpen">Dashboard</span>
-      </a>
-
-      <a
-        routerLink="/orders"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: false }"
-        class="nav-item"
-        [title]="!sidebarOpen ? 'Orders' : ''"
-      >
-        <span class="nav-icon" aria-hidden="true">&#128203;</span>
-        <span class="nav-label" *ngIf="sidebarOpen">Orders</span>
-      </a>
-
-      <a
-        routerLink="/inventory"
-        routerLinkActive="active"
-        class="nav-item"
-        [title]="!sidebarOpen ? 'Inventory' : ''"
-      >
-        <span class="nav-icon" aria-hidden="true">&#128230;</span>
-        <span class="nav-label" *ngIf="sidebarOpen">Inventory</span>
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path [attr.d]="item.icon" />
+        </svg>
+        <span class="nav-label" [class.visually-hidden]="!sidebarOpen">{{ item.label }}</span>
       </a>
     </nav>
 
@@ -50,24 +42,50 @@
     </div>
   </aside>
 
+  <!-- Backdrop (mobile only, while the drawer is open) -->
+  <div
+    class="sidebar-backdrop"
+    *ngIf="isMobile && sidebarOpen"
+    (click)="closeSidebar()"
+    aria-hidden="true"
+  ></div>
+
   <!-- Main area -->
   <div class="main-area">
     <header class="topbar">
-      <h1 class="page-title">Order Management System</h1>
+      <div class="topbar-left">
+        <button
+          *ngIf="isMobile"
+          class="topbar-menu"
+          type="button"
+          (click)="toggleSidebar()"
+          aria-label="Open navigation"
+          [attr.aria-expanded]="sidebarOpen"
+          aria-controls="app-sidebar"
+        >
+          <span class="hamburger" aria-hidden="true"></span>
+        </button>
+        <span class="page-title">Order Management System</span>
+      </div>
       <div class="topbar-right">
         <div class="current-user">
           <span class="current-user__name">{{ authService.getCurrentUser()?.username }}</span>
           <span class="current-user__roles">{{ authService.getCurrentUser()?.roles?.join(', ') }}</span>
         </div>
-        <span class="ws-indicator" title="WebSocket connected">
-          <span class="ws-dot"></span>
-          Live
+        <span
+          class="ws-indicator"
+          [class.ws-indicator--offline]="!(wsConnected$ | async)"
+          role="status"
+          [attr.title]="(wsConnected$ | async) ? 'Real-time updates connected' : 'Real-time updates disconnected'"
+        >
+          <span class="ws-dot" aria-hidden="true"></span>
+          {{ (wsConnected$ | async) ? 'Live' : 'Offline' }}
         </span>
         <button class="btn btn-secondary btn-sm" type="button" (click)="logout()">Logout</button>
       </div>
     </header>
 
-    <main class="content" role="main">
+    <main id="main-content" class="content" tabindex="-1">
       <router-outlet></router-outlet>
     </main>
   </div>
