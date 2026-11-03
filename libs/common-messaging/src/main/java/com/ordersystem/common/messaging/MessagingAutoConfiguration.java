@@ -1,7 +1,9 @@
 package com.ordersystem.common.messaging;
 
+import java.util.Map;
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
@@ -15,9 +17,12 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.retry.policy.SimpleRetryPolicy;
 
 @AutoConfiguration(before = RabbitAutoConfiguration.class)
 public class MessagingAutoConfiguration {
+
+    public static final int LISTENER_MAX_ATTEMPTS = 3;
 
     @Bean
     public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
@@ -44,11 +49,24 @@ public class MessagingAutoConfiguration {
         factory.setAcknowledgeMode(AcknowledgeMode.AUTO);
         factory.setDefaultRequeueRejected(false);
         factory.setAdviceChain(RetryInterceptorBuilder.stateless()
-                .maxAttempts(3)
+                .retryPolicy(listenerRetryPolicy())
                 .backOffOptions(1000, 2.0, 10000)
                 .recoverer(new RejectAndDontRequeueRecoverer())
                 .build());
         return factory;
+    }
+
+    /**
+     * Até {@value #LISTENER_MAX_ATTEMPTS} tentativas por mensagem, exceto quando o listener lança
+     * {@link AmqpRejectAndDontRequeueException} (também como causa): mensagem malformada não melhora
+     * com retry e vai direto para a dead-letter da fila.
+     */
+    public static SimpleRetryPolicy listenerRetryPolicy() {
+        return new SimpleRetryPolicy(
+                LISTENER_MAX_ATTEMPTS,
+                Map.of(AmqpRejectAndDontRequeueException.class, false),
+                true,
+                true);
     }
 
     private Message applyCorrelationId(Message message) {
